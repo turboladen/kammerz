@@ -84,6 +84,16 @@ pub fn run() {
             commands::shots::get_lenses_for_shot,
             commands::shots::suggest_next_frame,
             commands::shots::count_shots_for_roll,
+            // Development
+            commands::development::get_lab_dev_for_roll,
+            commands::development::create_lab_dev,
+            commands::development::update_lab_dev,
+            commands::development::delete_lab_dev,
+            commands::development::get_self_dev_for_roll,
+            commands::development::create_self_dev,
+            commands::development::update_self_dev,
+            commands::development::delete_self_dev,
+            commands::development::list_dev_stages,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

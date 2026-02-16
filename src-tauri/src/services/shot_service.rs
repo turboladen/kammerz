@@ -48,14 +48,14 @@ impl ShotService {
     }
 
     pub async fn create(
-        db: &DatabaseConnection,
+        db: &impl ConnectionTrait,
         model: shot::ActiveModel,
     ) -> Result<shot::Model, DbErr> {
         model.insert(db).await
     }
 
     pub async fn update(
-        db: &DatabaseConnection,
+        db: &impl ConnectionTrait,
         model: shot::ActiveModel,
     ) -> Result<shot::Model, DbErr> {
         model.update(db).await
@@ -80,7 +80,7 @@ impl ShotService {
     }
 
     pub async fn set_lenses_for_shot(
-        db: &DatabaseConnection,
+        db: &impl ConnectionTrait,
         shot_id: i32,
         lens_ids: Vec<i32>,
     ) -> Result<(), DbErr> {
@@ -90,13 +90,16 @@ impl ShotService {
             .exec(db)
             .await?;
 
-        // Insert new
-        for lens_id in lens_ids {
-            let model = shot_lens::ActiveModel {
-                shot_id: Set(shot_id),
-                lens_id: Set(lens_id),
-            };
-            model.insert(db).await?;
+        // Bulk insert new
+        if !lens_ids.is_empty() {
+            let models: Vec<shot_lens::ActiveModel> = lens_ids
+                .into_iter()
+                .map(|lens_id| shot_lens::ActiveModel {
+                    shot_id: Set(shot_id),
+                    lens_id: Set(lens_id),
+                })
+                .collect();
+            ShotLens::insert_many(models).exec(db).await?;
         }
         Ok(())
     }

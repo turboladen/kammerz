@@ -1,10 +1,21 @@
-use sea_orm::Set;
+use sea_orm::{DbErr, Set, TransactionTrait};
 use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::shot;
 use crate::services::shot_service::ShotService;
 use crate::AppState;
+
+/// Set ActiveModel fields from a DTO only when the DTO field is Some.
+macro_rules! set_if_some {
+    ($model:expr, $data:expr, $($field:ident),+ $(,)?) => {
+        $(
+            if $data.$field.is_some() {
+                $model.$field = Set($data.$field);
+            }
+        )+
+    };
+}
 
 // --- DTOs ---
 
@@ -69,38 +80,44 @@ pub async fn create_shot(
     data: CreateShotDto,
 ) -> Result<i32, String> {
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    let model = shot::ActiveModel {
-        roll_id: Set(data.roll_id),
-        frame_number: Set(data.frame_number),
-        aperture: Set(data.aperture),
-        shutter_speed: Set(data.shutter_speed),
-        date: Set(data.date),
-        date_fuzzy: Set(data.date_fuzzy),
-        location: Set(data.location),
-        gps_lat: Set(data.gps_lat),
-        gps_lon: Set(data.gps_lon),
-        notes: Set(data.notes),
-        created_at: Set(now.clone()),
-        updated_at: Set(now),
-        ..Default::default()
-    };
-    let result = ShotService::create(&state.db, model).await.map_err(|e| {
-        log::error!("Failed to create shot: {e}");
-        format!("Could not create shot: {e}")
-    })?;
 
-    if let Some(lens_ids) = data.lens_ids {
-        if !lens_ids.is_empty() {
-            ShotService::set_lenses_for_shot(&state.db, result.id, lens_ids)
-                .await
-                .map_err(|e| {
-                    log::error!("Failed to set lenses for shot {}: {e}", result.id);
-                    format!("Could not set lenses: {e}")
-                })?;
-        }
-    }
+    let result_id = state
+        .db
+        .transaction::<_, i32, DbErr>(|txn| {
+            Box::pin(async move {
+                let model = shot::ActiveModel {
+                    roll_id: Set(data.roll_id),
+                    frame_number: Set(data.frame_number),
+                    aperture: Set(data.aperture),
+                    shutter_speed: Set(data.shutter_speed),
+                    date: Set(data.date),
+                    date_fuzzy: Set(data.date_fuzzy),
+                    location: Set(data.location),
+                    gps_lat: Set(data.gps_lat),
+                    gps_lon: Set(data.gps_lon),
+                    notes: Set(data.notes),
+                    created_at: Set(now.clone()),
+                    updated_at: Set(now),
+                    ..Default::default()
+                };
+                let result = ShotService::create(txn, model).await?;
 
-    Ok(result.id)
+                if let Some(lens_ids) = data.lens_ids {
+                    if !lens_ids.is_empty() {
+                        ShotService::set_lenses_for_shot(txn, result.id, lens_ids).await?;
+                    }
+                }
+
+                Ok(result.id)
+            })
+        })
+        .await
+        .map_err(|e| {
+            log::error!("Failed to create shot: {e}");
+            format!("Could not create shot: {e}")
+        })?;
+
+    Ok(result_id)
 }
 
 #[tauri::command]
@@ -115,32 +132,36 @@ pub async fn update_shot(
         .ok_or_else(|| format!("Shot {id} not found"))?;
 
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    let mut model: shot::ActiveModel = existing.into();
 
-    if let Some(v) = data.frame_number { model.frame_number = Set(v); }
-    if data.aperture.is_some() { model.aperture = Set(data.aperture); }
-    if data.shutter_speed.is_some() { model.shutter_speed = Set(data.shutter_speed); }
-    if data.date.is_some() { model.date = Set(data.date); }
-    if data.date_fuzzy.is_some() { model.date_fuzzy = Set(data.date_fuzzy); }
-    if data.location.is_some() { model.location = Set(data.location); }
-    if data.gps_lat.is_some() { model.gps_lat = Set(data.gps_lat); }
-    if data.gps_lon.is_some() { model.gps_lon = Set(data.gps_lon); }
-    if data.notes.is_some() { model.notes = Set(data.notes); }
-    model.updated_at = Set(now);
+    state
+        .db
+        .transaction::<_, (), DbErr>(|txn| {
+            Box::pin(async move {
+                let mut model: shot::ActiveModel = existing.into();
 
-    ShotService::update(&state.db, model).await.map_err(|e| {
-        log::error!("Failed to update shot {id}: {e}");
-        format!("Could not update shot: {e}")
-    })?;
+                if let Some(v) = data.frame_number {
+                    model.frame_number = Set(v);
+                }
+                set_if_some!(
+                    model, data, aperture, shutter_speed, date, date_fuzzy, location, gps_lat,
+                    gps_lon, notes
+                );
+                model.updated_at = Set(now);
 
-    if let Some(lens_ids) = data.lens_ids {
-        ShotService::set_lenses_for_shot(&state.db, id, lens_ids)
-            .await
-            .map_err(|e| {
-                log::error!("Failed to set lenses for shot {id}: {e}");
-                format!("Could not set lenses: {e}")
-            })?;
-    }
+                ShotService::update(txn, model).await?;
+
+                if let Some(lens_ids) = data.lens_ids {
+                    ShotService::set_lenses_for_shot(txn, id, lens_ids).await?;
+                }
+
+                Ok(())
+            })
+        })
+        .await
+        .map_err(|e| {
+            log::error!("Failed to update shot {id}: {e}");
+            format!("Could not update shot: {e}")
+        })?;
 
     Ok(())
 }

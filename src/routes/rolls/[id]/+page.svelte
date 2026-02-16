@@ -9,12 +9,15 @@
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
+	import DevelopmentSection from '$lib/components/rolls/DevelopmentSection.svelte';
 	import { getRoll, updateRoll, deleteRoll } from '$lib/api/rolls';
 	import { listCameras, getLensesForCamera } from '$lib/api/cameras';
 	import { listLenses } from '$lib/api/lenses';
 	import { listShotsForRoll, createShot, updateShot, deleteShot, getLensesForShot, suggestNextFrame } from '$lib/api/shots';
+	import { getLabDevForRoll, getSelfDevForRoll, listDevStages } from '$lib/api/development';
+	import { listLabs } from '$lib/api/labs';
 	import { lensDisplayName } from '$lib/utils/lens';
-	import type { RollWithDetails, Camera, Lens, Shot, RollStatus } from '$lib/types';
+	import type { RollWithDetails, Camera, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus } from '$lib/types';
 
 	const id = $derived(Number(page.params.id));
 
@@ -44,6 +47,13 @@
 	let shotLensIds: number[] = $state([]);
 	let shotError = $state('');
 
+	// Development state (shared with DevelopmentSection component)
+	let labs: Lab[] = $state([]);
+	let labDev: DevelopmentLab | null = $state(null);
+	let selfDev: DevelopmentSelf | null = $state(null);
+	let devStages: DevStage[] = $state([]);
+	let devAutoPrompt: 'lab' | 'self' | null = $state(null);
+
 	const statusProgression: RollStatus[] = [
 		'loaded', 'shooting', 'shot', 'at-lab', 'developing', 'developed', 'scanned', 'archived'
 	];
@@ -69,17 +79,30 @@
 
 	async function load() {
 		try {
-			const [r, cams, s, lenses] = await Promise.all([
+			const [r, cams, s, lenses, labsList, ld, sd] = await Promise.all([
 				getRoll(id),
 				listCameras(),
 				listShotsForRoll(id),
-				listLenses()
+				listLenses(),
+				listLabs(),
+				getLabDevForRoll(id),
+				getSelfDevForRoll(id)
 			]);
 			roll = r;
 			cameras = cams;
 			shots = s;
 			allLenses = lenses;
+			labs = labsList;
+			labDev = ld;
+			selfDev = sd;
 			assignCameraId = roll?.camera_id?.toString() ?? '';
+
+			// Load dev stages if self-development exists
+			if (sd) {
+				devStages = await listDevStages(sd.id);
+			} else {
+				devStages = [];
+			}
 
 			// Load camera-lens associations if camera is set
 			if (roll?.camera_id) {
@@ -212,6 +235,12 @@
 		try {
 			await updateRoll(id, { status });
 			await load();
+			// Auto-prompt development dialogs
+			if (status === 'at-lab' && !labDev && !selfDev) {
+				devAutoPrompt = 'lab';
+			} else if (status === 'developing' && !selfDev && !labDev) {
+				devAutoPrompt = 'self';
+			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -337,6 +366,17 @@
 				{/each}
 			</div>
 		</div>
+
+		<!-- Development -->
+		<DevelopmentSection
+			rollId={id}
+			{labs}
+			bind:labDev
+			bind:selfDev
+			bind:devStages
+			bind:autoPrompt={devAutoPrompt}
+			onchange={load}
+		/>
 
 		<!-- Shots -->
 		<div>

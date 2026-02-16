@@ -75,35 +75,42 @@ Replaced `tauri-plugin-sql` (JS calls raw SQL directly) with SeaORM (JS → Taur
 - [ ] Film stock format-aware ordering still works on New Roll page
 - [ ] Dashboard stats and "needs attention" alerts still work
 
-## Phase 4: Shot Entry & Quick Entry 🔲
+## Phase 4: Shot Entry & Quick Entry ✅
 
 Per-frame metadata logging and a streamlined "notes to data" workflow.
 
-- [ ] **Shot entry UI** on roll detail page — add/edit/delete individual frames
-  - Frame number, aperture, shutter speed, date, location, GPS, notes
-  - Lens selection per shot (uses `shot_lenses` junction table)
-  - Inline list of shots on the roll detail page
-- [ ] **Quick Entry page** — bulk entry mode for transferring handwritten notes into structured shot data
-  - Minimal UI optimized for speed: frame number + key fields, tab through
-  - Auto-advance to next frame after save
-- [ ] Frame count validation (warn if shots exceed roll's frame count)
-- [ ] Camera-lens associations — UI for linking which lenses are compatible with which cameras
-  - Uses existing `camera_lenses` junction table (schema already in place)
-  - Filter lens dropdown on shot entry to lenses linked to the roll's camera
+- [x] **Shot service** (`src-tauri/src/services/shot_service.rs`) — CRUD, shot-lens junction, frame suggestion
+- [x] **Shot commands** (`src-tauri/src/commands/shots.rs`) — 8 Tauri commands with DTOs
+- [x] **Frontend API** (`src/lib/api/shots.ts`) — invoke wrappers for all shot commands
+- [x] **Shared lens utility** (`src/lib/utils/lens.ts`) — `lensDisplayName()` used across pages
+- [x] **Camera-lens associations** — UI on camera detail page for linking/unlinking lenses
+- [x] **Shot entry UI** on roll detail page — add/edit/delete individual frames
+  - Frame number, aperture, shutter speed, date, location, notes
+  - Lens selection per shot via checkboxes (camera-linked lenses first)
+  - Frame progress bar with overcount warning
+- [x] **Quick Entry page** — rapid shot logging with roll selector
+  - Auto-advance frame number after save, keep lens selection
+  - ⌘+Enter keyboard shortcut, focus management
+  - Recent shots preview (reverse chronological)
+- [x] Frame count validation (warning banner when shots exceed roll's frame count)
 
-## Phase 5: Development Tracking 🔲
+## Phase 5: Development Tracking ✅
 
 Record how each roll was developed, whether at a lab or self-developed.
 
-- [ ] **Lab development** — track drop-off/pickup dates, cost, and which lab
-  - Link to labs catalog
-  - Auto-advance roll status to `at-lab` → `developed` based on dates
-- [ ] **Self development** — full chemistry tracking
+- [x] **Development service** (`src-tauri/src/services/development_service.rs`) — lab dev, self dev, stages CRUD
+- [x] **Development commands** (`src-tauri/src/commands/development.rs`) — 9 Tauri commands with DTOs
+- [x] **Frontend API** (`src/lib/api/development.ts`) — invoke wrappers for all development commands
+- [x] **Lab development** — track drop-off/pickup dates, cost, and which lab
+  - Lab selector from labs catalog
+  - Date fields, cost tracking, notes
+- [x] **Self development** — full chemistry tracking
   - Developer, fixer, stop bath, wetting agent, clearing agent
   - Dilution ratios, temperature, agitation notes
-  - `dev_stages` step-by-step timing (e.g., "Pre-soak 1:00", "Developer 8:30", "Stop 0:30")
-- [ ] Development section on roll detail page (replaces or augments current status section)
-- [ ] Cost tracking summary — development costs across rolls
+  - Inline-editable dev stages with mm:ss duration and reorder (up/down)
+- [x] **Development section** on roll detail page between Status and Shots
+- [x] **Auto-prompt**: Status change to `at-lab` → opens lab dev dialog; `developing` → opens self dev dialog
+- [x] **Exclusive development**: One dev record per roll (lab or self, not both)
 
 ## Phase 6: Search, Import & Polish 🔲
 
@@ -128,15 +135,15 @@ All 12 database tables exist. Phase 3 ports the schema to SeaORM migrations and 
 | `cameras` | ✅ | ✅ |
 | `camera_maintenance` | ✅ | ✅ |
 | `lenses` | ✅ | ✅ |
-| `camera_lenses` | ✅ | 🔲 Phase 4 |
+| `camera_lenses` | ✅ | ✅ |
 | `film_stocks` | ✅ | ✅ |
 | `labs` | ✅ | ✅ |
 | `rolls` | ✅ | ✅ |
-| `shots` | ✅ | 🔲 Phase 4 |
-| `shot_lenses` | ✅ | 🔲 Phase 4 |
-| `development_lab` | ✅ | 🔲 Phase 5 |
-| `development_self` | ✅ | 🔲 Phase 5 |
-| `dev_stages` | ✅ | 🔲 Phase 5 |
+| `shots` | ✅ | ✅ |
+| `shot_lenses` | ✅ | ✅ |
+| `development_lab` | ✅ | ✅ |
+| `development_self` | ✅ | ✅ |
+| `dev_stages` | ✅ | ✅ |
 
 ## Reference Projects
 
