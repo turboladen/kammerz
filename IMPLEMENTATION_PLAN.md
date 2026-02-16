@@ -37,7 +37,52 @@ Roll lifecycle management from loading film to archiving, plus UX polish across 
 - [x] Back navigation on detail pages (PageHeader `backHref`/`backLabel`)
 - [x] Date Sold on Add Camera form (for retroactive data entry)
 
-## Phase 3: Shot Entry & Quick Entry 🔲
+## Phase 3: Backend Migration — SeaORM 🔲
+
+Replace `tauri-plugin-sql` (JS calls raw SQL directly) with SeaORM (JS → Tauri command → Rust service → SQL). This adds type safety, proper migrations, and a service layer. Reference projects: `~/Development/projects/financier` and `~/Development/projects/fewd`.
+
+### 3a. Rust scaffolding
+- [ ] Add `sea-orm` and `sea-orm-migration` dependencies to `src-tauri/Cargo.toml`
+- [ ] Create `migration/` crate alongside `src-tauri/` with `Migrator` struct
+- [ ] Port existing `001_initial_schema.sql` into a SeaORM migration (`m{date}_001_initial_schema.rs`)
+- [ ] Initialize DB in `lib.rs` setup hook: connect to SQLite, run migrations, store `DatabaseConnection` in `AppState`
+- [ ] Set SQLite pragmas (`journal_mode=WAL`, `busy_timeout=5000`)
+
+### 3b. Entities & services
+- [ ] Define SeaORM entities in `src-tauri/src/entities/` (one file per table, `DeriveEntityModel` + `Serialize`/`Deserialize`)
+  - `camera.rs`, `camera_maintenance.rs`, `lens.rs`, `camera_lens.rs`
+  - `film_stock.rs`, `lab.rs`, `roll.rs`, `shot.rs`, `shot_lens.rs`
+  - `development_lab.rs`, `development_self.rs`, `dev_stage.rs`
+- [ ] Define entity relations (`Relation` enum, `Related` impls)
+- [ ] Create service layer in `src-tauri/src/services/` (one struct per entity with CRUD methods)
+  - e.g., `CameraService::get_all()`, `::get_by_id()`, `::create()`, `::update()`, `::delete()`
+  - Distinct-value helpers (for ComboInput): `::distinct_brands()`, `::distinct_vendors()`, etc.
+  - Roll queries with joined camera/film stock data (replaces current `listRollsWithDetails` SQL join)
+
+### 3c. Tauri commands
+- [ ] Create `src-tauri/src/commands/` modules with `#[tauri::command]` functions
+  - Commands receive `State<AppState>`, delegate to services, return `Result<T, String>`
+  - DTOs for request payloads (e.g., `CreateCameraDto`, `UpdateRollDto`)
+- [ ] Register all commands in `lib.rs` `invoke_handler![]`
+- [ ] Update Tauri capabilities — remove `sql:default` and `sql:allow-execute` (no longer needed)
+
+### 3d. Frontend migration
+- [ ] Create `src/lib/api/` layer — thin wrappers around `invoke()` from `@tauri-apps/api/core`
+  - e.g., `listCameras()` → `invoke<Camera[]>("list_cameras")`
+  - One file per entity matching current `src/lib/db/` structure
+- [ ] Swap all page imports from `$lib/db/*` to `$lib/api/*`
+- [ ] Remove `tauri-plugin-sql` dependency and old `src/lib/db/` files
+- [ ] Verify all existing functionality works end-to-end
+
+### 3e. Verification
+- [ ] `bun run build` passes (frontend compiles)
+- [ ] `cargo build` passes (Rust compiles)
+- [ ] All CRUD operations work in the running app (create, read, update, delete for each entity)
+- [ ] ComboInput autocomplete still populated
+- [ ] Film stock format-aware ordering still works on New Roll page
+- [ ] Dashboard stats and "needs attention" alerts still work
+
+## Phase 4: Shot Entry & Quick Entry 🔲
 
 Per-frame metadata logging and a streamlined "notes to data" workflow.
 
@@ -53,7 +98,7 @@ Per-frame metadata logging and a streamlined "notes to data" workflow.
   - Uses existing `camera_lenses` junction table (schema already in place)
   - Filter lens dropdown on shot entry to lenses linked to the roll's camera
 
-## Phase 4: Development Tracking 🔲
+## Phase 5: Development Tracking 🔲
 
 Record how each roll was developed, whether at a lab or self-developed.
 
@@ -67,7 +112,7 @@ Record how each roll was developed, whether at a lab or self-developed.
 - [ ] Development section on roll detail page (replaces or augments current status section)
 - [ ] Cost tracking summary — development costs across rolls
 
-## Phase 5: Search, Import & Polish 🔲
+## Phase 6: Search, Import & Polish 🔲
 
 Cross-catalog search, data portability, and fit-and-finish improvements.
 
@@ -83,19 +128,26 @@ Cross-catalog search, data portability, and fit-and-finish improvements.
 
 ## Schema Status
 
-All 12 database tables are created and migrated (Phase 1). No further migrations are needed for Phases 3–4 — the schema already covers shots, shot-lenses, development (lab and self), and dev stages.
+All 12 database tables exist. Phase 3 ports the schema to SeaORM migrations and entities. No new tables are needed for Phases 4–5.
 
-| Table | Phase Built | UI Built |
+| Table | SeaORM Entity | UI Built |
 |---|---|---|
-| `cameras` | 1 | ✅ |
-| `camera_maintenance` | 1 | ✅ |
-| `lenses` | 1 | ✅ |
-| `camera_lenses` | 1 | 🔲 Phase 3 |
-| `film_stocks` | 1 | ✅ |
-| `labs` | 1 | ✅ |
-| `rolls` | 1 | ✅ |
-| `shots` | 1 | 🔲 Phase 3 |
-| `shot_lenses` | 1 | 🔲 Phase 3 |
-| `development_lab` | 1 | 🔲 Phase 4 |
-| `development_self` | 1 | 🔲 Phase 4 |
-| `dev_stages` | 1 | 🔲 Phase 4 |
+| `cameras` | 🔲 Phase 3 | ✅ |
+| `camera_maintenance` | 🔲 Phase 3 | ✅ |
+| `lenses` | 🔲 Phase 3 | ✅ |
+| `camera_lenses` | 🔲 Phase 3 | 🔲 Phase 4 |
+| `film_stocks` | 🔲 Phase 3 | ✅ |
+| `labs` | 🔲 Phase 3 | ✅ |
+| `rolls` | 🔲 Phase 3 | ✅ |
+| `shots` | 🔲 Phase 3 | 🔲 Phase 4 |
+| `shot_lenses` | 🔲 Phase 3 | 🔲 Phase 4 |
+| `development_lab` | 🔲 Phase 3 | 🔲 Phase 5 |
+| `development_self` | 🔲 Phase 3 | 🔲 Phase 5 |
+| `dev_stages` | 🔲 Phase 3 | 🔲 Phase 5 |
+
+## Reference Projects
+
+| Project | Path | Pattern | Useful for |
+|---|---|---|---|
+| **financier** | `~/Development/projects/financier` | Tauri 2 + SeaORM + React | Tauri command registration, AppState, DB init, migration cleanup |
+| **fewd** | `~/Development/projects/fewd` | Axum + SeaORM (web server) | Service layer patterns, entity definitions, error handling |
