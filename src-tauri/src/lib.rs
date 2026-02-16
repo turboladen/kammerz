@@ -75,6 +75,15 @@ pub fn run() {
             commands::rolls::delete_roll,
             commands::rolls::list_rolls_for_camera,
             commands::rolls::suggest_roll_id,
+            // Shots
+            commands::shots::list_shots_for_roll,
+            commands::shots::get_shot,
+            commands::shots::create_shot,
+            commands::shots::update_shot,
+            commands::shots::delete_shot,
+            commands::shots::get_lenses_for_shot,
+            commands::shots::suggest_next_frame,
+            commands::shots::count_shots_for_roll,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

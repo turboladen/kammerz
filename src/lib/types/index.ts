@@ -145,6 +145,11 @@ export interface Shot {
 
 export type ShotInsert = Omit<Shot, 'id' | 'created_at' | 'updated_at'>;
 
+/** Shot with its associated lens IDs, used on roll detail page */
+export interface ShotWithLensIds extends Shot {
+	lens_ids: number[];
+}
+
 // --- Development ---
 
 export interface DevelopmentLab {

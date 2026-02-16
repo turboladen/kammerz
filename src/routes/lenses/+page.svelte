@@ -10,6 +10,7 @@
 	import { listLenses, createLens, updateLens, deleteLens, listDistinctLensBrands, listDistinctLensSystems } from '$lib/api/lenses';
 	import { listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
 	import type { Lens, LensInsert } from '$lib/types';
+	import { lensDisplayName } from '$lib/utils/lens';
 
 	let lenses: Lens[] = $state([]);
 	let loading = $state(true);
@@ -152,13 +153,6 @@
 		load();
 	});
 
-	function lensDisplayName(lens: Lens): string {
-		if (lens.name_on_lens) return lens.name_on_lens;
-		const parts = [lens.brand];
-		if (lens.focal_length) parts.push(`${lens.focal_length}mm`);
-		if (lens.max_aperture) parts.push(`f/${lens.max_aperture}`);
-		return parts.join(' ');
-	}
 </script>
 
 <PageHeader title="Lenses" description="Your lens collection">

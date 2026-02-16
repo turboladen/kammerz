@@ -10,16 +10,21 @@
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
-	import { getCamera, updateCamera, deleteCamera, listMaintenanceForCamera, createMaintenance, deleteMaintenance, listDistinctCameraBrands, listDistinctVendors, listDistinctMaintProviders } from '$lib/api/cameras';
-	import { listDistinctLensBrands } from '$lib/api/lenses';
+	import { getCamera, updateCamera, deleteCamera, listMaintenanceForCamera, createMaintenance, deleteMaintenance, listDistinctCameraBrands, listDistinctVendors, listDistinctMaintProviders, getLensesForCamera, linkLensToCamera, unlinkLensFromCamera } from '$lib/api/cameras';
+	import { listDistinctLensBrands, listLenses } from '$lib/api/lenses';
 	import { listRollsForCamera } from '$lib/api/rolls';
-	import type { Camera, CameraMaintenance, CameraMaintenanceInsert, RollWithDetails } from '$lib/types';
+	import { lensDisplayName } from '$lib/utils/lens';
+	import type { Camera, CameraMaintenance, CameraMaintenanceInsert, Lens, RollWithDetails } from '$lib/types';
 
 	const id = $derived(Number(page.params.id));
 
 	let camera: Camera | undefined = $state();
 	let maintenance: CameraMaintenance[] = $state([]);
 	let rolls: RollWithDetails[] = $state([]);
+	let allLenses: Lens[] = $state([]);
+	let linkedLensIds: number[] = $state([]);
+	let showLinkLensDialog = $state(false);
+	let linkLensId = $state('');
 	let loading = $state(true);
 	let editing = $state(false);
 	let showMaintenanceDialog = $state(false);
@@ -50,6 +55,13 @@
 	let maintCost = $state('');
 	let maintNotes = $state('');
 	let error = $state('');
+
+	const linkedLenses = $derived(allLenses.filter((l) => linkedLensIds.includes(l.id)));
+	const unlinkedLenses = $derived(allLenses.filter((l) => !linkedLensIds.includes(l.id) && !l.date_sold));
+	const linkLensOptions = $derived([
+		{ value: '', label: 'Select a lens...' },
+		...unlinkedLenses.map((l) => ({ value: String(l.id), label: lensDisplayName(l) }))
+	]);
 
 	const formatOptions = [
 		{ value: '35mm', label: '35mm' },
@@ -86,10 +98,12 @@
 
 	async function load() {
 		try {
-			const [cam, maint, r, camBrands, lensBrands, vendors, maintProviders] = await Promise.all([
+			const [cam, maint, r, lenses, camLensIds, camBrands, lensBrands, vendors, maintProviders] = await Promise.all([
 				getCamera(id),
 				listMaintenanceForCamera(id),
 				listRollsForCamera(id),
+				listLenses(),
+				getLensesForCamera(id),
 				listDistinctCameraBrands(),
 				listDistinctLensBrands(),
 				listDistinctVendors(),
@@ -98,6 +112,8 @@
 			camera = cam;
 			maintenance = maint;
 			rolls = r;
+			allLenses = lenses;
+			linkedLensIds = camLensIds;
 			brandOptions = [...new Set([...camBrands, ...lensBrands])].sort();
 			vendorOptions = vendors;
 			maintProviderOptions = maintProviders;
@@ -192,6 +208,29 @@
 			await deleteMaintenance(deletingMaintenanceId);
 			deletingMaintenanceId = null;
 			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	async function handleLinkLens() {
+		if (!linkLensId) return;
+		error = '';
+		try {
+			await linkLensToCamera(id, Number(linkLensId));
+			showLinkLensDialog = false;
+			linkLensId = '';
+			linkedLensIds = await getLensesForCamera(id);
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	async function handleUnlinkLens(lensId: number) {
+		error = '';
+		try {
+			await unlinkLensFromCamera(id, lensId);
+			linkedLensIds = await getLensesForCamera(id);
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -330,6 +369,34 @@
 			{/if}
 		</div>
 
+		<!-- Compatible Lenses -->
+		<div class="mb-8">
+			<div class="mb-3 flex items-center justify-between">
+				<h2 class="text-sm font-semibold text-text-muted">Compatible Lenses</h2>
+				<Button size="sm" onclick={() => { linkLensId = ''; showLinkLensDialog = true; }}>+ Link Lens</Button>
+			</div>
+			{#if linkedLenses.length === 0}
+				<p class="text-sm text-text-faint">No lenses linked. Link lenses to filter them first in shot entry.</p>
+			{:else}
+				<div class="space-y-2">
+					{#each linkedLenses as lens}
+						<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-3">
+							<div class="flex items-center gap-2">
+								<span class="text-sm">{lensDisplayName(lens)}</span>
+								{#if lens.lens_system}
+									<span class="text-xs text-text-faint">{lens.lens_system}</span>
+								{/if}
+								{#if lens.date_sold}
+									<span class="rounded bg-red-500/15 px-1.5 py-0.5 text-xs text-red-400">Sold</span>
+								{/if}
+							</div>
+							<Button size="sm" variant="ghost" class="opacity-0 group-hover:opacity-100 transition-opacity" onclick={() => handleUnlinkLens(lens.id)}>&times;</Button>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+
 		<!-- Rolls shot with this camera -->
 		<div>
 			<h2 class="mb-3 text-sm font-semibold text-text-muted">Rolls ({rolls.length})</h2>
@@ -383,6 +450,23 @@
 	onconfirm={confirmDelete}
 	oncancel={() => {}}
 />
+
+<!-- Link Lens Dialog -->
+<Dialog bind:open={showLinkLensDialog} title="Link Lens to Camera">
+	<div class="space-y-4">
+		{#if unlinkedLenses.length === 0}
+			<p class="text-sm text-text-muted">All your lenses are already linked to this camera.</p>
+		{:else}
+			<Select label="Lens" bind:value={linkLensId} options={linkLensOptions} />
+		{/if}
+		<div class="flex justify-end gap-2 pt-2">
+			<Button variant="ghost" onclick={() => (showLinkLensDialog = false)}>Cancel</Button>
+			{#if unlinkedLenses.length > 0}
+				<Button variant="primary" onclick={handleLinkLens} disabled={!linkLensId}>Link Lens</Button>
+			{/if}
+		</div>
+	</div>
+</Dialog>
 
 <!-- Delete Maintenance Confirmation -->
 {#if deletingMaintenanceId !== null}
