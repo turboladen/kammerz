@@ -60,6 +60,12 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 ### Camera Format Dropdown
 - Includes generic "Medium Format" and "Large Format" options for cameras that support multiple backs (e.g., Mamiya RB67).
 - Format labels use "Medium Format: 6x6" style (not "6x6 (Medium Format)").
+- Camera format → film stock format mapping: `35mm`→`135`, all medium format variants (`6x4.5`–`6x9`)→`120`, large format sizes map directly (`4x5`→`4x5`, etc.). Don't filter out non-matching formats — only reorder (cameras can use different backs).
+
+### Component Patterns
+- `ComboInput` dropdown options use `onmousedown` (not `onclick`) to beat the blur/click race condition.
+- `Select` options support an optional `disabled` property (used for visual dividers like `── Other formats ──`).
+- Use `$derived.by(() => { ... })` when derived state needs multi-line logic; `$derived(expr)` for one-liners.
 
 ### Error Handling
 - Wrap all `db.execute()` calls in try/catch with user-visible error display. Without this, permission or SQL errors fail silently (unhandled promise rejection).
@@ -67,3 +73,4 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 ## Reference
 
 - Another Tauri 2 + SQLite project by the same author: `~/Development/projects/financier` (uses SeaORM + Tauri commands instead of tauri-plugin-sql)
+- `IMPLEMENTATION_PLAN.md` tracks phase-by-phase development progress. Schema is complete (all 12 tables); Phases 3–5 are UI-only.
