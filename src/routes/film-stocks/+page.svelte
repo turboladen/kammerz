@@ -7,7 +7,7 @@
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
-	import { listFilmStocks, createFilmStock, deleteFilmStock, listDistinctFilmBrands } from '$lib/db/film-stocks';
+	import { listFilmStocks, createFilmStock, deleteFilmStock, listDistinctFilmBrands } from '$lib/api/film-stocks';
 	import type { FilmStock, FilmStockInsert } from '$lib/types';
 
 	let stocks: FilmStock[] = $state([]);
@@ -16,6 +16,7 @@
 	let filterType = $state('all');
 	let filterFormat = $state('all');
 	let deletingStock: FilmStock | null = $state(null);
+	let error = $state('');
 
 	// Autocomplete options
 	let filmBrandOptions: string[] = $state([]);
@@ -85,25 +86,30 @@
 	}
 
 	async function handleAdd() {
-		const stock: FilmStockInsert = {
-			brand,
-			name,
-			format,
-			exposure_count: exposureCount ? parseInt(exposureCount) : null,
-			stock_type: stockType,
-			iso: iso ? parseInt(iso) : null,
-			notes: notes || null
-		};
-		await createFilmStock(stock);
-		showAddDialog = false;
-		brand = '';
-		name = '';
-		format = '135';
-		exposureCount = '';
-		stockType = 'color-negative';
-		iso = '';
-		notes = '';
-		await load();
+		error = '';
+		try {
+			const stock: FilmStockInsert = {
+				brand,
+				name,
+				format,
+				exposure_count: exposureCount ? parseInt(exposureCount) : null,
+				stock_type: stockType,
+				iso: iso ? parseInt(iso) : null,
+				notes: notes || null
+			};
+			await createFilmStock(stock);
+			showAddDialog = false;
+			brand = '';
+			name = '';
+			format = '135';
+			exposureCount = '';
+			stockType = 'color-negative';
+			iso = '';
+			notes = '';
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	function handleDelete(stock: FilmStock) {
@@ -112,9 +118,14 @@
 
 	async function confirmDelete() {
 		if (!deletingStock) return;
-		await deleteFilmStock(deletingStock.id);
-		deletingStock = null;
-		await load();
+		error = '';
+		try {
+			await deleteFilmStock(deletingStock.id);
+			deletingStock = null;
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	$effect(() => {
@@ -187,6 +198,9 @@
 			<Input label="Exposure Count" bind:value={exposureCount} type="number" placeholder="36" hint="Leave empty for variable (120 film)" />
 		</div>
 		<Textarea label="Notes" bind:value={notes} />
+		{#if error}
+			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+		{/if}
 		<div class="flex justify-end gap-2 pt-2">
 			<Button variant="ghost" onclick={() => (showAddDialog = false)}>Cancel</Button>
 			<Button variant="primary" onclick={handleAdd}>Add Film Stock</Button>

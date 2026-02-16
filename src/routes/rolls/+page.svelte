@@ -3,7 +3,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
-	import { listRolls } from '$lib/db/rolls';
+	import { listRolls } from '$lib/api/rolls';
 	import type { RollWithDetails, RollStatus } from '$lib/types';
 
 	let rolls: RollWithDetails[] = $state([]);

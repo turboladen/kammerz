@@ -6,7 +6,7 @@
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
-	import { listLabs, createLab, updateLab, deleteLab } from '$lib/db/labs';
+	import { listLabs, createLab, updateLab, deleteLab } from '$lib/api/labs';
 	import type { Lab, LabInsert } from '$lib/types';
 
 	let labs: Lab[] = $state([]);
@@ -14,6 +14,7 @@
 	let showAddDialog = $state(false);
 	let editingLab: Lab | null = $state(null);
 	let deletingLab: Lab | null = $state(null);
+	let error = $state('');
 
 	let name = $state('');
 	let location = $state('');
@@ -36,16 +37,21 @@
 	}
 
 	async function handleAdd() {
-		const lab: LabInsert = {
-			name,
-			location: location || null,
-			website: website || null,
-			notes: notes || null
-		};
-		await createLab(lab);
-		showAddDialog = false;
-		resetForm();
-		await load();
+		error = '';
+		try {
+			const lab: LabInsert = {
+				name,
+				location: location || null,
+				website: website || null,
+				notes: notes || null
+			};
+			await createLab(lab);
+			showAddDialog = false;
+			resetForm();
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	function startEdit(lab: Lab) {
@@ -58,15 +64,20 @@
 
 	async function handleEdit() {
 		if (!editingLab) return;
-		await updateLab(editingLab.id, {
-			name,
-			location: location || null,
-			website: website || null,
-			notes: notes || null
-		});
-		editingLab = null;
-		resetForm();
-		await load();
+		error = '';
+		try {
+			await updateLab(editingLab.id, {
+				name,
+				location: location || null,
+				website: website || null,
+				notes: notes || null
+			});
+			editingLab = null;
+			resetForm();
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	function handleDelete(lab: Lab) {
@@ -75,9 +86,14 @@
 
 	async function confirmDelete() {
 		if (!deletingLab) return;
-		await deleteLab(deletingLab.id);
-		deletingLab = null;
-		await load();
+		error = '';
+		try {
+			await deleteLab(deletingLab.id);
+			deletingLab = null;
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	$effect(() => {
@@ -130,6 +146,9 @@
 		<Input label="Location" bind:value={location} placeholder="San Clemente, CA" />
 		<Input label="Website" bind:value={website} placeholder="thedarkroom.com" />
 		<Textarea label="Notes" bind:value={notes} />
+		{#if error}
+			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+		{/if}
 		<div class="flex justify-end gap-2 pt-2">
 			<Button variant="ghost" onclick={() => (showAddDialog = false)}>Cancel</Button>
 			<Button variant="primary" onclick={handleAdd}>Add Lab</Button>
@@ -144,6 +163,9 @@
 			<Input label="Location" bind:value={location} />
 			<Input label="Website" bind:value={website} />
 			<Textarea label="Notes" bind:value={notes} />
+			{#if error}
+				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+			{/if}
 			<div class="flex justify-end gap-2 pt-2">
 				<Button variant="ghost" onclick={() => { editingLab = null; resetForm(); }}>Cancel</Button>
 				<Button variant="primary" onclick={handleEdit}>Save</Button>

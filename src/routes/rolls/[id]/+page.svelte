@@ -6,8 +6,8 @@
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
-	import { getRoll, updateRoll, deleteRoll } from '$lib/db/rolls';
-	import { listCameras } from '$lib/db/cameras';
+	import { getRoll, updateRoll, deleteRoll } from '$lib/api/rolls';
+	import { listCameras } from '$lib/api/cameras';
 	import type { RollWithDetails, Camera, RollStatus } from '$lib/types';
 
 	const id = $derived(Number(page.params.id));
@@ -17,6 +17,7 @@
 	let loading = $state(true);
 	let assignCameraId = $state('');
 	let showDeleteConfirm = $state(false);
+	let error = $state('');
 
 	const statusProgression: RollStatus[] = [
 		'loaded', 'shooting', 'shot', 'at-lab', 'developing', 'developed', 'scanned', 'archived'
@@ -39,13 +40,23 @@
 	}
 
 	async function updateStatus(status: RollStatus) {
-		await updateRoll(id, { status });
-		await load();
+		error = '';
+		try {
+			await updateRoll(id, { status });
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	async function assignCamera() {
-		await updateRoll(id, { camera_id: assignCameraId ? Number(assignCameraId) : null });
-		await load();
+		error = '';
+		try {
+			await updateRoll(id, { camera_id: assignCameraId ? Number(assignCameraId) : null });
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	function handleDelete() {
@@ -53,8 +64,13 @@
 	}
 
 	async function confirmDelete() {
-		await deleteRoll(id);
-		goto('/rolls');
+		error = '';
+		try {
+			await deleteRoll(id);
+			goto('/rolls');
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	$effect(() => {
@@ -75,6 +91,10 @@
 	</PageHeader>
 
 	<div class="p-6">
+		{#if error}
+			<div class="mb-4 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+		{/if}
+
 		<!-- Roll Header -->
 		<div class="mb-6 rounded-xl border border-border bg-surface-raised p-5">
 			<div class="flex items-start justify-between">

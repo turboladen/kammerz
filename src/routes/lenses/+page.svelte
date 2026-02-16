@@ -7,8 +7,8 @@
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
-	import { listLenses, createLens, updateLens, deleteLens, listDistinctLensBrands, listDistinctLensSystems } from '$lib/db/lenses';
-	import { listDistinctCameraBrands, listDistinctVendors } from '$lib/db/cameras';
+	import { listLenses, createLens, updateLens, deleteLens, listDistinctLensBrands, listDistinctLensSystems } from '$lib/api/lenses';
+	import { listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
 	import type { Lens, LensInsert } from '$lib/types';
 
 	let lenses: Lens[] = $state([]);
@@ -16,6 +16,7 @@
 	let showAddDialog = $state(false);
 	let editingLens: Lens | null = $state(null);
 	let deletingLens: Lens | null = $state(null);
+	let error = $state('');
 
 	// Autocomplete options
 	let brandOptions: string[] = $state([]);
@@ -90,10 +91,15 @@
 	}
 
 	async function handleAdd() {
-		await createLens(buildInsert());
-		showAddDialog = false;
-		resetForm();
-		await load();
+		error = '';
+		try {
+			await createLens(buildInsert());
+			showAddDialog = false;
+			resetForm();
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	function startEdit(lens: Lens) {
@@ -115,10 +121,15 @@
 
 	async function handleEdit() {
 		if (!editingLens) return;
-		await updateLens(editingLens.id, buildInsert());
-		editingLens = null;
-		resetForm();
-		await load();
+		error = '';
+		try {
+			await updateLens(editingLens.id, buildInsert());
+			editingLens = null;
+			resetForm();
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	function handleDelete(lens: Lens) {
@@ -127,9 +138,14 @@
 
 	async function confirmDelete() {
 		if (!deletingLens) return;
-		await deleteLens(deletingLens.id);
-		deletingLens = null;
-		await load();
+		error = '';
+		try {
+			await deleteLens(deletingLens.id);
+			deletingLens = null;
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	$effect(() => {
@@ -218,6 +234,9 @@
 		</div>
 		<Input label="Date Sold" bind:value={dateSold} type="date" />
 		<Textarea label="Notes" bind:value={notes} />
+		{#if error}
+			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+		{/if}
 		<div class="flex justify-end gap-2 pt-2">
 			<Button variant="ghost" onclick={() => (showAddDialog = false)}>Cancel</Button>
 			<Button variant="primary" onclick={handleAdd}>Add Lens</Button>
@@ -252,6 +271,9 @@
 			</div>
 			<Input label="Date Sold" bind:value={dateSold} type="date" />
 			<Textarea label="Notes" bind:value={notes} />
+			{#if error}
+				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+			{/if}
 			<div class="flex justify-end gap-2 pt-2">
 				<Button variant="ghost" onclick={() => { editingLens = null; resetForm(); }}>Cancel</Button>
 				<Button variant="primary" onclick={handleEdit}>Save</Button>

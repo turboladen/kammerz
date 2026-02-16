@@ -1,38 +1,81 @@
-use tauri_plugin_sql::{Migration, MigrationKind};
+pub mod commands;
+pub mod db;
+pub mod entities;
+pub mod services;
+
+use sea_orm::DatabaseConnection;
+use tauri::Manager;
+
+pub struct AppState {
+    pub db: DatabaseConnection,
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let migrations = vec![
-        Migration {
-            version: 1,
-            description: "create initial schema",
-            sql: include_str!("../migrations/001_initial_schema.sql"),
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 2,
-            description: "seed film stocks",
-            sql: include_str!("../migrations/002_seed_film_stocks.sql"),
-            kind: MigrationKind::Up,
-        },
-    ];
-
     tauri::Builder::default()
         .plugin(
-            tauri_plugin_sql::Builder::default()
-                .add_migrations("sqlite:kamerz.db", migrations)
+            tauri_plugin_log::Builder::default()
+                .level(log::LevelFilter::Info)
                 .build(),
         )
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            let conn = tauri::async_runtime::block_on(async {
+                db::init(app.handle())
+                    .await
+                    .expect("Failed to initialize database")
+            });
+
+            app.manage(AppState { db: conn });
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            // Cameras
+            commands::cameras::list_cameras,
+            commands::cameras::get_camera,
+            commands::cameras::create_camera,
+            commands::cameras::update_camera,
+            commands::cameras::delete_camera,
+            commands::cameras::list_maintenance,
+            commands::cameras::create_maintenance,
+            commands::cameras::update_maintenance,
+            commands::cameras::delete_maintenance,
+            commands::cameras::list_distinct_camera_brands,
+            commands::cameras::list_distinct_vendors,
+            commands::cameras::list_distinct_maint_providers,
+            commands::cameras::get_lenses_for_camera,
+            commands::cameras::link_lens_to_camera,
+            commands::cameras::unlink_lens_from_camera,
+            // Lenses
+            commands::lenses::list_lenses,
+            commands::lenses::get_lens,
+            commands::lenses::create_lens,
+            commands::lenses::update_lens,
+            commands::lenses::delete_lens,
+            commands::lenses::list_distinct_lens_brands,
+            commands::lenses::list_distinct_lens_systems,
+            commands::lenses::get_cameras_for_lens,
+            // Film stocks
+            commands::film_stocks::list_film_stocks,
+            commands::film_stocks::get_film_stock,
+            commands::film_stocks::create_film_stock,
+            commands::film_stocks::update_film_stock,
+            commands::film_stocks::delete_film_stock,
+            commands::film_stocks::list_distinct_film_brands,
+            // Labs
+            commands::labs::list_labs,
+            commands::labs::get_lab,
+            commands::labs::create_lab,
+            commands::labs::update_lab,
+            commands::labs::delete_lab,
+            // Rolls
+            commands::rolls::list_rolls,
+            commands::rolls::get_roll,
+            commands::rolls::create_roll,
+            commands::rolls::update_roll,
+            commands::rolls::delete_roll,
+            commands::rolls::list_rolls_for_camera,
+            commands::rolls::suggest_roll_id,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

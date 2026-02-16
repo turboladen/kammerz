@@ -2,8 +2,8 @@
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
-	import { listRolls } from '$lib/db/rolls';
-	import { listCameras } from '$lib/db/cameras';
+	import { listRolls } from '$lib/api/rolls';
+	import { listCameras } from '$lib/api/cameras';
 	import type { RollWithDetails, Camera, RollStatus } from '$lib/types';
 
 	let rolls: RollWithDetails[] = $state([]);

@@ -7,8 +7,8 @@
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
-	import { listCameras, createCamera, deleteCamera, listDistinctCameraBrands, listDistinctVendors } from '$lib/db/cameras';
-	import { listDistinctLensBrands } from '$lib/db/lenses';
+	import { listCameras, createCamera, deleteCamera, listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
+	import { listDistinctLensBrands } from '$lib/api/lenses';
 	import type { Camera, CameraInsert } from '$lib/types';
 
 	let cameras: Camera[] = $state([]);

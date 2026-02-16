@@ -7,7 +7,7 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - **Tauri 2** (v2.10.0) — native macOS app using system WebKit webview
 - **SvelteKit** with **Svelte 5** runes (`$state`, `$derived`, `$effect`, `$props`, `$bindable`)
 - **Bun** as package manager and JS runtime
-- **SQLite** via `tauri-plugin-sql` (v2.3.2) with migration runner
+- **SQLite** via **SeaORM 1.1** (Rust ORM) — typed entities, services, and migrations
 - **Tailwind CSS 4** with `@tailwindcss/vite` plugin and custom dark theme via `@theme`
 - **adapter-static** for SvelteKit (Tauri has no server — serves static files)
 
@@ -16,30 +16,40 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - `bun run tauri dev` — Run the app in development mode (Tauri + Vite)
 - `bun run tauri build` — Build the production .app bundle
 - `bun run build` — Build SvelteKit frontend only (useful for quick compile checks)
+- `cargo build` — Build Rust backend only (in `src-tauri/`)
 - `bun run dev` — Run Vite dev server only (no Tauri backend — DB calls will fail)
 
 ## Architecture
+
+### Data Flow
+
+`Frontend (SvelteKit)` → `invoke()` → `Tauri Command` → `Service` → `SeaORM Entity` → `SQLite`
 
 ### Frontend (SvelteKit)
 
 - `src/routes/` — Page components (SvelteKit file-based routing)
 - `src/lib/components/ui/` — Reusable UI components (Button, Input, Select, Dialog, etc.)
 - `src/lib/components/layout/` — Layout components (Sidebar, PageHeader)
-- `src/lib/db/` — Database access layer (thin wrappers around `tauri-plugin-sql` calls)
+- `src/lib/api/` — Thin wrappers around `invoke()` from `@tauri-apps/api/core`
 - `src/lib/types/index.ts` — TypeScript interfaces for all entities
 - `ssr = false` and `prerender = false` in root layout (required for Tauri)
 
 ### Backend (Rust/Tauri)
 
-- `src-tauri/src/lib.rs` — Tauri app setup, registers SQL plugin with migrations
-- `src-tauri/migrations/` — SQLite schema and seed data (embedded at compile time via `include_str!`)
+- `src-tauri/src/lib.rs` — Tauri app setup, AppState, command registration
+- `src-tauri/src/db.rs` — Database connection, pragmas, migration runner
+- `src-tauri/src/entities/` — SeaORM entity models (one file per table, 12 total)
+- `src-tauri/src/services/` — Business logic layer (CRUD + helpers, 5 files)
+- `src-tauri/src/commands/` — `#[tauri::command]` handlers with DTOs (5 files)
+- `src-tauri/migration/` — SeaORM migration crate (schema + seed data)
 - `src-tauri/capabilities/default.json` — Tauri 2 permission grants
 
 ### Database
 
-- SQLite via `tauri-plugin-sql` — JS calls `db.select()` / `db.execute()` directly
-- Migrations run automatically on app start via tauri-plugin-sql's migration runner
-- Parameter binding uses `$1, $2, ...` style (not `?`)
+- SQLite via SeaORM — all queries go through typed Rust entities
+- Migrations run automatically via `Migrator::up()` on app start
+- Existing databases (from old tauri-plugin-sql) auto-detected and migration table bridged
+- SQLite pragmas: `journal_mode=WAL`, `busy_timeout=5000`
 
 ## Important Conventions
 
@@ -52,10 +62,13 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - Use `onclick={handler}` on buttons instead of `<form onsubmit>`. Form submission events don't work reliably in Tauri's WebKit webview inside conditional Svelte blocks.
 - Button component passes `onclick` via `{...rest}` spread to the native `<button>` element.
 
-### Tauri 2 Gotchas
-- **SQL plugin permissions**: `sql:default` only grants `select` and `load`. Write operations need `sql:allow-execute` in `src-tauri/capabilities/default.json`.
-- Changes to `src-tauri/` files (Rust, capabilities, Cargo.toml) require Tauri to recompile. The dev server usually auto-restarts, but may need manual restart.
-- The `beforeDevCommand` and `beforeBuildCommand` in `tauri.conf.json` run the frontend build automatically.
+### Tauri 2 / SeaORM Patterns
+- Commands receive `State<'_, AppState>`, delegate to services, return `Result<T, String>`
+- Services are static async methods on unit structs (e.g., `CameraService::list_all(&db)`)
+- Entities use `String` for timestamps (SQLite TEXT), `Option<T>` for nullable fields
+- For joined queries (e.g., rolls with camera/film stock), use `#[derive(FromQueryResult)]` with raw SQL
+- DTOs in command files handle create/update payloads; services work with `ActiveModel` directly
+- Changes to `src-tauri/` files (Rust, capabilities, Cargo.toml) require Tauri to recompile
 
 ### Camera Format Dropdown
 - Includes generic "Medium Format" and "Large Format" options for cameras that support multiple backs (e.g., Mamiya RB67).
@@ -68,9 +81,9 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - Use `$derived.by(() => { ... })` when derived state needs multi-line logic; `$derived(expr)` for one-liners.
 
 ### Error Handling
-- Wrap all `db.execute()` calls in try/catch with user-visible error display. Without this, permission or SQL errors fail silently (unhandled promise rejection).
+- Frontend `invoke()` calls return promises that reject on error. Wrap in try/catch with user-visible error display.
 
 ## Reference
 
-- Another Tauri 2 + SQLite project by the same author: `~/Development/projects/financier` (uses SeaORM + Tauri commands instead of tauri-plugin-sql)
-- `IMPLEMENTATION_PLAN.md` tracks phase-by-phase development progress. Schema is complete (all 12 tables); Phases 3–5 are UI-only.
+- Another Tauri 2 + SQLite project by the same author: `~/Development/projects/financier` (same SeaORM patterns)
+- `IMPLEMENTATION_PLAN.md` tracks phase-by-phase development progress

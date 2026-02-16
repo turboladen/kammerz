@@ -10,9 +10,9 @@
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
-	import { getCamera, updateCamera, deleteCamera, listMaintenanceForCamera, createMaintenance, deleteMaintenance, listDistinctCameraBrands, listDistinctVendors, listDistinctMaintProviders } from '$lib/db/cameras';
-	import { listDistinctLensBrands } from '$lib/db/lenses';
-	import { listRollsForCamera } from '$lib/db/rolls';
+	import { getCamera, updateCamera, deleteCamera, listMaintenanceForCamera, createMaintenance, deleteMaintenance, listDistinctCameraBrands, listDistinctVendors, listDistinctMaintProviders } from '$lib/api/cameras';
+	import { listDistinctLensBrands } from '$lib/api/lenses';
+	import { listRollsForCamera } from '$lib/api/rolls';
 	import type { Camera, CameraMaintenance, CameraMaintenanceInsert, RollWithDetails } from '$lib/types';
 
 	const id = $derived(Number(page.params.id));
@@ -49,6 +49,7 @@
 	let maintDateDone = $state('');
 	let maintCost = $state('');
 	let maintNotes = $state('');
+	let error = $state('');
 
 	const formatOptions = [
 		{ value: '35mm', label: '35mm' },
@@ -121,20 +122,25 @@
 	}
 
 	async function saveEdit() {
-		await updateCamera(id, {
-			brand: editBrand,
-			model: editModel,
-			prefix: editPrefix || null,
-			format: editFormat,
-			camera_type: editCameraType || null,
-			serial_number: editSerialNumber || null,
-			date_purchased: editDatePurchased || null,
-			purchased_from: editPurchasedFrom || null,
-			date_sold: editDateSold || null,
-			notes: editNotes || null
-		});
-		editing = false;
-		await load();
+		error = '';
+		try {
+			await updateCamera(id, {
+				brand: editBrand,
+				model: editModel,
+				prefix: editPrefix || null,
+				format: editFormat,
+				camera_type: editCameraType || null,
+				serial_number: editSerialNumber || null,
+				date_purchased: editDatePurchased || null,
+				purchased_from: editPurchasedFrom || null,
+				date_sold: editDateSold || null,
+				notes: editNotes || null
+			});
+			editing = false;
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	async function handleDelete() {
@@ -142,27 +148,37 @@
 	}
 
 	async function confirmDelete() {
-		await deleteCamera(id);
-		goto('/cameras');
+		error = '';
+		try {
+			await deleteCamera(id);
+			goto('/cameras');
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	async function addMaintenance() {
-		const record: CameraMaintenanceInsert = {
-			camera_id: id,
-			maintenance_type: maintType,
-			done_by: maintDoneBy || null,
-			date_done: maintDateDone || null,
-			cost: maintCost ? parseFloat(maintCost) : null,
-			notes: maintNotes || null
-		};
-		await createMaintenance(record);
-		showMaintenanceDialog = false;
-		maintType = 'CLA';
-		maintDoneBy = '';
-		maintDateDone = '';
-		maintCost = '';
-		maintNotes = '';
-		await load();
+		error = '';
+		try {
+			const record: CameraMaintenanceInsert = {
+				camera_id: id,
+				maintenance_type: maintType,
+				done_by: maintDoneBy || null,
+				date_done: maintDateDone || null,
+				cost: maintCost ? parseFloat(maintCost) : null,
+				notes: maintNotes || null
+			};
+			await createMaintenance(record);
+			showMaintenanceDialog = false;
+			maintType = 'CLA';
+			maintDoneBy = '';
+			maintDateDone = '';
+			maintCost = '';
+			maintNotes = '';
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	async function removeMaintenance(maintId: number) {
@@ -171,9 +187,14 @@
 
 	async function confirmRemoveMaintenance() {
 		if (deletingMaintenanceId === null) return;
-		await deleteMaintenance(deletingMaintenanceId);
-		deletingMaintenanceId = null;
-		await load();
+		error = '';
+		try {
+			await deleteMaintenance(deletingMaintenanceId);
+			deletingMaintenanceId = null;
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	$effect(() => {
@@ -213,6 +234,9 @@
 			</div>
 			<Input label="Date Sold" bind:value={editDateSold} type="date" hint="Leave empty if you still own it" />
 			<Textarea label="Notes" bind:value={editNotes} />
+			{#if error}
+				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+			{/if}
 		</div>
 	</div>
 {:else}
@@ -222,6 +246,10 @@
 	</PageHeader>
 
 	<div class="p-6">
+		{#if error}
+			<div class="mb-4 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+		{/if}
+
 		<!-- Camera Details -->
 		<div class="mb-8 grid grid-cols-2 gap-x-8 gap-y-3 rounded-xl border border-border bg-surface-raised p-5">
 			<div>

@@ -37,47 +37,40 @@ Roll lifecycle management from loading film to archiving, plus UX polish across 
 - [x] Back navigation on detail pages (PageHeader `backHref`/`backLabel`)
 - [x] Date Sold on Add Camera form (for retroactive data entry)
 
-## Phase 3: Backend Migration — SeaORM 🔲
+## Phase 3: Backend Migration — SeaORM ✅
 
-Replace `tauri-plugin-sql` (JS calls raw SQL directly) with SeaORM (JS → Tauri command → Rust service → SQL). This adds type safety, proper migrations, and a service layer. Reference projects: `~/Development/projects/financier` and `~/Development/projects/fewd`.
+Replaced `tauri-plugin-sql` (JS calls raw SQL directly) with SeaORM (JS → Tauri command → Rust service → SQL). This adds type safety, proper migrations, and a service layer.
 
 ### 3a. Rust scaffolding
-- [ ] Add `sea-orm` and `sea-orm-migration` dependencies to `src-tauri/Cargo.toml`
-- [ ] Create `migration/` crate alongside `src-tauri/` with `Migrator` struct
-- [ ] Port existing `001_initial_schema.sql` into a SeaORM migration (`m{date}_001_initial_schema.rs`)
-- [ ] Initialize DB in `lib.rs` setup hook: connect to SQLite, run migrations, store `DatabaseConnection` in `AppState`
-- [ ] Set SQLite pragmas (`journal_mode=WAL`, `busy_timeout=5000`)
+- [x] Add `sea-orm` and `sea-orm-migration` dependencies to `src-tauri/Cargo.toml`
+- [x] Create `migration/` crate alongside `src-tauri/` with `Migrator` struct
+- [x] Port existing `001_initial_schema.sql` into a SeaORM migration (`m20250101_000001_initial_schema.rs`)
+- [x] Port seed data into `m20250101_000002_seed_film_stocks.rs`
+- [x] Initialize DB in `lib.rs` setup hook: connect to SQLite, run migrations, store `DatabaseConnection` in `AppState`
+- [x] Set SQLite pragmas (`journal_mode=WAL`, `busy_timeout=5000`)
+- [x] Detect-and-skip for existing databases (bridge `_sqlx_migrations` → `seaql_migrations`)
 
 ### 3b. Entities & services
-- [ ] Define SeaORM entities in `src-tauri/src/entities/` (one file per table, `DeriveEntityModel` + `Serialize`/`Deserialize`)
-  - `camera.rs`, `camera_maintenance.rs`, `lens.rs`, `camera_lens.rs`
-  - `film_stock.rs`, `lab.rs`, `roll.rs`, `shot.rs`, `shot_lens.rs`
-  - `development_lab.rs`, `development_self.rs`, `dev_stage.rs`
-- [ ] Define entity relations (`Relation` enum, `Related` impls)
-- [ ] Create service layer in `src-tauri/src/services/` (one struct per entity with CRUD methods)
-  - e.g., `CameraService::get_all()`, `::get_by_id()`, `::create()`, `::update()`, `::delete()`
-  - Distinct-value helpers (for ComboInput): `::distinct_brands()`, `::distinct_vendors()`, etc.
-  - Roll queries with joined camera/film stock data (replaces current `listRollsWithDetails` SQL join)
+- [x] Define SeaORM entities in `src-tauri/src/entities/` (12 files, `DeriveEntityModel` + `Serialize`/`Deserialize`)
+- [x] Define entity relations (`Relation` enum, `Related` impls)
+- [x] Create service layer in `src-tauri/src/services/` (5 files with CRUD methods)
+- [x] Distinct-value helpers (for ComboInput): `distinct_brands()`, `distinct_vendors()`, etc.
+- [x] Roll queries with joined camera/film stock data (`RollWithDetails` via `FromQueryResult`)
 
 ### 3c. Tauri commands
-- [ ] Create `src-tauri/src/commands/` modules with `#[tauri::command]` functions
-  - Commands receive `State<AppState>`, delegate to services, return `Result<T, String>`
-  - DTOs for request payloads (e.g., `CreateCameraDto`, `UpdateRollDto`)
-- [ ] Register all commands in `lib.rs` `invoke_handler![]`
-- [ ] Update Tauri capabilities — remove `sql:default` and `sql:allow-execute` (no longer needed)
+- [x] Create `src-tauri/src/commands/` modules (5 files) with `#[tauri::command]` functions + DTOs
+- [x] Register all ~35 commands in `lib.rs` `invoke_handler![]`
+- [x] Update Tauri capabilities — removed `sql:default` and `sql:allow-execute`
 
 ### 3d. Frontend migration
-- [ ] Create `src/lib/api/` layer — thin wrappers around `invoke()` from `@tauri-apps/api/core`
-  - e.g., `listCameras()` → `invoke<Camera[]>("list_cameras")`
-  - One file per entity matching current `src/lib/db/` structure
-- [ ] Swap all page imports from `$lib/db/*` to `$lib/api/*`
-- [ ] Remove `tauri-plugin-sql` dependency and old `src/lib/db/` files
-- [ ] Verify all existing functionality works end-to-end
+- [x] Create `src/lib/api/` layer — thin wrappers around `invoke()` (5 files)
+- [x] Swap all 9 route page imports from `$lib/db/*` to `$lib/api/*`
+- [x] Remove `@tauri-apps/plugin-sql` dependency from `package.json`
 
 ### 3e. Verification
-- [ ] `bun run build` passes (frontend compiles)
-- [ ] `cargo build` passes (Rust compiles)
-- [ ] All CRUD operations work in the running app (create, read, update, delete for each entity)
+- [x] `bun run build` passes (frontend compiles)
+- [x] `cargo build` passes (Rust compiles)
+- [ ] All CRUD operations work in the running app (manual end-to-end testing needed)
 - [ ] ComboInput autocomplete still populated
 - [ ] Film stock format-aware ordering still works on New Roll page
 - [ ] Dashboard stats and "needs attention" alerts still work
@@ -132,18 +125,18 @@ All 12 database tables exist. Phase 3 ports the schema to SeaORM migrations and 
 
 | Table | SeaORM Entity | UI Built |
 |---|---|---|
-| `cameras` | 🔲 Phase 3 | ✅ |
-| `camera_maintenance` | 🔲 Phase 3 | ✅ |
-| `lenses` | 🔲 Phase 3 | ✅ |
-| `camera_lenses` | 🔲 Phase 3 | 🔲 Phase 4 |
-| `film_stocks` | 🔲 Phase 3 | ✅ |
-| `labs` | 🔲 Phase 3 | ✅ |
-| `rolls` | 🔲 Phase 3 | ✅ |
-| `shots` | 🔲 Phase 3 | 🔲 Phase 4 |
-| `shot_lenses` | 🔲 Phase 3 | 🔲 Phase 4 |
-| `development_lab` | 🔲 Phase 3 | 🔲 Phase 5 |
-| `development_self` | 🔲 Phase 3 | 🔲 Phase 5 |
-| `dev_stages` | 🔲 Phase 3 | 🔲 Phase 5 |
+| `cameras` | ✅ | ✅ |
+| `camera_maintenance` | ✅ | ✅ |
+| `lenses` | ✅ | ✅ |
+| `camera_lenses` | ✅ | 🔲 Phase 4 |
+| `film_stocks` | ✅ | ✅ |
+| `labs` | ✅ | ✅ |
+| `rolls` | ✅ | ✅ |
+| `shots` | ✅ | 🔲 Phase 4 |
+| `shot_lenses` | ✅ | 🔲 Phase 4 |
+| `development_lab` | ✅ | 🔲 Phase 5 |
+| `development_self` | ✅ | 🔲 Phase 5 |
+| `dev_stages` | ✅ | 🔲 Phase 5 |
 
 ## Reference Projects
 

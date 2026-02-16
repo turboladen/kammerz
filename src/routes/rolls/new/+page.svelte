@@ -5,9 +5,9 @@
 	import Input from '$lib/components/ui/Input.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
-	import { createRoll, suggestRollId } from '$lib/db/rolls';
-	import { listCameras } from '$lib/db/cameras';
-	import { listFilmStocks } from '$lib/db/film-stocks';
+	import { createRoll, suggestRollId } from '$lib/api/rolls';
+	import { listCameras } from '$lib/api/cameras';
+	import { listFilmStocks } from '$lib/api/film-stocks';
 	import type { Camera, FilmStock, RollInsert } from '$lib/types';
 
 	let cameras: Camera[] = $state([]);
@@ -22,6 +22,7 @@
 	let dateFuzzy = $state('');
 	let pushPull = $state('');
 	let notes = $state('');
+	let error = $state('');
 
 	// Map camera format → matching film stock format
 	const cameraFormatToStockFormat: Record<string, string> = {
@@ -113,20 +114,25 @@
 	}
 
 	async function handleSubmit() {
-		const roll: RollInsert = {
-			roll_id: rollId,
-			camera_id: cameraId ? Number(cameraId) : null,
-			film_stock_id: filmStockId ? Number(filmStockId) : null,
-			status: 'loaded',
-			frame_count: frameCount ? parseInt(frameCount) : null,
-			date_loaded: dateLoaded || null,
-			date_finished: null,
-			date_fuzzy: dateFuzzy || null,
-			push_pull: pushPull || null,
-			notes: notes || null
-		};
-		const id = await createRoll(roll);
-		goto(`/rolls/${id}`);
+		error = '';
+		try {
+			const roll: RollInsert = {
+				roll_id: rollId,
+				camera_id: cameraId ? Number(cameraId) : null,
+				film_stock_id: filmStockId ? Number(filmStockId) : null,
+				status: 'loaded',
+				frame_count: frameCount ? parseInt(frameCount) : null,
+				date_loaded: dateLoaded || null,
+				date_finished: null,
+				date_fuzzy: dateFuzzy || null,
+				push_pull: pushPull || null,
+				notes: notes || null
+			};
+			const id = await createRoll(roll);
+			goto(`/rolls/${id}`);
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	$effect(() => {
@@ -166,6 +172,10 @@
 			/>
 
 			<Textarea label="Notes" bind:value={notes} placeholder="Any notes about this roll..." />
+
+			{#if error}
+				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+			{/if}
 
 			<div class="flex justify-end gap-2 pt-4">
 				<Button variant="ghost" href="/rolls">Cancel</Button>
