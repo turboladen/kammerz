@@ -88,30 +88,37 @@
 			const [r, lenses] = await Promise.all([listRolls(), listLenses()]);
 			rolls = r;
 			allLenses = lenses;
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
 		} finally {
 			loading = false;
 		}
 	}
 
 	async function loadRollData(rollId: number) {
-		const [s, roll] = await Promise.all([
-			listShotsForRoll(rollId),
-			Promise.resolve(rolls.find((r) => r.id === rollId))
-		]);
-		shots = s;
-
-		// Load camera-lens associations
-		if (roll?.camera_id) {
-			cameraLensIds = await getLensesForCamera(roll.camera_id);
-		} else {
-			cameraLensIds = [];
-		}
-
-		// Suggest next frame
+		error = '';
 		try {
-			frameNumber = await suggestNextFrame(rollId);
-		} catch {
-			frameNumber = '';
+			const [s, roll] = await Promise.all([
+				listShotsForRoll(rollId),
+				Promise.resolve(rolls.find((r) => r.id === rollId))
+			]);
+			shots = s;
+
+			// Load camera-lens associations
+			if (roll?.camera_id) {
+				cameraLensIds = await getLensesForCamera(roll.camera_id);
+			} else {
+				cameraLensIds = [];
+			}
+
+			// Suggest next frame
+			try {
+				frameNumber = await suggestNextFrame(rollId);
+			} catch {
+				frameNumber = '';
+			}
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
 		}
 	}
 

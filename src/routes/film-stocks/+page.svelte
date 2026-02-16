@@ -80,6 +80,8 @@
 			]);
 			stocks = s;
 			filmBrandOptions = brands;
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
 		} finally {
 			loading = false;
 		}
@@ -138,6 +140,10 @@
 </PageHeader>
 
 <div class="p-6">
+	{#if error}
+		<div class="mb-4 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+	{/if}
+
 	<!-- Filters -->
 	<div class="mb-4 flex gap-4">
 		<div class="flex gap-2">

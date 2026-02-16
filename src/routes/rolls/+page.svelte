@@ -8,6 +8,7 @@
 
 	let rolls: RollWithDetails[] = $state([]);
 	let loading = $state(true);
+	let error = $state('');
 	let filterStatus = $state('all');
 
 	const filtered = $derived(
@@ -29,6 +30,8 @@
 	async function load() {
 		try {
 			rolls = await listRolls();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
 		} finally {
 			loading = false;
 		}
@@ -54,6 +57,10 @@
 			>{s.label}</Button>
 		{/each}
 	</div>
+
+	{#if error}
+		<div class="mb-4 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+	{/if}
 
 	{#if loading}
 		<p class="text-sm text-text-muted">Loading...</p>

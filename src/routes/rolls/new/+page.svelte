@@ -108,6 +108,8 @@
 			cameras = cams;
 			filmStocks = stocks;
 			rollId = suggestedId;
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
 		} finally {
 			loading = false;
 		}

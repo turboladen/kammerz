@@ -1,4 +1,4 @@
-use sea_orm::{EntityTrait, Set};
+use sea_orm::Set;
 use serde::Deserialize;
 use tauri::State;
 
@@ -109,8 +109,7 @@ pub async fn update_shot(
     id: i32,
     data: UpdateShotDto,
 ) -> Result<(), String> {
-    let existing = shot::Entity::find_by_id(id)
-        .one(&state.db)
+    let existing = ShotService::get_by_id(&state.db, id)
         .await
         .map_err(|e| format!("Could not find shot: {e}"))?
         .ok_or_else(|| format!("Shot {id} not found"))?;
