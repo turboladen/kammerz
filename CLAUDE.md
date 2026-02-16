@@ -83,7 +83,14 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 ### Error Handling
 - Frontend `invoke()` calls return promises that reject on error. Wrap in try/catch with user-visible error display.
 
+### UI Design
+- Follow the design system in `UI_DESIGN.md` — colors, typography, component styling, layout patterns, and design principles.
+- All colors use CSS custom properties defined in `src/app.css` via Tailwind's `@theme`. Never use raw hex colors.
+- Fonts: DM Sans (UI), IBM Plex Mono (data), Instrument Serif (display). Self-hosted in `static/fonts/`.
+- Keep `UI_DESIGN.md` updated when design decisions change.
+
 ## Reference
 
 - Another Tauri 2 + SQLite project by the same author: `~/Development/projects/financier` (same SeaORM patterns)
+- `UI_DESIGN.md` documents the visual design system (colors, typography, components, layout)
 - `IMPLEMENTATION_PLAN.md` tracks phase-by-phase development progress

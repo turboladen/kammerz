@@ -65,7 +65,7 @@ Use `#c45c4a` for destructive actions (warm red, not pure red).
 
 ## Typography
 
-Fonts are loaded via Google Fonts CDN in `src/app.html`.
+Fonts are self-hosted in `static/fonts/` and loaded via `@font-face` declarations in `src/app.css`.
 
 ### Font Stack
 
@@ -262,7 +262,7 @@ Defined as `@keyframes` in `src/app.css`:
 |---|---|---|
 | `lucide-svelte` | ^0.564.0 | Tree-shakeable SVG icon components |
 
-Google Fonts (loaded via CDN):
+Self-hosted fonts (in `static/fonts/`, loaded via `@font-face` in `src/app.css`):
 - [DM Sans](https://fonts.google.com/specimen/DM+Sans) — 400, 500, 600
 - [IBM Plex Mono](https://fonts.google.com/specimen/IBM+Plex+Mono) — 400, 500
 - [Instrument Serif](https://fonts.google.com/specimen/Instrument+Serif) — 400
