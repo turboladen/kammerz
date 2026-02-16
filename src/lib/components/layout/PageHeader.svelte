@@ -10,16 +10,16 @@
 	let { title, description, backHref, backLabel, children }: Props = $props();
 </script>
 
-<div class="flex items-center justify-between border-b border-border px-6 py-4">
+<div class="flex items-center justify-between border-b border-border-subtle px-6 py-4">
 	<div>
 		{#if backHref}
 			<a href={backHref} class="mb-1 inline-flex items-center gap-1 text-xs text-text-muted transition-colors hover:text-accent">
 				&larr; {backLabel ?? 'Back'}
 			</a>
 		{/if}
-		<h1 class="text-xl font-semibold">{title}</h1>
+		<h1 class="font-display text-xl">{title}</h1>
 		{#if description}
-			<p class="mt-1 text-sm text-text-muted">{description}</p>
+			<p class="mt-1 text-sm text-text-faint">{description}</p>
 		{/if}
 	</div>
 	{#if children}

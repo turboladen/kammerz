@@ -251,7 +251,7 @@
 		{/if}
 
 		<!-- Camera Details -->
-		<div class="mb-8 grid grid-cols-2 gap-x-8 gap-y-3 rounded-xl border border-border bg-surface-raised p-5">
+		<div class="mb-8 grid grid-cols-2 gap-x-8 gap-y-3 rounded-lg border border-border bg-surface-raised p-5">
 			<div>
 				<span class="text-xs text-text-muted">Format</span>
 				<p class="text-sm">{camera.format}</p>
@@ -340,7 +340,7 @@
 					{#each rolls as roll}
 						<a
 							href="/rolls/{roll.id}"
-							class="flex items-center justify-between rounded-lg border border-border bg-surface-raised p-3 transition-colors hover:bg-surface-overlay"
+							class="flex items-center justify-between rounded-lg border border-border bg-surface-raised p-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 						>
 							<div class="flex items-center gap-3">
 								<span class="font-mono text-sm">{roll.roll_id}</span>

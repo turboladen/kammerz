@@ -68,7 +68,7 @@
 			{#each filtered as roll}
 				<a
 					href="/rolls/{roll.id}"
-					class="group flex items-center justify-between rounded-xl border border-border bg-surface-raised p-4 transition-colors hover:bg-surface-overlay"
+					class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 				>
 					<div class="flex items-center gap-4">
 						<span class="font-mono text-sm font-semibold">{roll.roll_id}</span>

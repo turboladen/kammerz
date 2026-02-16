@@ -7,20 +7,21 @@
 
 	let { status }: Props = $props();
 
-	const statusConfig: Record<RollStatus, { label: string; classes: string }> = {
-		loaded: { label: 'Loaded', classes: 'bg-status-loaded/20 text-status-loaded' },
-		shooting: { label: 'Shooting', classes: 'bg-status-shooting/20 text-status-shooting' },
-		shot: { label: 'Shot', classes: 'bg-status-shot/20 text-status-shot' },
-		'at-lab': { label: 'At Lab', classes: 'bg-status-at-lab/20 text-status-at-lab' },
-		developing: { label: 'Developing', classes: 'bg-status-developing/20 text-status-developing' },
-		developed: { label: 'Developed', classes: 'bg-status-developed/20 text-status-developed' },
-		scanned: { label: 'Scanned', classes: 'bg-status-scanned/20 text-status-scanned' },
-		archived: { label: 'Archived', classes: 'bg-status-archived/20 text-status-archived' }
+	const statusConfig: Record<RollStatus, { label: string; pillClasses: string; dotClass: string }> = {
+		loaded: { label: 'Loaded', pillClasses: 'bg-status-loaded/10 text-status-loaded', dotClass: 'bg-status-loaded' },
+		shooting: { label: 'Shooting', pillClasses: 'bg-status-shooting/10 text-status-shooting', dotClass: 'bg-status-shooting' },
+		shot: { label: 'Shot', pillClasses: 'bg-status-shot/10 text-status-shot', dotClass: 'bg-status-shot' },
+		'at-lab': { label: 'At Lab', pillClasses: 'bg-status-at-lab/10 text-status-at-lab', dotClass: 'bg-status-at-lab' },
+		developing: { label: 'Developing', pillClasses: 'bg-status-developing/10 text-status-developing', dotClass: 'bg-status-developing' },
+		developed: { label: 'Developed', pillClasses: 'bg-status-developed/10 text-status-developed', dotClass: 'bg-status-developed' },
+		scanned: { label: 'Scanned', pillClasses: 'bg-status-scanned/10 text-status-scanned', dotClass: 'bg-status-scanned' },
+		archived: { label: 'Archived', pillClasses: 'bg-status-archived/10 text-status-archived', dotClass: 'bg-status-archived' }
 	};
 
 	const config = $derived(statusConfig[status]);
 </script>
 
-<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {config.classes}">
+<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium {config.pillClasses}">
+	<span class="h-1.5 w-1.5 rounded-full {config.dotClass}"></span>
 	{config.label}
 </span>

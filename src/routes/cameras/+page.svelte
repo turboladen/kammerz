@@ -163,7 +163,7 @@
 			{#each filtered as camera}
 				<a
 					href="/cameras/{camera.id}"
-					class="group flex items-center justify-between rounded-xl border border-border bg-surface-raised p-4 transition-colors hover:bg-surface-overlay"
+					class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 				>
 					<div>
 						<div class="flex items-center gap-2">

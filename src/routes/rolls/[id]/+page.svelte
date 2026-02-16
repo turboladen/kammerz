@@ -96,7 +96,7 @@
 		{/if}
 
 		<!-- Roll Header -->
-		<div class="mb-6 rounded-xl border border-border bg-surface-raised p-5">
+		<div class="mb-6 rounded-lg border border-border bg-surface-raised p-5">
 			<div class="flex items-start justify-between">
 				<div>
 					<div class="mb-2 flex items-center gap-3">
@@ -134,7 +134,7 @@
 
 		<!-- Camera Assignment -->
 		{#if !roll.camera_id}
-			<div class="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+			<div class="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
 				<p class="mb-2 text-sm font-medium text-amber-400">No camera assigned</p>
 				<div class="flex items-end gap-2">
 					<div class="flex-1">
@@ -171,7 +171,7 @@
 		</div>
 
 		<!-- Placeholder for shots (Phase 3) -->
-		<div class="rounded-xl border border-border-subtle bg-surface-raised p-5">
+		<div class="rounded-lg border border-border-subtle bg-surface-raised p-5">
 			<h2 class="mb-2 text-sm font-semibold text-text-muted">Shots</h2>
 			<p class="text-sm text-text-faint">Shot entry will be added in the next phase.</p>
 		</div>

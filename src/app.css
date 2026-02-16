@@ -1,30 +1,76 @@
 @import 'tailwindcss';
 
+/* Self-hosted fonts — no CDN dependency, works offline */
+@font-face {
+	font-family: 'DM Sans';
+	font-style: normal;
+	font-weight: 400 600;
+	font-display: swap;
+	src: url('/fonts/dm-sans-latin.woff2') format('woff2');
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+	font-family: 'IBM Plex Mono';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/ibm-plex-mono-latin-400.woff2') format('woff2');
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+	font-family: 'IBM Plex Mono';
+	font-style: normal;
+	font-weight: 500;
+	font-display: swap;
+	src: url('/fonts/ibm-plex-mono-latin-500.woff2') format('woff2');
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+	font-family: 'Instrument Serif';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/instrument-serif-latin.woff2') format('woff2');
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 @theme {
-	--color-surface: #1a1a2e;
-	--color-surface-raised: #222244;
-	--color-surface-overlay: #2a2a4a;
-	--color-border: #3a3a5c;
-	--color-border-subtle: #2e2e4e;
-	--color-text: #e8e8f0;
-	--color-text-muted: #9898b8;
-	--color-text-faint: #686888;
-	--color-accent: #c084fc;
-	--color-accent-hover: #d8b4fe;
-	--color-accent-muted: #7c3aed;
+	/* Surfaces: warm dark tones, like darkroom walls */
+	--color-surface: #151210;
+	--color-surface-raised: #1e1a17;
+	--color-surface-overlay: #272220;
 
-	/* Status colors */
-	--color-status-loaded: #60a5fa;
-	--color-status-shooting: #34d399;
-	--color-status-shot: #a78bfa;
-	--color-status-at-lab: #fbbf24;
-	--color-status-developing: #f97316;
-	--color-status-developed: #c084fc;
-	--color-status-scanned: #2dd4bf;
-	--color-status-archived: #6b7280;
+	/* Borders: warm grays */
+	--color-border: #3d3530;
+	--color-border-subtle: #2d2723;
 
-	--font-sans: 'Inter', 'SF Pro Display', system-ui, -apple-system, sans-serif;
-	--font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+	/* Text: cream/warm white, like aged paper */
+	--color-text: #e8e2d9;
+	--color-text-muted: #a09488;
+	--color-text-faint: #6d6258;
+
+	/* Accent: amber/gold, like a darkroom safelight */
+	--color-accent: #d4915c;
+	--color-accent-hover: #e4a876;
+	--color-accent-muted: #a06830;
+
+	/* Status colors: shifted warmer, still distinct */
+	--color-status-loaded: #6ca4d4;
+	--color-status-shooting: #5cb88a;
+	--color-status-shot: #a38bc7;
+	--color-status-at-lab: #d4a84e;
+	--color-status-developing: #c87a42;
+	--color-status-developed: #b384c7;
+	--color-status-scanned: #5aaf9e;
+	--color-status-archived: #7a726a;
+
+	/* Typography */
+	--font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+	--font-mono: 'IBM Plex Mono', 'SF Mono', ui-monospace, monospace;
+	--font-display: 'Instrument Serif', Georgia, serif;
 }
 
 html {
@@ -36,4 +82,39 @@ body {
 	font-family: var(--font-sans);
 	-webkit-font-smoothing: antialiased;
 	margin: 0;
+}
+
+/* Film grain texture — subtle analog atmosphere */
+body::after {
+	content: '';
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	z-index: 9999;
+	opacity: 0.03;
+	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+	background-repeat: repeat;
+	background-size: 256px 256px;
+}
+
+/* Dialog entry animation */
+@keyframes dialog-enter {
+	from {
+		opacity: 0;
+		transform: scale(0.95);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@keyframes backdrop-enter {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+/* Font display utility for Instrument Serif */
+.font-display {
+	font-family: var(--font-display);
 }

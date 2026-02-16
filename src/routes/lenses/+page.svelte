@@ -175,7 +175,7 @@
 	{:else}
 		<div class="grid gap-3">
 			{#each lenses as lens}
-				<div class="group flex items-center justify-between rounded-xl border border-border bg-surface-raised p-4">
+				<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40">
 					<div>
 						<div class="flex items-center gap-2">
 							<span class="font-semibold">{lensDisplayName(lens)}</span>

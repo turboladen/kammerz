@@ -115,7 +115,7 @@
 	{:else}
 		<div class="grid gap-3">
 			{#each labs as lab}
-				<div class="group flex items-center justify-between rounded-xl border border-border bg-surface-raised p-4">
+				<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40">
 					<div>
 						<span class="font-semibold">{lab.name}</span>
 						<div class="mt-1 flex gap-3 text-xs text-text-muted">
