@@ -10,3 +10,4 @@ pub mod shot_lens;
 pub mod development_lab;
 pub mod development_self;
 pub mod dev_stage;
+pub mod setting;

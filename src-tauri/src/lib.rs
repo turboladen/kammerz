@@ -94,6 +94,17 @@ pub fn run() {
             commands::development::update_self_dev,
             commands::development::delete_self_dev,
             commands::development::list_dev_stages,
+            // Search
+            commands::search::search_catalog,
+            // Stats
+            commands::stats::get_catalog_stats,
+            // Settings
+            commands::settings::get_setting,
+            commands::settings::set_setting,
+            // Import
+            commands::import::list_models,
+            commands::import::parse_note,
+            commands::import::import_parsed_roll,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

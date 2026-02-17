@@ -103,6 +103,7 @@ export interface Roll {
 	roll_id: string;
 	camera_id: number | null;
 	film_stock_id: number | null;
+	lens_id: number | null;
 	status: RollStatus;
 	frame_count: number | null;
 	date_loaded: string | null;
@@ -123,6 +124,8 @@ export interface RollWithDetails extends Roll {
 	film_stock_brand?: string;
 	film_stock_name?: string;
 	film_stock_iso?: number;
+	lens_brand?: string;
+	lens_name?: string;
 }
 
 // --- Shots ---
@@ -196,3 +199,155 @@ export interface DevStage {
 }
 
 export type DevStageInsert = Omit<DevStage, 'id'>;
+
+// --- Search ---
+
+export interface CameraSearchResult {
+	id: number;
+	brand: string;
+	model: string;
+	format: string;
+	match_field: string;
+	match_snippet: string;
+}
+
+export interface LensSearchResult {
+	id: number;
+	brand: string;
+	name_on_lens: string | null;
+	focal_length: string | null;
+	match_field: string;
+	match_snippet: string;
+}
+
+export interface FilmStockSearchResult {
+	id: number;
+	brand: string;
+	name: string;
+	format: string;
+	stock_type: string;
+	match_field: string;
+	match_snippet: string;
+}
+
+export interface RollSearchResult {
+	id: number;
+	roll_id: string;
+	status: string;
+	camera_brand: string | null;
+	camera_model: string | null;
+	film_stock_brand: string | null;
+	film_stock_name: string | null;
+	match_field: string;
+	match_snippet: string;
+}
+
+export interface ShotSearchResult {
+	id: number;
+	frame_number: string;
+	roll_pk: number;
+	roll_id_display: string;
+	aperture: string | null;
+	location: string | null;
+	match_field: string;
+	match_snippet: string;
+}
+
+export interface LabSearchResult {
+	id: number;
+	name: string;
+	location: string | null;
+	match_field: string;
+	match_snippet: string;
+}
+
+export interface SearchResults {
+	cameras: CameraSearchResult[];
+	lenses: LensSearchResult[];
+	film_stocks: FilmStockSearchResult[];
+	rolls: RollSearchResult[];
+	shots: ShotSearchResult[];
+	labs: LabSearchResult[];
+}
+
+// --- Statistics ---
+
+export interface MonthCount {
+	month: string;
+	count: number;
+}
+
+export interface RankedItem {
+	label: string;
+	count: number;
+}
+
+export interface CatalogStats {
+	total_rolls: number;
+	total_shots: number;
+	total_cameras: number;
+	total_lenses: number;
+	total_lab_dev_cost: number;
+	total_maintenance_cost: number;
+	total_cost: number;
+	rolls_per_month: MonthCount[];
+	top_film_stocks: RankedItem[];
+	top_cameras: RankedItem[];
+	top_lenses: RankedItem[];
+	rolls_by_format: RankedItem[];
+	rolls_by_status: RankedItem[];
+}
+
+// --- AI Import ---
+
+export interface ModelInfo {
+	id: string;
+	display_name: string;
+}
+
+export interface ParsedRoll {
+	roll_id: string;
+	film_stock_guess: string | null;
+	camera_prefix_guess: string | null;
+	lens_guess: string | null;
+	frame_count: number | null;
+	date_loaded: string | null;
+	date_finished: string | null;
+	notes: string | null;
+	shots: ParsedShot[];
+}
+
+export interface ParsedShot {
+	frame_number: string;
+	aperture: string | null;
+	shutter_speed: string | null;
+	date: string | null;
+	focal_length: string | null;
+	location: string | null;
+	notes: string | null;
+}
+
+export interface ImportRollDto {
+	roll_id: string;
+	camera_id: number | null;
+	film_stock_id: number | null;
+	lens_id: number | null;
+	status: string;
+	frame_count: number | null;
+	date_loaded: string | null;
+	date_finished: string | null;
+	date_fuzzy: string | null;
+	notes: string | null;
+	shots: ImportShotDto[];
+}
+
+export interface ImportShotDto {
+	frame_number: string;
+	aperture: string | null;
+	shutter_speed: string | null;
+	date: string | null;
+	date_fuzzy: string | null;
+	location: string | null;
+	notes: string | null;
+	lens_ids: number[] | null;
+}

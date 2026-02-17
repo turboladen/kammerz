@@ -1,14 +1,16 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { LayoutDashboard, Film, Camera, Aperture, Package, FlaskConical, Plus } from 'lucide-svelte';
+	import { LayoutDashboard, Search, Film, Camera, Aperture, Package, FlaskConical, BarChart3, Plus } from 'lucide-svelte';
 
 	const navItems = [
 		{ href: '/', label: 'Dashboard', icon: LayoutDashboard },
+		{ href: '/search', label: 'Search', icon: Search },
 		{ href: '/rolls', label: 'Rolls', icon: Film },
 		{ href: '/cameras', label: 'Cameras', icon: Camera },
 		{ href: '/lenses', label: 'Lenses', icon: Aperture },
 		{ href: '/film-stocks', label: 'Film Stocks', icon: Package },
-		{ href: '/labs', label: 'Labs', icon: FlaskConical }
+		{ href: '/labs', label: 'Labs', icon: FlaskConical },
+		{ href: '/stats', label: 'Stats', icon: BarChart3 }
 	];
 
 	function isActive(href: string): boolean {

@@ -9,6 +9,7 @@ pub struct Model {
     pub roll_id: String,
     pub camera_id: Option<i32>,
     pub film_stock_id: Option<i32>,
+    pub lens_id: Option<i32>,
     pub status: String,
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
@@ -34,6 +35,12 @@ pub enum Relation {
         to = "super::film_stock::Column::Id"
     )]
     FilmStock,
+    #[sea_orm(
+        belongs_to = "super::lens::Entity",
+        from = "Column::LensId",
+        to = "super::lens::Column::Id"
+    )]
+    Lens,
     #[sea_orm(has_many = "super::shot::Entity")]
     Shots,
     #[sea_orm(has_many = "super::development_lab::Entity")]
@@ -51,6 +58,12 @@ impl Related<super::camera::Entity> for Entity {
 impl Related<super::film_stock::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::FilmStock.def()
+    }
+}
+
+impl Related<super::lens::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Lens.def()
     }
 }
 

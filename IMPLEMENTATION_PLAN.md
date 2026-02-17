@@ -112,15 +112,49 @@ Record how each roll was developed, whether at a lab or self-developed.
 - [x] **Auto-prompt**: Status change to `at-lab` → opens lab dev dialog; `developing` → opens self dev dialog
 - [x] **Exclusive development**: One dev record per roll (lab or self, not both)
 
-## Phase 6: Search, Import & Polish 🔲
+## Phase 6: Search, Statistics & AI Import ✅
 
-Cross-catalog search, data portability, and fit-and-finish improvements.
+Cross-catalog search, shooting statistics, and AI-powered note import.
 
-- [ ] **Search page** — full-text search across cameras, lenses, film stocks, rolls, shots, and notes
-- [ ] Data import from CSV/JSON (for migrating from spreadsheets or other tools)
+### 6a. Search
+- [x] **Search service** (`src-tauri/src/services/search_service.rs`) — LIKE search across 6 tables
+- [x] **Search command** (`src-tauri/src/commands/search.rs`) — `search_catalog` with 2-char minimum
+- [x] **Search page** (`src/routes/search/+page.svelte`) — debounced search (300ms), results grouped by entity type
+  - Cameras, lenses, film stocks, rolls, shots, labs
+  - Each result shows match context ("in {field}: {snippet}")
+  - Clickable results navigate to entity detail pages
+
+### 6b. Statistics
+- [x] **Stats service** (`src-tauri/src/services/stats_service.rs`) — aggregate SQL queries
+- [x] **Stats command** (`src-tauri/src/commands/stats.rs`) — `get_catalog_stats`
+- [x] **Stats page** (`src/routes/stats/+page.svelte`) — visual dashboard
+  - Summary cards: total rolls, shots, cost, cameras
+  - Rolls per month horizontal bar chart (last 12 months)
+  - Top film stocks, cameras, lenses ranked lists
+  - Format and status distribution bars
+  - Cost breakdown: lab dev + maintenance
+
+### 6c. AI-Powered Note Import
+- [x] **Settings table** — `settings(key TEXT PK, value TEXT)` for API key + model preference
+- [x] **Settings service** (`src-tauri/src/services/settings_service.rs`) — generic key-value get/set with upsert
+- [x] **Import service** (`src-tauri/src/services/import_service.rs`) — Claude API integration
+  - `list_models(api_key)` — fetches available models from `/v1/models`
+  - `parse_note(api_key, model, note_text)` — extracts structured roll + shot data via Claude Messages API
+- [x] **Import commands** — `list_models`, `parse_note`, `import_parsed_roll` (transactional)
+- [x] **Import page** (`src/routes/import/+page.svelte`) — multi-step workflow
+  - Step 1: Paste freeform note text, configure API key (with show/hide toggle) and model selection
+  - Step 2: Preview & edit parsed roll + shots, auto-match camera/film stock from catalog
+  - Step 3: Import → redirect to new roll detail page
+  - Dynamic model fetching from Claude API with refresh button
+  - Model preference persisted to settings
+
+## Phase 7: Data Portability & Polish 🔲
+
+Export, bulk operations, media attachments, and fit-and-finish improvements.
+
 - [ ] Data export (backup entire catalog to JSON)
+- [ ] Data import from CSV/JSON (for migrating from spreadsheets or other tools)
 - [ ] Bulk operations (e.g., mark multiple rolls as a batch)
-- [ ] Statistics and insights (most-used film stock, shots per camera, rolls per month)
 - [ ] Image/scan attachment support (link scanned images to rolls or individual shots)
 - [ ] Print/share roll summaries
 
@@ -128,7 +162,7 @@ Cross-catalog search, data portability, and fit-and-finish improvements.
 
 ## Schema Status
 
-All 12 database tables exist. Phase 3 ports the schema to SeaORM migrations and entities. No new tables are needed for Phases 4–5.
+All 13 database tables exist. Phases 1–3 created the core 12 tables; Phase 6 added `settings`.
 
 | Table | SeaORM Entity | UI Built |
 |---|---|---|
@@ -144,6 +178,7 @@ All 12 database tables exist. Phase 3 ports the schema to SeaORM migrations and 
 | `development_lab` | ✅ | ✅ |
 | `development_self` | ✅ | ✅ |
 | `dev_stages` | ✅ | ✅ |
+| `settings` | ✅ | ✅ (Import page) |
 
 ## Reference Projects
 

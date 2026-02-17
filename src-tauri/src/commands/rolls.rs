@@ -13,6 +13,7 @@ pub struct CreateRollDto {
     pub roll_id: String,
     pub camera_id: Option<i32>,
     pub film_stock_id: Option<i32>,
+    pub lens_id: Option<i32>,
     pub status: String,
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
@@ -27,6 +28,7 @@ pub struct UpdateRollDto {
     pub roll_id: Option<String>,
     pub camera_id: Option<i32>,
     pub film_stock_id: Option<i32>,
+    pub lens_id: Option<i32>,
     pub status: Option<String>,
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
@@ -68,6 +70,7 @@ pub async fn create_roll(state: State<'_, AppState>, data: CreateRollDto) -> Res
         roll_id: Set(data.roll_id),
         camera_id: Set(data.camera_id),
         film_stock_id: Set(data.film_stock_id),
+        lens_id: Set(data.lens_id),
         status: Set(data.status),
         frame_count: Set(data.frame_count),
         date_loaded: Set(data.date_loaded),
@@ -104,6 +107,7 @@ pub async fn update_roll(
     if let Some(v) = data.roll_id { model.roll_id = Set(v); }
     if data.camera_id.is_some() { model.camera_id = Set(data.camera_id); }
     if data.film_stock_id.is_some() { model.film_stock_id = Set(data.film_stock_id); }
+    if data.lens_id.is_some() { model.lens_id = Set(data.lens_id); }
     if let Some(v) = data.status { model.status = Set(v); }
     if data.frame_count.is_some() { model.frame_count = Set(data.frame_count); }
     if data.date_loaded.is_some() { model.date_loaded = Set(data.date_loaded); }

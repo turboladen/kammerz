@@ -43,7 +43,10 @@
 </script>
 
 <PageHeader title="Rolls" description="All film rolls">
-	<Button variant="primary" href="/rolls/new">+ New Roll</Button>
+	<div class="flex items-center gap-2">
+		<Button variant="ghost" href="/import">Import Notes</Button>
+		<Button variant="primary" href="/rolls/new">+ New Roll</Button>
+	</div>
 </PageHeader>
 
 <div class="p-6">
@@ -89,6 +92,9 @@
 					<div class="flex items-center gap-4">
 						{#if roll.film_stock_brand}
 							<span class="text-xs text-text-muted">{roll.film_stock_brand} {roll.film_stock_name}</span>
+						{/if}
+						{#if roll.lens_brand}
+							<span class="text-xs text-text-faint">{roll.lens_brand} {roll.lens_name}</span>
 						{/if}
 						{#if roll.date_loaded}
 							<span class="text-xs text-text-faint">{roll.date_loaded}</span>

@@ -6,17 +6,22 @@
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import { createRoll, suggestRollId } from '$lib/api/rolls';
-	import { listCameras } from '$lib/api/cameras';
+	import { listCameras, getLensesForCamera } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
-	import type { Camera, FilmStock, RollInsert } from '$lib/types';
+	import { listLenses } from '$lib/api/lenses';
+	import { lensDisplayName } from '$lib/utils/lens';
+	import type { Camera, FilmStock, Lens, RollInsert } from '$lib/types';
 
 	let cameras: Camera[] = $state([]);
 	let filmStocks: FilmStock[] = $state([]);
+	let allLenses: Lens[] = $state([]);
+	let cameraLensIds: number[] = $state([]);
 	let loading = $state(true);
 
 	let rollId = $state('');
 	let cameraId = $state('');
 	let filmStockId = $state('');
+	let lensId = $state('');
 	let frameCount = $state('');
 	let dateLoaded = $state('');
 	let dateFuzzy = $state('');
@@ -89,6 +94,37 @@
 		return options;
 	});
 
+	// Fetch camera-linked lens IDs when camera changes
+	$effect(() => {
+		const camId = cameraId;
+		if (camId) {
+			getLensesForCamera(Number(camId))
+				.then((ids) => (cameraLensIds = ids))
+				.catch(() => (cameraLensIds = []));
+		} else {
+			cameraLensIds = [];
+		}
+	});
+
+	const lensOptions = $derived.by(() => {
+		const owned = allLenses.filter((l) => !l.date_sold);
+		const linked = owned.filter((l) => cameraLensIds.includes(l.id));
+		const other = owned.filter((l) => !cameraLensIds.includes(l.id));
+		const options: { value: string; label: string; disabled?: boolean }[] = [
+			{ value: '', label: 'No default lens' }
+		];
+		for (const l of linked) {
+			options.push({ value: String(l.id), label: lensDisplayName(l) });
+		}
+		if (linked.length > 0 && other.length > 0) {
+			options.push({ value: '', label: '── Other lenses ──', disabled: true });
+		}
+		for (const l of other) {
+			options.push({ value: String(l.id), label: lensDisplayName(l) });
+		}
+		return options;
+	});
+
 	const pushPullOptions = [
 		{ value: '', label: 'Normal (box speed)' },
 		{ value: '-2', label: 'Pull -2' },
@@ -100,13 +136,15 @@
 
 	async function load() {
 		try {
-			const [cams, stocks, suggestedId] = await Promise.all([
+			const [cams, stocks, lenses, suggestedId] = await Promise.all([
 				listCameras(),
 				listFilmStocks(),
+				listLenses(),
 				suggestRollId()
 			]);
 			cameras = cams;
 			filmStocks = stocks;
+			allLenses = lenses;
 			rollId = suggestedId;
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -122,6 +160,7 @@
 				roll_id: rollId,
 				camera_id: cameraId ? Number(cameraId) : null,
 				film_stock_id: filmStockId ? Number(filmStockId) : null,
+				lens_id: lensId ? Number(lensId) : null,
 				status: 'loaded',
 				frame_count: frameCount ? parseInt(frameCount) : null,
 				date_loaded: dateLoaded || null,
@@ -159,6 +198,7 @@
 
 			<Select label="Camera" bind:value={cameraId} options={cameraOptions} />
 			<Select label="Film Stock" bind:value={filmStockId} options={filmStockOptions} />
+			<Select label="Default Lens" bind:value={lensId} options={lensOptions} />
 
 			<div class="grid grid-cols-3 gap-4">
 				<Input label="Frame Count" bind:value={frameCount} type="number" placeholder="36" />

@@ -25,6 +25,7 @@
 	let cameras: Camera[] = $state([]);
 	let loading = $state(true);
 	let assignCameraId = $state('');
+	let assignLensId = $state('');
 	let showDeleteConfirm = $state(false);
 	let error = $state('');
 
@@ -71,6 +72,25 @@
 		return [...linked, ...other];
 	});
 
+	// Roll-level default lens dropdown options
+	const rollLensOptions = $derived.by(() => {
+		const options: { value: string; label: string; disabled?: boolean }[] = [
+			{ value: '', label: 'No default lens' }
+		];
+		const linked = availableLenses.filter((l) => cameraLensIds.includes(l.id));
+		const other = availableLenses.filter((l) => !cameraLensIds.includes(l.id));
+		for (const l of linked) {
+			options.push({ value: String(l.id), label: lensDisplayName(l) });
+		}
+		if (linked.length > 0 && other.length > 0) {
+			options.push({ value: '', label: '── Other lenses ──', disabled: true });
+		}
+		for (const l of other) {
+			options.push({ value: String(l.id), label: lensDisplayName(l) });
+		}
+		return options;
+	});
+
 	// Frame progress
 	const frameProgress = $derived.by(() => {
 		if (!roll?.frame_count) return null;
@@ -96,6 +116,7 @@
 			labDev = ld;
 			selfDev = sd;
 			assignCameraId = roll?.camera_id?.toString() ?? '';
+		assignLensId = roll?.lens_id?.toString() ?? '';
 
 			// Load dev stages if self-development exists
 			if (sd) {
@@ -221,13 +242,25 @@
 		}
 	}
 
-	function getLensNamesForShot(shotId: number): string {
+	function getShotLensDisplay(shotId: number): { name: string; isDefault: boolean } | null {
 		const ids = shotLensMap[shotId] ?? [];
-		return ids
-			.map((lid) => allLenses.find((l) => l.id === lid))
-			.filter(Boolean)
-			.map((l) => lensDisplayName(l!))
-			.join(', ');
+		if (ids.length > 0) {
+			// Per-shot override
+			const names = ids
+				.map((lid) => allLenses.find((l) => l.id === lid))
+				.filter(Boolean)
+				.map((l) => lensDisplayName(l!))
+				.join(', ');
+			return { name: names, isDefault: false };
+		}
+		// Fall back to roll default
+		if (roll?.lens_id) {
+			const defaultLens = allLenses.find((l) => l.id === roll.lens_id);
+			if (defaultLens) {
+				return { name: lensDisplayName(defaultLens), isDefault: true };
+			}
+		}
+		return null;
 	}
 
 	async function updateStatus(status: RollStatus) {
@@ -250,6 +283,16 @@
 		error = '';
 		try {
 			await updateRoll(id, { camera_id: assignCameraId ? Number(assignCameraId) : null });
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	async function assignLens() {
+		error = '';
+		try {
+			await updateRoll(id, { lens_id: assignLensId ? Number(assignLensId) : null });
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -307,6 +350,9 @@
 						{#if roll.film_stock_brand}
 							<span>{roll.film_stock_brand} {roll.film_stock_name}</span>
 						{/if}
+						{#if roll.lens_brand}
+							<span>{roll.lens_brand} {roll.lens_name}</span>
+						{/if}
 						{#if roll.film_stock_iso}
 							<span>ISO {roll.film_stock_iso}</span>
 						{/if}
@@ -348,6 +394,14 @@
 				</div>
 			</div>
 		{/if}
+
+		<!-- Default Lens -->
+		<div class="mb-6 flex items-center gap-2">
+			<Select label="Default Lens" bind:value={assignLensId} options={rollLensOptions} />
+			<div class="pt-5">
+				<Button size="sm" onclick={assignLens}>Update</Button>
+			</div>
+		</div>
 
 		<!-- Status Progression -->
 		<div class="mb-6">
@@ -409,7 +463,7 @@
 			{:else}
 				<div class="space-y-1.5">
 					{#each shots as shot}
-						{@const lensNames = getLensNamesForShot(shot.id)}
+						{@const lensDisplay = getShotLensDisplay(shot.id)}
 						<div class="group flex items-start justify-between rounded-lg border border-border bg-surface-raised px-4 py-2.5 transition-all duration-150 hover:border-accent/30">
 							<div class="flex items-start gap-3">
 								<span class="mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded bg-accent/15 px-1.5 font-mono text-xs font-medium text-accent">
@@ -423,8 +477,13 @@
 										{#if shot.shutter_speed}
 											<span class="text-text-muted">{shot.shutter_speed}</span>
 										{/if}
-										{#if lensNames}
-											<span class="text-text-faint">{lensNames}</span>
+										{#if lensDisplay}
+											<span class="text-text-faint">
+												{lensDisplay.name}
+												{#if lensDisplay.isDefault}
+													<span class="text-text-faint/60 italic">(roll default)</span>
+												{/if}
+											</span>
 										{/if}
 										{#if shot.location}
 											<span class="text-text-faint">{shot.location}</span>

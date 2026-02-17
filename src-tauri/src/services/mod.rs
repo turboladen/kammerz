@@ -5,3 +5,7 @@ pub mod lab_service;
 pub mod roll_service;
 pub mod shot_service;
 pub mod development_service;
+pub mod search_service;
+pub mod stats_service;
+pub mod settings_service;
+pub mod import_service;

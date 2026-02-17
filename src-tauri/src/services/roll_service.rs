@@ -12,6 +12,7 @@ pub struct RollWithDetails {
     pub roll_id: String,
     pub camera_id: Option<i32>,
     pub film_stock_id: Option<i32>,
+    pub lens_id: Option<i32>,
     pub status: String,
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
@@ -28,18 +29,24 @@ pub struct RollWithDetails {
     pub film_stock_brand: Option<String>,
     pub film_stock_name: Option<String>,
     pub film_stock_iso: Option<i32>,
+    // Joined lens fields
+    pub lens_brand: Option<String>,
+    pub lens_name: Option<String>,
 }
 
 const ROLLS_WITH_DETAILS_SQL: &str = "\
-    SELECT r.id, r.roll_id, r.camera_id, r.film_stock_id, r.status, \
+    SELECT r.id, r.roll_id, r.camera_id, r.film_stock_id, r.lens_id, r.status, \
            r.frame_count, r.date_loaded, r.date_finished, r.date_fuzzy, \
            r.push_pull, r.notes, r.created_at, r.updated_at, \
            c.brand AS camera_brand, c.model AS camera_model, \
            fs.brand AS film_stock_brand, fs.name AS film_stock_name, \
-           fs.iso AS film_stock_iso \
+           fs.iso AS film_stock_iso, \
+           l.brand AS lens_brand, \
+           COALESCE(l.name_on_lens, l.focal_length) AS lens_name \
     FROM rolls r \
     LEFT JOIN cameras c ON r.camera_id = c.id \
-    LEFT JOIN film_stocks fs ON r.film_stock_id = fs.id";
+    LEFT JOIN film_stocks fs ON r.film_stock_id = fs.id \
+    LEFT JOIN lenses l ON r.lens_id = l.id";
 
 pub struct RollService;
 

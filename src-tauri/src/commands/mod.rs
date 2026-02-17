@@ -5,3 +5,7 @@ pub mod labs;
 pub mod rolls;
 pub mod shots;
 pub mod development;
+pub mod search;
+pub mod stats;
+pub mod settings;
+pub mod import;
