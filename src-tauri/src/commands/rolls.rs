@@ -105,9 +105,9 @@ pub async fn update_roll(
     let mut model: roll::ActiveModel = existing.into();
 
     if let Some(v) = data.roll_id { model.roll_id = Set(v); }
-    if data.camera_id.is_some() { model.camera_id = Set(data.camera_id); }
-    if data.film_stock_id.is_some() { model.film_stock_id = Set(data.film_stock_id); }
-    if data.lens_id.is_some() { model.lens_id = Set(data.lens_id); }
+    model.camera_id = Set(data.camera_id);
+    model.film_stock_id = Set(data.film_stock_id);
+    model.lens_id = Set(data.lens_id);
     if let Some(v) = data.status { model.status = Set(v); }
     if data.frame_count.is_some() { model.frame_count = Set(data.frame_count); }
     if data.date_loaded.is_some() { model.date_loaded = Set(data.date_loaded); }

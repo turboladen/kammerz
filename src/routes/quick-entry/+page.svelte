@@ -41,7 +41,7 @@
 			options.push({ value: String(r.id), label: `${r.roll_id}${filmInfo} (${r.status})` });
 		}
 		if (other.length > 0 && active.length > 0) {
-			options.push({ value: '', label: '── Other rolls ──', disabled: true });
+			options.push({ value: '__divider__', label: '── Other rolls ──', disabled: true });
 		}
 		for (const r of other) {
 			const filmInfo = r.film_stock_brand ? ` — ${r.film_stock_brand} ${r.film_stock_name}` : '';
@@ -66,7 +66,7 @@
 				options.push({ value: String(l.id), label: lensDisplayName(l) });
 			}
 			if (other.length > 0) {
-				options.push({ value: '', label: '── Other lenses ──', disabled: true });
+				options.push({ value: '__divider__', label: '── Other lenses ──', disabled: true });
 			}
 		}
 		for (const l of other) {

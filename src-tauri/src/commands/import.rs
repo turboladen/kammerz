@@ -1,14 +1,14 @@
-use sea_orm::{ActiveModelTrait, DbErr, Set, TransactionTrait};
+use sea_orm::Set;
 use serde::Deserialize;
 use tauri::State;
 
-use crate::entities::{roll, shot};
+use crate::entities::roll;
 use crate::services::import_service::{ImportService, ModelInfo, ParsedRoll};
+use crate::services::roll_service::{ImportShotEntry, RollService};
 use crate::services::settings_service::SettingsService;
-use crate::services::shot_service::ShotService;
 use crate::AppState;
 
-const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
+const DEFAULT_MODEL: &str = "claude-sonnet-4-5-20250929";
 
 // --- DTOs ---
 
@@ -90,64 +90,41 @@ pub async fn import_parsed_roll(
         .format("%Y-%m-%d %H:%M:%S")
         .to_string();
 
-    let roll_id = state
-        .db
-        .transaction::<_, i32, DbErr>(|txn| {
-            let now = now.clone();
-            Box::pin(async move {
-                // Create the roll
-                let roll_model = roll::ActiveModel {
-                    roll_id: Set(data.roll_id),
-                    camera_id: Set(data.camera_id),
-                    film_stock_id: Set(data.film_stock_id),
-                    lens_id: Set(data.lens_id),
-                    status: Set(data.status),
-                    frame_count: Set(data.frame_count),
-                    date_loaded: Set(data.date_loaded),
-                    date_finished: Set(data.date_finished),
-                    date_fuzzy: Set(data.date_fuzzy),
-                    notes: Set(data.notes),
-                    created_at: Set(now.clone()),
-                    updated_at: Set(now.clone()),
-                    ..Default::default()
-                };
-                let roll_result = roll_model.insert(txn).await?;
-                let new_roll_id = roll_result.id;
+    let roll_model = roll::ActiveModel {
+        roll_id: Set(data.roll_id),
+        camera_id: Set(data.camera_id),
+        film_stock_id: Set(data.film_stock_id),
+        lens_id: Set(data.lens_id),
+        status: Set(data.status),
+        frame_count: Set(data.frame_count),
+        date_loaded: Set(data.date_loaded),
+        date_finished: Set(data.date_finished),
+        date_fuzzy: Set(data.date_fuzzy),
+        notes: Set(data.notes),
+        created_at: Set(now.clone()),
+        updated_at: Set(now),
+        ..Default::default()
+    };
 
-                // Create shots
-                for shot_dto in data.shots {
-                    let shot_model = shot::ActiveModel {
-                        roll_id: Set(new_roll_id),
-                        frame_number: Set(shot_dto.frame_number),
-                        aperture: Set(shot_dto.aperture),
-                        shutter_speed: Set(shot_dto.shutter_speed),
-                        date: Set(shot_dto.date),
-                        date_fuzzy: Set(shot_dto.date_fuzzy),
-                        location: Set(shot_dto.location),
-                        notes: Set(shot_dto.notes),
-                        created_at: Set(now.clone()),
-                        updated_at: Set(now.clone()),
-                        ..Default::default()
-                    };
-                    let shot_result = shot_model.insert(txn).await?;
-
-                    // Link lenses if provided
-                    if let Some(lens_ids) = shot_dto.lens_ids {
-                        if !lens_ids.is_empty() {
-                            ShotService::set_lenses_for_shot(txn, shot_result.id, lens_ids)
-                                .await?;
-                        }
-                    }
-                }
-
-                Ok(new_roll_id)
-            })
+    let shot_entries: Vec<ImportShotEntry> = data
+        .shots
+        .into_iter()
+        .map(|s| ImportShotEntry {
+            frame_number: s.frame_number,
+            aperture: s.aperture,
+            shutter_speed: s.shutter_speed,
+            date: s.date,
+            date_fuzzy: s.date_fuzzy,
+            location: s.location,
+            notes: s.notes,
+            lens_ids: s.lens_ids,
         })
+        .collect();
+
+    RollService::import_roll(&state.db, roll_model, shot_entries)
         .await
         .map_err(|e| {
             log::error!("Failed to import roll: {e}");
             format!("Could not import roll: {e}")
-        })?;
-
-    Ok(roll_id)
+        })
 }

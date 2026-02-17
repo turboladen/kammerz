@@ -83,7 +83,7 @@
 			options.push({ value: String(l.id), label: lensDisplayName(l) });
 		}
 		if (linked.length > 0 && other.length > 0) {
-			options.push({ value: '', label: '── Other lenses ──', disabled: true });
+			options.push({ value: '__divider__', label: '── Other lenses ──', disabled: true });
 		}
 		for (const l of other) {
 			options.push({ value: String(l.id), label: lensDisplayName(l) });
@@ -116,7 +116,7 @@
 			labDev = ld;
 			selfDev = sd;
 			assignCameraId = roll?.camera_id?.toString() ?? '';
-		assignLensId = roll?.lens_id?.toString() ?? '';
+			assignLensId = roll?.lens_id?.toString() ?? '';
 
 			// Load dev stages if self-development exists
 			if (sd) {

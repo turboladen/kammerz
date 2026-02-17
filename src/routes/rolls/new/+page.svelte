@@ -84,7 +84,7 @@
 		}
 
 		if (matching.length > 0 && rest.length > 0) {
-			options.push({ value: '', label: '── Other formats ──', disabled: true });
+			options.push({ value: '__divider__', label: '── Other formats ──', disabled: true });
 		}
 
 		for (const s of rest) {
@@ -117,7 +117,7 @@
 			options.push({ value: String(l.id), label: lensDisplayName(l) });
 		}
 		if (linked.length > 0 && other.length > 0) {
-			options.push({ value: '', label: '── Other lenses ──', disabled: true });
+			options.push({ value: '__divider__', label: '── Other lenses ──', disabled: true });
 		}
 		for (const l of other) {
 			options.push({ value: String(l.id), label: lensDisplayName(l) });

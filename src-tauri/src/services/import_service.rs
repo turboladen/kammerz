@@ -225,13 +225,14 @@ impl ImportService {
             .ok_or_else(|| "Claude API returned no text content".to_string())?;
 
         // Strip markdown code fences if present
-        let json_str = text
-            .trim()
+        let trimmed = text.trim();
+        let after_prefix = trimmed
             .strip_prefix("```json")
-            .or_else(|| text.trim().strip_prefix("```"))
-            .unwrap_or(text.trim())
+            .or_else(|| trimmed.strip_prefix("```"))
+            .unwrap_or(trimmed);
+        let json_str = after_prefix
             .strip_suffix("```")
-            .unwrap_or(text.trim())
+            .unwrap_or(after_prefix)
             .trim();
 
         serde_json::from_str::<ParsedRoll>(json_str).map_err(|e| {

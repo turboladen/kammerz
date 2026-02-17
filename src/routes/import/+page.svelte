@@ -21,11 +21,12 @@
 	// Settings
 	let apiKey = $state('');
 	let showApiKey = $state(false);
-	let selectedModel = $state('claude-sonnet-4-20250514');
+	let selectedModel = $state('claude-sonnet-4-5-20250929');
 	let showSettings = $state(false);
 	let savingKey = $state(false);
 	let keySaved = $state(false);
 	let settingsLoaded = $state(false); // guards $effect from saving during initial load
+	let lastPersistedModel = $state(''); // tracks last DB value to avoid redundant writes
 
 	// Models
 	let models: ModelInfo[] = $state([]);
@@ -69,9 +70,9 @@
 		models.length > 0
 			? models.map((m) => ({ value: m.id, label: m.display_name }))
 			: [
-					{ value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
-					{ value: 'claude-haiku-3-5-20241022', label: 'Claude Haiku 3.5' },
-					{ value: 'claude-opus-4-20250514', label: 'Claude Opus 4' }
+					{ value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5' },
+					{ value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+					{ value: 'claude-opus-4-6', label: 'Claude Opus 4.6' }
 				]
 	);
 
@@ -143,7 +144,10 @@
 				// Auto-fetch models if we have a saved key
 				fetchModels();
 			}
-			if (model) selectedModel = model;
+			if (model) {
+				selectedModel = model;
+				lastPersistedModel = model;
+			}
 		} catch {
 			// Settings not yet configured — that's fine
 		} finally {
@@ -185,7 +189,9 @@
 	// Auto-persist model selection whenever it changes (after initial load)
 	$effect(() => {
 		const model = selectedModel; // read to subscribe
-		if (!settingsLoaded) return;  // skip the initial load assignment
+		if (!settingsLoaded) return;  // skip before settings loaded
+		if (model === lastPersistedModel) return;  // skip redundant writes
+		lastPersistedModel = model;
 		setSetting('claude_model', model).catch(() => {
 			// Non-critical — model will fall back to default
 		});

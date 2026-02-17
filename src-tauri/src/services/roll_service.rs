@@ -2,6 +2,16 @@ use sea_orm::*;
 use serde::Serialize;
 
 use crate::entities::roll::{self, Entity as Roll};
+use crate::entities::shot;
+use crate::services::shot_service::ShotService;
+
+/// Convert `TransactionError<DbErr>` to `DbErr`.
+fn transaction_err(e: TransactionError<DbErr>) -> DbErr {
+    match e {
+        TransactionError::Connection(db_err) => db_err,
+        TransactionError::Transaction(db_err) => db_err,
+    }
+}
 
 /// Flat struct for rolls joined with camera and film stock data.
 /// Mirrors the frontend's `RollWithDetails` TypeScript interface.
@@ -47,6 +57,18 @@ const ROLLS_WITH_DETAILS_SQL: &str = "\
     LEFT JOIN cameras c ON r.camera_id = c.id \
     LEFT JOIN film_stocks fs ON r.film_stock_id = fs.id \
     LEFT JOIN lenses l ON r.lens_id = l.id";
+
+/// Data for a single shot during roll import.
+pub struct ImportShotEntry {
+    pub frame_number: String,
+    pub aperture: Option<String>,
+    pub shutter_speed: Option<String>,
+    pub date: Option<String>,
+    pub date_fuzzy: Option<String>,
+    pub location: Option<String>,
+    pub notes: Option<String>,
+    pub lens_ids: Option<Vec<i32>>,
+}
 
 pub struct RollService;
 
@@ -110,6 +132,55 @@ impl RollService {
         ))
         .all(db)
         .await
+    }
+
+    /// Import a roll with its shots in a single transaction.
+    pub async fn import_roll(
+        db: &DatabaseConnection,
+        roll_model: roll::ActiveModel,
+        shot_entries: Vec<ImportShotEntry>,
+    ) -> Result<i32, DbErr> {
+        let roll_id = db
+            .transaction::<_, i32, DbErr>(|txn| {
+                Box::pin(async move {
+                    let roll_result = roll_model.insert(txn).await?;
+                    let new_roll_id = roll_result.id;
+
+                    let now = chrono::Utc::now()
+                        .format("%Y-%m-%d %H:%M:%S")
+                        .to_string();
+
+                    for entry in shot_entries {
+                        let shot_model = shot::ActiveModel {
+                            roll_id: Set(new_roll_id),
+                            frame_number: Set(entry.frame_number),
+                            aperture: Set(entry.aperture),
+                            shutter_speed: Set(entry.shutter_speed),
+                            date: Set(entry.date),
+                            date_fuzzy: Set(entry.date_fuzzy),
+                            location: Set(entry.location),
+                            notes: Set(entry.notes),
+                            created_at: Set(now.clone()),
+                            updated_at: Set(now.clone()),
+                            ..Default::default()
+                        };
+                        let shot_result = shot_model.insert(txn).await?;
+
+                        if let Some(lens_ids) = entry.lens_ids {
+                            if !lens_ids.is_empty() {
+                                ShotService::set_lenses_for_shot(txn, shot_result.id, lens_ids)
+                                    .await?;
+                            }
+                        }
+                    }
+
+                    Ok(new_roll_id)
+                })
+            })
+            .await
+            .map_err(transaction_err)?;
+
+        Ok(roll_id)
     }
 
     /// Suggest a roll ID in YYMMDD-N format.
