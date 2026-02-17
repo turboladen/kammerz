@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
+	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import { searchCatalog } from '$lib/api/search';
 	import type { SearchResults } from '$lib/types';
 	import { Camera, Aperture, Package, Film, Focus, FlaskConical, Search } from 'lucide-svelte';
@@ -83,189 +84,201 @@
 		<div class="mt-6 space-y-6">
 			<!-- Cameras -->
 			{#if results.cameras.length > 0}
-				<section>
-					<div class="mb-2 flex items-center gap-2">
-						<Camera size={14} strokeWidth={1.75} class="text-accent" />
-						<h2 class="text-xs font-semibold uppercase tracking-wider text-text-muted">
-							Cameras <span class="text-text-faint">({results.cameras.length})</span>
-						</h2>
-					</div>
-					<div class="grid gap-1.5">
-						{#each results.cameras as cam}
-							<a
-								href="/cameras/{cam.id}"
-								class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
-							>
-								<div class="flex items-center gap-3">
-									<span class="text-sm font-medium">{cam.brand} {cam.model}</span>
-									<span class="text-xs text-text-faint">{cam.format}</span>
-								</div>
-								<div class="flex items-center gap-2">
-									<span class="text-xs text-text-faint">in {cam.match_field}</span>
-									<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
-								</div>
-							</a>
-						{/each}
-					</div>
-				</section>
+				<FadeIn>
+					<section class="border-l-2 border-accent/40 pl-4">
+						<div class="mb-2 flex items-center gap-2">
+							<Camera size={14} strokeWidth={1.75} class="text-accent" />
+							<h2 class="text-xs font-semibold uppercase tracking-wider text-text-muted">
+								Cameras <span class="text-text-faint">({results.cameras.length})</span>
+							</h2>
+						</div>
+						<div class="grid gap-1.5">
+							{#each results.cameras as cam}
+								<a
+									href="/cameras/{cam.id}"
+									class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+								>
+									<div class="flex items-center gap-3">
+										<span class="text-sm font-medium">{cam.brand} {cam.model}</span>
+										<span class="text-xs text-text-faint">{cam.format}</span>
+									</div>
+									<div class="flex items-center gap-2">
+										<span class="text-xs text-text-faint">in {cam.match_field}</span>
+										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+									</div>
+								</a>
+							{/each}
+						</div>
+					</section>
+				</FadeIn>
 			{/if}
 
 			<!-- Lenses -->
 			{#if results.lenses.length > 0}
-				<section>
-					<div class="mb-2 flex items-center gap-2">
-						<Aperture size={14} strokeWidth={1.75} class="text-accent" />
-						<h2 class="text-xs font-semibold uppercase tracking-wider text-text-muted">
-							Lenses <span class="text-text-faint">({results.lenses.length})</span>
-						</h2>
-					</div>
-					<div class="grid gap-1.5">
-						{#each results.lenses as lens}
-							<a
-								href="/lenses/{lens.id}"
-								class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
-							>
-								<div class="flex items-center gap-3">
-									<span class="text-sm font-medium">{lens.brand} {lens.name_on_lens ?? ''}</span>
-									{#if lens.focal_length}
-										<span class="text-xs text-text-faint">{lens.focal_length}</span>
-									{/if}
-								</div>
-								<div class="flex items-center gap-2">
-									<span class="text-xs text-text-faint">in {lens.match_field}</span>
-									<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
-								</div>
-							</a>
-						{/each}
-					</div>
-				</section>
+				<FadeIn delay={50}>
+					<section class="border-l-2 border-accent/40 pl-4">
+						<div class="mb-2 flex items-center gap-2">
+							<Aperture size={14} strokeWidth={1.75} class="text-accent" />
+							<h2 class="text-xs font-semibold uppercase tracking-wider text-text-muted">
+								Lenses <span class="text-text-faint">({results.lenses.length})</span>
+							</h2>
+						</div>
+						<div class="grid gap-1.5">
+							{#each results.lenses as lens}
+								<a
+									href="/lenses/{lens.id}"
+									class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+								>
+									<div class="flex items-center gap-3">
+										<span class="text-sm font-medium">{lens.brand} {lens.name_on_lens ?? ''}</span>
+										{#if lens.focal_length}
+											<span class="text-xs text-text-faint">{lens.focal_length}</span>
+										{/if}
+									</div>
+									<div class="flex items-center gap-2">
+										<span class="text-xs text-text-faint">in {lens.match_field}</span>
+										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+									</div>
+								</a>
+							{/each}
+						</div>
+					</section>
+				</FadeIn>
 			{/if}
 
 			<!-- Film Stocks -->
 			{#if results.film_stocks.length > 0}
-				<section>
-					<div class="mb-2 flex items-center gap-2">
-						<Package size={14} strokeWidth={1.75} class="text-accent" />
-						<h2 class="text-xs font-semibold uppercase tracking-wider text-text-muted">
-							Film Stocks <span class="text-text-faint">({results.film_stocks.length})</span>
-						</h2>
-					</div>
-					<div class="grid gap-1.5">
-						{#each results.film_stocks as fs}
-							<a
-								href="/film-stocks/{fs.id}"
-								class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
-							>
-								<div class="flex items-center gap-3">
-									<span class="text-sm font-medium">{fs.brand} {fs.name}</span>
-									<span class="text-xs text-text-faint">{fs.format} · {fs.stock_type}</span>
-								</div>
-								<div class="flex items-center gap-2">
-									<span class="text-xs text-text-faint">in {fs.match_field}</span>
-									<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
-								</div>
-							</a>
-						{/each}
-					</div>
-				</section>
+				<FadeIn delay={100}>
+					<section class="border-l-2 border-accent/40 pl-4">
+						<div class="mb-2 flex items-center gap-2">
+							<Package size={14} strokeWidth={1.75} class="text-accent" />
+							<h2 class="text-xs font-semibold uppercase tracking-wider text-text-muted">
+								Film Stocks <span class="text-text-faint">({results.film_stocks.length})</span>
+							</h2>
+						</div>
+						<div class="grid gap-1.5">
+							{#each results.film_stocks as fs}
+								<a
+									href="/film-stocks/{fs.id}"
+									class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+								>
+									<div class="flex items-center gap-3">
+										<span class="text-sm font-medium">{fs.brand} {fs.name}</span>
+										<span class="text-xs text-text-faint">{fs.format} · {fs.stock_type}</span>
+									</div>
+									<div class="flex items-center gap-2">
+										<span class="text-xs text-text-faint">in {fs.match_field}</span>
+										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+									</div>
+								</a>
+							{/each}
+						</div>
+					</section>
+				</FadeIn>
 			{/if}
 
 			<!-- Rolls -->
 			{#if results.rolls.length > 0}
-				<section>
-					<div class="mb-2 flex items-center gap-2">
-						<Film size={14} strokeWidth={1.75} class="text-accent" />
-						<h2 class="text-xs font-semibold uppercase tracking-wider text-text-muted">
-							Rolls <span class="text-text-faint">({results.rolls.length})</span>
-						</h2>
-					</div>
-					<div class="grid gap-1.5">
-						{#each results.rolls as roll}
-							<a
-								href="/rolls/{roll.id}"
-								class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
-							>
-								<div class="flex items-center gap-3">
-									<span class="font-mono text-sm font-semibold">{roll.roll_id}</span>
-									<span class="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase text-accent">{roll.status}</span>
-									{#if roll.camera_brand}
-										<span class="text-xs text-text-muted">{roll.camera_brand} {roll.camera_model}</span>
-									{/if}
-								</div>
-								<div class="flex items-center gap-2">
-									{#if roll.film_stock_brand}
-										<span class="text-xs text-text-faint">{roll.film_stock_brand} {roll.film_stock_name}</span>
-									{/if}
-									<span class="text-xs text-text-faint">· in {roll.match_field}</span>
-									<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
-								</div>
-							</a>
-						{/each}
-					</div>
-				</section>
+				<FadeIn delay={150}>
+					<section class="border-l-2 border-accent/40 pl-4">
+						<div class="mb-2 flex items-center gap-2">
+							<Film size={14} strokeWidth={1.75} class="text-accent" />
+							<h2 class="text-xs font-semibold uppercase tracking-wider text-text-muted">
+								Rolls <span class="text-text-faint">({results.rolls.length})</span>
+							</h2>
+						</div>
+						<div class="grid gap-1.5">
+							{#each results.rolls as roll}
+								<a
+									href="/rolls/{roll.id}"
+									class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+								>
+									<div class="flex items-center gap-3">
+										<span class="font-mono text-sm font-semibold">{roll.roll_id}</span>
+										<span class="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase text-accent">{roll.status}</span>
+										{#if roll.camera_brand}
+											<span class="text-xs text-text-muted">{roll.camera_brand} {roll.camera_model}</span>
+										{/if}
+									</div>
+									<div class="flex items-center gap-2">
+										{#if roll.film_stock_brand}
+											<span class="text-xs text-text-faint">{roll.film_stock_brand} {roll.film_stock_name}</span>
+										{/if}
+										<span class="text-xs text-text-faint">· in {roll.match_field}</span>
+										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+									</div>
+								</a>
+							{/each}
+						</div>
+					</section>
+				</FadeIn>
 			{/if}
 
 			<!-- Shots -->
 			{#if results.shots.length > 0}
-				<section>
-					<div class="mb-2 flex items-center gap-2">
-						<Focus size={14} strokeWidth={1.75} class="text-accent" />
-						<h2 class="text-xs font-semibold uppercase tracking-wider text-text-muted">
-							Shots <span class="text-text-faint">({results.shots.length})</span>
-						</h2>
-					</div>
-					<div class="grid gap-1.5">
-						{#each results.shots as shot}
-							<a
-								href="/rolls/{shot.roll_pk}"
-								class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
-							>
-								<div class="flex items-center gap-3">
-									<span class="font-mono text-sm font-semibold">#{shot.frame_number}</span>
-									<span class="text-xs text-text-muted">Roll {shot.roll_id_display}</span>
-									{#if shot.location}
-										<span class="text-xs text-text-faint">{shot.location}</span>
-									{/if}
-								</div>
-								<div class="flex items-center gap-2">
-									<span class="text-xs text-text-faint">in {shot.match_field}: {shot.match_snippet}</span>
-									<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
-								</div>
-							</a>
-						{/each}
-					</div>
-				</section>
+				<FadeIn delay={200}>
+					<section class="border-l-2 border-accent/40 pl-4">
+						<div class="mb-2 flex items-center gap-2">
+							<Focus size={14} strokeWidth={1.75} class="text-accent" />
+							<h2 class="text-xs font-semibold uppercase tracking-wider text-text-muted">
+								Shots <span class="text-text-faint">({results.shots.length})</span>
+							</h2>
+						</div>
+						<div class="grid gap-1.5">
+							{#each results.shots as shot}
+								<a
+									href="/rolls/{shot.roll_pk}"
+									class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+								>
+									<div class="flex items-center gap-3">
+										<span class="font-mono text-sm font-semibold">#{shot.frame_number}</span>
+										<span class="text-xs text-text-muted">Roll {shot.roll_id_display}</span>
+										{#if shot.location}
+											<span class="text-xs text-text-faint">{shot.location}</span>
+										{/if}
+									</div>
+									<div class="flex items-center gap-2">
+										<span class="text-xs text-text-faint">in {shot.match_field}: {shot.match_snippet}</span>
+										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+									</div>
+								</a>
+							{/each}
+						</div>
+					</section>
+				</FadeIn>
 			{/if}
 
 			<!-- Labs -->
 			{#if results.labs.length > 0}
-				<section>
-					<div class="mb-2 flex items-center gap-2">
-						<FlaskConical size={14} strokeWidth={1.75} class="text-accent" />
-						<h2 class="text-xs font-semibold uppercase tracking-wider text-text-muted">
-							Labs <span class="text-text-faint">({results.labs.length})</span>
-						</h2>
-					</div>
-					<div class="grid gap-1.5">
-						{#each results.labs as lab}
-							<a
-								href="/labs/{lab.id}"
-								class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
-							>
-								<div class="flex items-center gap-3">
-									<span class="text-sm font-medium">{lab.name}</span>
-									{#if lab.location}
-										<span class="text-xs text-text-faint">{lab.location}</span>
-									{/if}
-								</div>
-								<div class="flex items-center gap-2">
-									<span class="text-xs text-text-faint">in {lab.match_field}</span>
-									<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
-								</div>
-							</a>
-						{/each}
-					</div>
-				</section>
+				<FadeIn delay={250}>
+					<section class="border-l-2 border-accent/40 pl-4">
+						<div class="mb-2 flex items-center gap-2">
+							<FlaskConical size={14} strokeWidth={1.75} class="text-accent" />
+							<h2 class="text-xs font-semibold uppercase tracking-wider text-text-muted">
+								Labs <span class="text-text-faint">({results.labs.length})</span>
+							</h2>
+						</div>
+						<div class="grid gap-1.5">
+							{#each results.labs as lab}
+								<a
+									href="/labs/{lab.id}"
+									class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+								>
+									<div class="flex items-center gap-3">
+										<span class="text-sm font-medium">{lab.name}</span>
+										{#if lab.location}
+											<span class="text-xs text-text-faint">{lab.location}</span>
+										{/if}
+									</div>
+									<div class="flex items-center gap-2">
+										<span class="text-xs text-text-faint">in {lab.match_field}</span>
+										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+									</div>
+								</a>
+							{/each}
+						</div>
+					</section>
+				</FadeIn>
 			{/if}
 		</div>
 	{/if}

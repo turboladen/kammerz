@@ -114,6 +114,33 @@ body::after {
 	to { opacity: 1; }
 }
 
+/* Page content fade-in-up — used for staggered list/section reveals */
+@keyframes fade-in-up {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.animate-fade-in-up {
+	animation: fade-in-up 200ms ease-out both;
+}
+
+/* Quick Entry success flash */
+@keyframes success-flash {
+	0% { background-color: transparent; }
+	30% { background-color: rgb(34 197 94 / 0.10); }
+	100% { background-color: rgb(34 197 94 / 0.10); }
+}
+
+.animate-success-flash {
+	animation: success-flash 600ms ease-out both;
+}
+
 /* Font display utility for Instrument Serif */
 .font-display {
 	font-family: var(--font-display);

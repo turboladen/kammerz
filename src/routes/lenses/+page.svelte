@@ -7,6 +7,7 @@
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
+	import { Aperture } from 'lucide-svelte';
 	import { listLenses, createLens, updateLens, deleteLens, listDistinctLensBrands, listDistinctLensSystems } from '$lib/api/lenses';
 	import { listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
 	import type { Lens, LensInsert } from '$lib/types';
@@ -169,13 +170,14 @@
 	{#if loading}
 		<p class="text-sm text-text-muted">Loading...</p>
 	{:else if lenses.length === 0}
-		<EmptyState message="No lenses yet. Add your first lens to get started.">
+		<EmptyState title="No Lenses" message="Add your first lens to get started.">
+			{#snippet icon()}<Aperture size={24} strokeWidth={1.5} />{/snippet}
 			<Button variant="primary" onclick={() => (showAddDialog = true)}>+ Add Lens</Button>
 		</EmptyState>
 	{:else}
 		<div class="grid gap-3">
 			{#each lenses as lens}
-				<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40">
+				<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px">
 					<div>
 						<div class="flex items-center gap-2">
 							<span class="font-semibold">{lensDisplayName(lens)}</span>

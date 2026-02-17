@@ -5,6 +5,7 @@
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
+	import { ChevronUp, ChevronDown, X } from 'lucide-svelte';
 	import {
 		createLabDev,
 		updateLabDev,
@@ -416,9 +417,9 @@
 									class="w-24 rounded border border-border bg-surface px-2 py-1 text-sm text-text-muted focus:border-accent focus:ring-1 focus:ring-accent/50 focus:outline-none"
 								/>
 								<div class="flex gap-0.5">
-									<button onclick={() => moveStage(i, -1)} disabled={i === 0} class="rounded px-1 py-0.5 text-xs text-text-faint hover:text-text disabled:opacity-30">&uarr;</button>
-									<button onclick={() => moveStage(i, 1)} disabled={i === devFormStages.length - 1} class="rounded px-1 py-0.5 text-xs text-text-faint hover:text-text disabled:opacity-30">&darr;</button>
-									<button onclick={() => removeStage(i)} class="rounded px-1 py-0.5 text-xs text-text-faint hover:text-red-400">&times;</button>
+									<button onclick={() => moveStage(i, -1)} disabled={i === 0} class="rounded p-0.5 text-text-faint transition-colors hover:bg-surface-overlay hover:text-text disabled:opacity-30"><ChevronUp size={12} /></button>
+									<button onclick={() => moveStage(i, 1)} disabled={i === devFormStages.length - 1} class="rounded p-0.5 text-text-faint transition-colors hover:bg-surface-overlay hover:text-text disabled:opacity-30"><ChevronDown size={12} /></button>
+									<button onclick={() => removeStage(i)} class="rounded p-0.5 text-text-faint transition-colors hover:bg-red-500/15 hover:text-red-400"><X size={12} /></button>
 								</div>
 							</div>
 						{/each}

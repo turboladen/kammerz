@@ -6,7 +6,9 @@
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
+	import { Camera as CameraIcon } from 'lucide-svelte';
 	import { listCameras, createCamera, deleteCamera, listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
 	import { listDistinctLensBrands } from '$lib/api/lenses';
 	import type { Camera, CameraInsert } from '$lib/types';
@@ -161,38 +163,41 @@
 	{#if loading}
 		<p class="text-sm text-text-muted">Loading...</p>
 	{:else if filtered.length === 0}
-		<EmptyState message="No cameras yet. Add your first camera to get started.">
+		<EmptyState title="No Cameras" message="Add your first camera to get started.">
+			{#snippet icon()}<CameraIcon size={24} strokeWidth={1.5} />{/snippet}
 			<Button variant="primary" onclick={() => (showAddDialog = true)}>+ Add Camera</Button>
 		</EmptyState>
 	{:else}
 		<div class="grid gap-3">
-			{#each filtered as camera}
-				<a
-					href="/cameras/{camera.id}"
-					class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
-				>
-					<div>
-						<div class="flex items-center gap-2">
-							<span class="font-semibold">{camera.brand} {camera.model}</span>
-							{#if camera.prefix}
-								<span class="rounded bg-surface-overlay px-1.5 py-0.5 font-mono text-xs text-text-muted">{camera.prefix}</span>
-							{/if}
-							{#if camera.date_sold}
-								<span class="rounded bg-red-500/15 px-1.5 py-0.5 text-xs text-red-400">Sold</span>
-							{/if}
+			{#each filtered as camera, i}
+				<FadeIn delay={Math.min(i, 10) * 30}>
+					<a
+						href="/cameras/{camera.id}"
+						class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+					>
+						<div>
+							<div class="flex items-center gap-2">
+								<span class="font-semibold">{camera.brand} {camera.model}</span>
+								{#if camera.prefix}
+									<span class="rounded bg-surface-overlay px-1.5 py-0.5 font-mono text-xs text-text-muted">{camera.prefix}</span>
+								{/if}
+								{#if camera.date_sold}
+									<span class="rounded bg-red-500/15 px-1.5 py-0.5 text-xs text-red-400">Sold</span>
+								{/if}
+							</div>
+							<div class="mt-1 flex gap-3 text-xs text-text-muted">
+								<span>{camera.format}</span>
+								{#if camera.camera_type}
+									<span>{camera.camera_type}</span>
+								{/if}
+								{#if camera.serial_number}
+									<span>S/N: {camera.serial_number}</span>
+								{/if}
+							</div>
 						</div>
-						<div class="mt-1 flex gap-3 text-xs text-text-muted">
-							<span>{camera.format}</span>
-							{#if camera.camera_type}
-								<span>{camera.camera_type}</span>
-							{/if}
-							{#if camera.serial_number}
-								<span>S/N: {camera.serial_number}</span>
-							{/if}
-						</div>
-					</div>
-					<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">View &rarr;</span>
-				</a>
+						<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">View &rarr;</span>
+					</a>
+				</FadeIn>
 			{/each}
 		</div>
 	{/if}

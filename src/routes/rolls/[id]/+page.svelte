@@ -405,7 +405,10 @@
 
 		<!-- Status Progression -->
 		<div class="mb-6">
-			<h2 class="mb-3 text-sm font-semibold text-text-muted">Status</h2>
+			<h2 class="mb-3 flex items-center gap-3 text-sm font-semibold text-text-muted">
+				Status
+				<div class="flex-1 border-b border-border-subtle"></div>
+			</h2>
 			<div class="flex flex-wrap gap-2">
 				{#each statusProgression as status}
 					<button

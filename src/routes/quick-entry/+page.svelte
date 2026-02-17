@@ -20,6 +20,8 @@
 	let saving = $state(false);
 	let error = $state('');
 	let successMessage = $state('');
+	let sessionCount = $state(0);
+	let lastSavedFrame = $state('');
 
 	// Form fields
 	let frameNumber = $state('');
@@ -145,6 +147,8 @@
 				lens_ids: lensIds
 			});
 
+			sessionCount++;
+			lastSavedFrame = frameNumber.trim();
 			successMessage = `Frame ${frameNumber} saved`;
 			setTimeout(() => (successMessage = ''), 2000);
 
@@ -255,13 +259,20 @@
 				{/if}
 
 				{#if successMessage}
-					<div class="mt-3 rounded-lg bg-green-500/15 px-3 py-2 text-sm text-green-400">{successMessage}</div>
+					{#key successMessage}
+						<div class="mt-3 animate-success-flash rounded-lg bg-green-500/15 px-3 py-2 text-sm text-green-400">{successMessage}</div>
+					{/key}
 				{/if}
 
 				<div class="mt-4 flex items-center justify-between">
-					<span class="text-xs text-text-faint">
-						{navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+Enter to save
-					</span>
+					<div class="flex items-center gap-3">
+						<span class="text-xs text-text-faint">
+							{navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+Enter to save
+						</span>
+						{#if sessionCount > 0}
+							<span class="font-mono text-xs text-text-faint">{sessionCount} this session</span>
+						{/if}
+					</div>
 					<Button variant="primary" onclick={handleSave} disabled={saving || !frameNumber.trim()}>
 						{saving ? 'Saving...' : 'Save & Next →'}
 					</Button>
@@ -273,8 +284,9 @@
 				<div>
 					<h2 class="mb-2 text-sm font-semibold text-text-muted">Previous shots</h2>
 					<div class="space-y-1">
-						{#each [...shots].reverse().slice(0, 10) as shot}
-							<div class="flex items-center gap-3 rounded px-3 py-1.5 text-sm text-text-muted">
+						{#each [...shots].reverse().slice(0, 10) as shot, i}
+							<div class="flex items-center gap-3 rounded px-3 py-1.5 text-sm text-text-muted {i === 0 && shot.frame_number === lastSavedFrame ? 'animate-fade-in-up' : ''}"
+							>
 								<span class="inline-flex h-5 min-w-5 items-center justify-center rounded bg-accent/10 px-1 font-mono text-xs text-accent">
 									{shot.frame_number}
 								</span>

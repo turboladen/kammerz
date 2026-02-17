@@ -6,6 +6,7 @@
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+	import { FlaskConical } from 'lucide-svelte';
 	import { listLabs, createLab, updateLab, deleteLab } from '$lib/api/labs';
 	import type { Lab, LabInsert } from '$lib/types';
 
@@ -115,13 +116,14 @@
 	{#if loading}
 		<p class="text-sm text-text-muted">Loading...</p>
 	{:else if labs.length === 0}
-		<EmptyState message="No labs yet. Add the labs you use for film development.">
+		<EmptyState title="No Labs" message="Add the labs you use for film development.">
+			{#snippet icon()}<FlaskConical size={24} strokeWidth={1.5} />{/snippet}
 			<Button variant="primary" onclick={() => (showAddDialog = true)}>+ Add Lab</Button>
 		</EmptyState>
 	{:else}
 		<div class="grid gap-3">
 			{#each labs as lab}
-				<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40">
+				<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px">
 					<div>
 						<span class="font-semibold">{lab.name}</span>
 						<div class="mt-1 flex gap-3 text-xs text-text-muted">

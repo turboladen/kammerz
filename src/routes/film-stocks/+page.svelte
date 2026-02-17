@@ -168,7 +168,7 @@
 				<h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">{brandName}</h2>
 				<div class="grid gap-2">
 					{#each brandStocks as stock}
-						<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40">
+						<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px">
 							<div class="flex items-center gap-3">
 								<span class="font-medium">{stock.name}</span>
 								{#if stock.iso}

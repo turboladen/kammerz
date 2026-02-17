@@ -469,7 +469,10 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 
 			<!-- Roll Info -->
 			<div class="mb-6 rounded-lg border border-border bg-surface-raised p-4">
-				<h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-text-faint">Roll Info</h3>
+				<h3 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+					Roll Info
+					<div class="flex-1 border-b border-border-subtle"></div>
+				</h3>
 				<div class="grid grid-cols-2 gap-4">
 					<Input label="Roll ID" bind:value={rollId} />
 					<Select
@@ -531,8 +534,9 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 			<!-- Shots -->
 			{#if shots.length > 0}
 				<div class="mb-6 rounded-lg border border-border bg-surface-raised p-4">
-					<h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+					<h3 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 						Shots ({shots.length})
+						<div class="flex-1 border-b border-border-subtle"></div>
 					</h3>
 					<div class="overflow-x-auto">
 						<table class="w-full text-sm">
@@ -553,38 +557,38 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 										<td class="px-1 py-1">
 											<input
 												bind:value={shot.frame_number}
-												class="w-14 rounded border border-border bg-surface px-1.5 py-1 text-xs font-mono"
+												class="w-14 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text font-mono focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 											/>
 										</td>
 										<td class="px-1 py-1">
 											<input
 												bind:value={shot.aperture}
-												class="w-16 rounded border border-border bg-surface px-1.5 py-1 text-xs"
+												class="w-16 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 											/>
 										</td>
 										<td class="px-1 py-1">
 											<input
 												bind:value={shot.shutter_speed}
-												class="w-16 rounded border border-border bg-surface px-1.5 py-1 text-xs"
+												class="w-16 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 											/>
 										</td>
 										<td class="px-1 py-1">
 											<input
 												bind:value={shot.date}
 												type="date"
-												class="rounded border border-border bg-surface px-1.5 py-1 text-xs"
+												class="rounded border border-border bg-surface px-1.5 py-1 text-xs text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 											/>
 										</td>
 										<td class="px-1 py-1">
 											<input
 												bind:value={shot.location}
-												class="w-28 rounded border border-border bg-surface px-1.5 py-1 text-xs"
+												class="w-28 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 											/>
 										</td>
 										<td class="px-1 py-1">
 											<input
 												bind:value={shot.notes}
-												class="w-32 rounded border border-border bg-surface px-1.5 py-1 text-xs"
+												class="w-32 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 											/>
 										</td>
 										<td class="px-1 py-1">
