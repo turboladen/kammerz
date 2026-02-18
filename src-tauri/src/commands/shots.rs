@@ -3,15 +3,17 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::shot;
+use crate::patch::double_option;
 use crate::services::shot_service::ShotService;
 use crate::AppState;
 
-/// Set ActiveModel fields from a DTO only when the DTO field is Some.
-macro_rules! set_if_some {
+/// Set ActiveModel fields from a DTO only when the DTO field is provided (Some).
+/// Works with both `Option<T>` (non-nullable) and `Option<Option<T>>` (nullable) fields.
+macro_rules! set_if_provided {
     ($model:expr, $data:expr, $($field:ident),+ $(,)?) => {
         $(
-            if $data.$field.is_some() {
-                $model.$field = Set($data.$field);
+            if let Some(v) = $data.$field {
+                $model.$field = Set(v);
             }
         )+
     };
@@ -34,17 +36,26 @@ pub struct CreateShotDto {
     pub lens_ids: Option<Vec<i32>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
 pub struct UpdateShotDto {
     pub frame_number: Option<String>,
-    pub aperture: Option<String>,
-    pub shutter_speed: Option<String>,
-    pub date: Option<String>,
-    pub date_fuzzy: Option<String>,
-    pub location: Option<String>,
-    pub gps_lat: Option<f64>,
-    pub gps_lon: Option<f64>,
-    pub notes: Option<String>,
+    #[serde(deserialize_with = "double_option")]
+    pub aperture: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub shutter_speed: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_fuzzy: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub location: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub gps_lat: Option<Option<f64>>,
+    #[serde(deserialize_with = "double_option")]
+    pub gps_lon: Option<Option<f64>>,
+    #[serde(deserialize_with = "double_option")]
+    pub notes: Option<Option<String>>,
     pub lens_ids: Option<Vec<i32>>,
 }
 
@@ -139,12 +150,9 @@ pub async fn update_shot(
             Box::pin(async move {
                 let mut model: shot::ActiveModel = existing.into();
 
-                if let Some(v) = data.frame_number {
-                    model.frame_number = Set(v);
-                }
-                set_if_some!(
-                    model, data, aperture, shutter_speed, date, date_fuzzy, location, gps_lat,
-                    gps_lon, notes
+                set_if_provided!(
+                    model, data, frame_number, aperture, shutter_speed, date, date_fuzzy,
+                    location, gps_lat, gps_lon, notes
                 );
                 model.updated_at = Set(now);
 

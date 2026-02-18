@@ -3,15 +3,17 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::{dev_stage, development_lab, development_self};
+use crate::patch::double_option;
 use crate::services::development_service::{DevelopmentService, StageInput};
 use crate::AppState;
 
-/// Set ActiveModel fields from a DTO only when the DTO field is Some.
-macro_rules! set_if_some {
+/// Set ActiveModel fields from a DTO only when the DTO field is provided (Some).
+/// Works with both `Option<T>` (non-nullable) and `Option<Option<T>>` (nullable) fields.
+macro_rules! set_if_provided {
     ($model:expr, $data:expr, $($field:ident),+ $(,)?) => {
         $(
-            if $data.$field.is_some() {
-                $model.$field = Set($data.$field);
+            if let Some(v) = $data.$field {
+                $model.$field = Set(v);
             }
         )+
     };
@@ -29,13 +31,19 @@ pub struct CreateLabDevDto {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
 pub struct UpdateLabDevDto {
-    pub lab_id: Option<i32>,
-    pub date_dropped_off: Option<String>,
-    pub date_received: Option<String>,
-    pub cost: Option<f64>,
-    pub notes: Option<String>,
+    #[serde(deserialize_with = "double_option")]
+    pub lab_id: Option<Option<i32>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_dropped_off: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_received: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub cost: Option<Option<f64>>,
+    #[serde(deserialize_with = "double_option")]
+    pub notes: Option<Option<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -55,19 +63,31 @@ pub struct CreateSelfDevDto {
     pub stages: Option<Vec<StageDto>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
 pub struct UpdateSelfDevDto {
-    pub date_processed: Option<String>,
-    pub developer: Option<String>,
-    pub developer_dilution: Option<String>,
-    pub fixer: Option<String>,
-    pub fixer_dilution: Option<String>,
-    pub stop_bath: Option<String>,
-    pub wetting_agent: Option<String>,
-    pub clearing_agent: Option<String>,
-    pub temperature: Option<String>,
-    pub agitation_notes: Option<String>,
-    pub notes: Option<String>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_processed: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub developer: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub developer_dilution: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub fixer: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub fixer_dilution: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub stop_bath: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub wetting_agent: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub clearing_agent: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub temperature: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub agitation_notes: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub notes: Option<Option<String>>,
     pub stages: Option<Vec<StageDto>>,
 }
 
@@ -146,7 +166,7 @@ pub async fn update_lab_dev(
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut model: development_lab::ActiveModel = existing.into();
 
-    set_if_some!(model, data, lab_id, date_dropped_off, date_received, cost, notes);
+    set_if_provided!(model, data, lab_id, date_dropped_off, date_received, cost, notes);
     model.updated_at = Set(now);
 
     DevelopmentService::update_lab_dev(&state.db, model)
@@ -252,7 +272,7 @@ pub async fn update_self_dev(
             Box::pin(async move {
                 let mut model: development_self::ActiveModel = existing.into();
 
-                set_if_some!(
+                set_if_provided!(
                     model, data, date_processed, developer, developer_dilution, fixer,
                     fixer_dilution, stop_bath, wetting_agent, clearing_agent, temperature,
                     agitation_notes, notes

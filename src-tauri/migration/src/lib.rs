@@ -4,6 +4,7 @@ mod m20250101_000001_initial_schema;
 mod m20250101_000002_seed_film_stocks;
 mod m20250201_000003_settings_table;
 mod m20250216_000004_add_roll_lens_id;
+mod m20250217_000005_add_rolls_lens_id_index;
 
 pub struct Migrator;
 
@@ -15,6 +16,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250101_000002_seed_film_stocks::Migration),
             Box::new(m20250201_000003_settings_table::Migration),
             Box::new(m20250216_000004_add_roll_lens_id::Migration),
+            Box::new(m20250217_000005_add_rolls_lens_id_index::Migration),
         ]
     }
 }

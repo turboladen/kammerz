@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod db;
 pub mod entities;
+pub mod patch;
 pub mod services;
 
 use sea_orm::DatabaseConnection;

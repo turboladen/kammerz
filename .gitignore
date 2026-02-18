@@ -30,4 +30,4 @@ vite.config.ts.timestamp-*
 bun.lock
 
 # Claude
-.claude/
+.claude/settings.*

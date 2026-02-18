@@ -3,6 +3,7 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::lab;
+use crate::patch::double_option;
 use crate::services::lab_service::LabService;
 use crate::AppState;
 
@@ -16,12 +17,16 @@ pub struct CreateLabDto {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
 pub struct UpdateLabDto {
     pub name: Option<String>,
-    pub location: Option<String>,
-    pub website: Option<String>,
-    pub notes: Option<String>,
+    #[serde(deserialize_with = "double_option")]
+    pub location: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub website: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub notes: Option<Option<String>>,
 }
 
 // --- Commands ---
@@ -76,9 +81,9 @@ pub async fn update_lab(
     let mut model: lab::ActiveModel = existing.into();
 
     if let Some(v) = data.name { model.name = Set(v); }
-    if data.location.is_some() { model.location = Set(data.location); }
-    if data.website.is_some() { model.website = Set(data.website); }
-    if data.notes.is_some() { model.notes = Set(data.notes); }
+    if let Some(v) = data.location { model.location = Set(v); }
+    if let Some(v) = data.website { model.website = Set(v); }
+    if let Some(v) = data.notes { model.notes = Set(v); }
     model.updated_at = Set(now);
 
     LabService::update(&state.db, model).await.map_err(|e| {

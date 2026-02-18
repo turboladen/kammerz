@@ -3,6 +3,7 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::lens;
+use crate::patch::double_option;
 use crate::services::lens_service::LensService;
 use crate::AppState;
 
@@ -25,21 +26,34 @@ pub struct CreateLensDto {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
 pub struct UpdateLensDto {
     pub brand: Option<String>,
-    pub lens_system: Option<String>,
-    pub name_on_lens: Option<String>,
-    pub focal_length: Option<String>,
-    pub max_aperture: Option<String>,
-    pub min_aperture: Option<String>,
-    pub filter_thread_front_mm: Option<i32>,
-    pub filter_thread_rear_mm: Option<i32>,
-    pub serial_number: Option<String>,
-    pub date_purchased: Option<String>,
-    pub purchased_from: Option<String>,
-    pub date_sold: Option<String>,
-    pub notes: Option<String>,
+    #[serde(deserialize_with = "double_option")]
+    pub lens_system: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub name_on_lens: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub focal_length: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub max_aperture: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub min_aperture: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub filter_thread_front_mm: Option<Option<i32>>,
+    #[serde(deserialize_with = "double_option")]
+    pub filter_thread_rear_mm: Option<Option<i32>>,
+    #[serde(deserialize_with = "double_option")]
+    pub serial_number: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_purchased: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub purchased_from: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_sold: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub notes: Option<Option<String>>,
 }
 
 // --- Commands ---
@@ -106,18 +120,18 @@ pub async fn update_lens(
     let mut model: lens::ActiveModel = existing.into();
 
     if let Some(v) = data.brand { model.brand = Set(v); }
-    if data.lens_system.is_some() { model.lens_system = Set(data.lens_system); }
-    if data.name_on_lens.is_some() { model.name_on_lens = Set(data.name_on_lens); }
-    if data.focal_length.is_some() { model.focal_length = Set(data.focal_length); }
-    if data.max_aperture.is_some() { model.max_aperture = Set(data.max_aperture); }
-    if data.min_aperture.is_some() { model.min_aperture = Set(data.min_aperture); }
-    if data.filter_thread_front_mm.is_some() { model.filter_thread_front_mm = Set(data.filter_thread_front_mm); }
-    if data.filter_thread_rear_mm.is_some() { model.filter_thread_rear_mm = Set(data.filter_thread_rear_mm); }
-    if data.serial_number.is_some() { model.serial_number = Set(data.serial_number); }
-    if data.date_purchased.is_some() { model.date_purchased = Set(data.date_purchased); }
-    if data.purchased_from.is_some() { model.purchased_from = Set(data.purchased_from); }
-    if data.date_sold.is_some() { model.date_sold = Set(data.date_sold); }
-    if data.notes.is_some() { model.notes = Set(data.notes); }
+    if let Some(v) = data.lens_system { model.lens_system = Set(v); }
+    if let Some(v) = data.name_on_lens { model.name_on_lens = Set(v); }
+    if let Some(v) = data.focal_length { model.focal_length = Set(v); }
+    if let Some(v) = data.max_aperture { model.max_aperture = Set(v); }
+    if let Some(v) = data.min_aperture { model.min_aperture = Set(v); }
+    if let Some(v) = data.filter_thread_front_mm { model.filter_thread_front_mm = Set(v); }
+    if let Some(v) = data.filter_thread_rear_mm { model.filter_thread_rear_mm = Set(v); }
+    if let Some(v) = data.serial_number { model.serial_number = Set(v); }
+    if let Some(v) = data.date_purchased { model.date_purchased = Set(v); }
+    if let Some(v) = data.purchased_from { model.purchased_from = Set(v); }
+    if let Some(v) = data.date_sold { model.date_sold = Set(v); }
+    if let Some(v) = data.notes { model.notes = Set(v); }
     model.updated_at = Set(now);
 
     LensService::update(&state.db, model).await.map_err(|e| {

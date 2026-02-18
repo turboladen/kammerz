@@ -3,6 +3,7 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::film_stock;
+use crate::patch::double_option;
 use crate::services::film_stock_service::FilmStockService;
 use crate::AppState;
 
@@ -19,15 +20,19 @@ pub struct CreateFilmStockDto {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
 pub struct UpdateFilmStockDto {
     pub brand: Option<String>,
     pub name: Option<String>,
     pub format: Option<String>,
-    pub exposure_count: Option<i32>,
+    #[serde(deserialize_with = "double_option")]
+    pub exposure_count: Option<Option<i32>>,
     pub stock_type: Option<String>,
-    pub iso: Option<i32>,
-    pub notes: Option<String>,
+    #[serde(deserialize_with = "double_option")]
+    pub iso: Option<Option<i32>>,
+    #[serde(deserialize_with = "double_option")]
+    pub notes: Option<Option<String>>,
 }
 
 // --- Commands ---
@@ -99,10 +104,10 @@ pub async fn update_film_stock(
     if let Some(v) = data.brand { model.brand = Set(v); }
     if let Some(v) = data.name { model.name = Set(v); }
     if let Some(v) = data.format { model.format = Set(v); }
-    if data.exposure_count.is_some() { model.exposure_count = Set(data.exposure_count); }
+    if let Some(v) = data.exposure_count { model.exposure_count = Set(v); }
     if let Some(v) = data.stock_type { model.stock_type = Set(v); }
-    if data.iso.is_some() { model.iso = Set(data.iso); }
-    if data.notes.is_some() { model.notes = Set(data.notes); }
+    if let Some(v) = data.iso { model.iso = Set(v); }
+    if let Some(v) = data.notes { model.notes = Set(v); }
     model.updated_at = Set(now);
 
     FilmStockService::update(&state.db, model)

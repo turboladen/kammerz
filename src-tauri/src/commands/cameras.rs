@@ -3,6 +3,7 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::{camera, camera_maintenance};
+use crate::patch::double_option;
 use crate::services::camera_service::CameraService;
 use crate::AppState;
 
@@ -22,18 +23,26 @@ pub struct CreateCameraDto {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
 pub struct UpdateCameraDto {
     pub brand: Option<String>,
     pub model: Option<String>,
-    pub prefix: Option<String>,
+    #[serde(deserialize_with = "double_option")]
+    pub prefix: Option<Option<String>>,
     pub format: Option<String>,
-    pub camera_type: Option<String>,
-    pub serial_number: Option<String>,
-    pub date_purchased: Option<String>,
-    pub purchased_from: Option<String>,
-    pub date_sold: Option<String>,
-    pub notes: Option<String>,
+    #[serde(deserialize_with = "double_option")]
+    pub camera_type: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub serial_number: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_purchased: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub purchased_from: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_sold: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub notes: Option<Option<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -46,14 +55,19 @@ pub struct CreateMaintenanceDto {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
 pub struct UpdateMaintenanceDto {
     pub camera_id: Option<i32>,
     pub maintenance_type: Option<String>,
-    pub done_by: Option<String>,
-    pub date_done: Option<String>,
-    pub cost: Option<f64>,
-    pub notes: Option<String>,
+    #[serde(deserialize_with = "double_option")]
+    pub done_by: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_done: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub cost: Option<Option<f64>>,
+    #[serde(deserialize_with = "double_option")]
+    pub notes: Option<Option<String>>,
 }
 
 // --- Camera commands ---
@@ -121,14 +135,14 @@ pub async fn update_camera(
 
     if let Some(v) = data.brand { model.brand = Set(v); }
     if let Some(v) = data.model { model.model = Set(v); }
-    if data.prefix.is_some() { model.prefix = Set(data.prefix); }
+    if let Some(v) = data.prefix { model.prefix = Set(v); }
     if let Some(v) = data.format { model.format = Set(v); }
-    if data.camera_type.is_some() { model.camera_type = Set(data.camera_type); }
-    if data.serial_number.is_some() { model.serial_number = Set(data.serial_number); }
-    if data.date_purchased.is_some() { model.date_purchased = Set(data.date_purchased); }
-    if data.purchased_from.is_some() { model.purchased_from = Set(data.purchased_from); }
-    if data.date_sold.is_some() { model.date_sold = Set(data.date_sold); }
-    if data.notes.is_some() { model.notes = Set(data.notes); }
+    if let Some(v) = data.camera_type { model.camera_type = Set(v); }
+    if let Some(v) = data.serial_number { model.serial_number = Set(v); }
+    if let Some(v) = data.date_purchased { model.date_purchased = Set(v); }
+    if let Some(v) = data.purchased_from { model.purchased_from = Set(v); }
+    if let Some(v) = data.date_sold { model.date_sold = Set(v); }
+    if let Some(v) = data.notes { model.notes = Set(v); }
     model.updated_at = Set(now);
 
     CameraService::update(&state.db, model).await.map_err(|e| {
@@ -204,10 +218,10 @@ pub async fn update_maintenance(
 
     if let Some(v) = data.camera_id { model.camera_id = Set(v); }
     if let Some(v) = data.maintenance_type { model.maintenance_type = Set(v); }
-    if data.done_by.is_some() { model.done_by = Set(data.done_by); }
-    if data.date_done.is_some() { model.date_done = Set(data.date_done); }
-    if data.cost.is_some() { model.cost = Set(data.cost); }
-    if data.notes.is_some() { model.notes = Set(data.notes); }
+    if let Some(v) = data.done_by { model.done_by = Set(v); }
+    if let Some(v) = data.date_done { model.date_done = Set(v); }
+    if let Some(v) = data.cost { model.cost = Set(v); }
+    if let Some(v) = data.notes { model.notes = Set(v); }
     model.updated_at = Set(now);
 
     CameraService::update_maintenance(&state.db, model)

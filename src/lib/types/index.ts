@@ -119,13 +119,13 @@ export type RollInsert = Omit<Roll, 'id' | 'created_at' | 'updated_at'>;
 
 // Roll with joined data for display
 export interface RollWithDetails extends Roll {
-	camera_brand?: string;
-	camera_model?: string;
-	film_stock_brand?: string;
-	film_stock_name?: string;
-	film_stock_iso?: number;
-	lens_brand?: string;
-	lens_name?: string;
+	camera_brand: string | null;
+	camera_model: string | null;
+	film_stock_brand: string | null;
+	film_stock_name: string | null;
+	film_stock_iso: number | null;
+	lens_brand: string | null;
+	lens_name: string | null;
 }
 
 // --- Shots ---
@@ -337,6 +337,7 @@ export interface ImportRollDto {
 	date_loaded: string | null;
 	date_finished: string | null;
 	date_fuzzy: string | null;
+	push_pull: string | null;
 	notes: string | null;
 	shots: ImportShotDto[];
 }

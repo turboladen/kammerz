@@ -23,6 +23,7 @@ pub struct ImportRollDto {
     pub date_loaded: Option<String>,
     pub date_finished: Option<String>,
     pub date_fuzzy: Option<String>,
+    pub push_pull: Option<String>,
     pub notes: Option<String>,
     pub shots: Vec<ImportShotDto>,
 }
@@ -100,6 +101,7 @@ pub async fn import_parsed_roll(
         date_loaded: Set(data.date_loaded),
         date_finished: Set(data.date_finished),
         date_fuzzy: Set(data.date_fuzzy),
+        push_pull: Set(data.push_pull),
         notes: Set(data.notes),
         created_at: Set(now.clone()),
         updated_at: Set(now),

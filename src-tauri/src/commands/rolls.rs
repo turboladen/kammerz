@@ -3,6 +3,7 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::roll;
+use crate::patch::double_option;
 use crate::services::roll_service::{RollService, RollWithDetails};
 use crate::AppState;
 
@@ -23,19 +24,29 @@ pub struct CreateRollDto {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
 pub struct UpdateRollDto {
     pub roll_id: Option<String>,
-    pub camera_id: Option<i32>,
-    pub film_stock_id: Option<i32>,
-    pub lens_id: Option<i32>,
+    #[serde(deserialize_with = "double_option")]
+    pub camera_id: Option<Option<i32>>,
+    #[serde(deserialize_with = "double_option")]
+    pub film_stock_id: Option<Option<i32>>,
+    #[serde(deserialize_with = "double_option")]
+    pub lens_id: Option<Option<i32>>,
     pub status: Option<String>,
-    pub frame_count: Option<i32>,
-    pub date_loaded: Option<String>,
-    pub date_finished: Option<String>,
-    pub date_fuzzy: Option<String>,
-    pub push_pull: Option<String>,
-    pub notes: Option<String>,
+    #[serde(deserialize_with = "double_option")]
+    pub frame_count: Option<Option<i32>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_loaded: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_finished: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_fuzzy: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub push_pull: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub notes: Option<Option<String>>,
 }
 
 // --- Commands ---
@@ -105,16 +116,16 @@ pub async fn update_roll(
     let mut model: roll::ActiveModel = existing.into();
 
     if let Some(v) = data.roll_id { model.roll_id = Set(v); }
-    model.camera_id = Set(data.camera_id);
-    model.film_stock_id = Set(data.film_stock_id);
-    model.lens_id = Set(data.lens_id);
+    if let Some(v) = data.camera_id { model.camera_id = Set(v); }
+    if let Some(v) = data.film_stock_id { model.film_stock_id = Set(v); }
+    if let Some(v) = data.lens_id { model.lens_id = Set(v); }
     if let Some(v) = data.status { model.status = Set(v); }
-    if data.frame_count.is_some() { model.frame_count = Set(data.frame_count); }
-    if data.date_loaded.is_some() { model.date_loaded = Set(data.date_loaded); }
-    if data.date_finished.is_some() { model.date_finished = Set(data.date_finished); }
-    if data.date_fuzzy.is_some() { model.date_fuzzy = Set(data.date_fuzzy); }
-    if data.push_pull.is_some() { model.push_pull = Set(data.push_pull); }
-    if data.notes.is_some() { model.notes = Set(data.notes); }
+    if let Some(v) = data.frame_count { model.frame_count = Set(v); }
+    if let Some(v) = data.date_loaded { model.date_loaded = Set(v); }
+    if let Some(v) = data.date_finished { model.date_finished = Set(v); }
+    if let Some(v) = data.date_fuzzy { model.date_fuzzy = Set(v); }
+    if let Some(v) = data.push_pull { model.push_pull = Set(v); }
+    if let Some(v) = data.notes { model.notes = Set(v); }
     model.updated_at = Set(now);
 
     RollService::update(&state.db, model).await.map_err(|e| {

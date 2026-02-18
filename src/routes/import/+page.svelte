@@ -305,6 +305,7 @@
 				date_loaded: dateLoaded || null,
 				date_finished: dateFinished || null,
 				date_fuzzy: null,
+				push_pull: null,
 				notes: rollNotes || null,
 				shots: shots.map((s) => ({
 					frame_number: s.frame_number,
