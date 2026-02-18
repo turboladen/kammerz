@@ -1,4 +1,4 @@
-# Kamerz — Implementation Plan
+# Kammerz — Implementation Plan
 
 Tracking development progress for the film photography catalog app.
 

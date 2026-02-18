@@ -1,5 +1,5 @@
 {
-  // Kamerz dprint configuration
+  // Kammerz dprint configuration
   // Formats: TypeScript, Svelte, JSON, CSS, Markdown
   "useTabs": true,
   "indentWidth": 2,

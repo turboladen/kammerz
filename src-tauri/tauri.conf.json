@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Kamerz",
+  "productName": "Kammerz",
   "version": "0.1.0",
-  "identifier": "com.kamerz.app",
+  "identifier": "com.kammerz.app",
   "build": {
     "frontendDist": "../build",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Kamerz",
+        "title": "Kammerz",
         "width": 1200,
         "height": 800,
         "minWidth": 900,

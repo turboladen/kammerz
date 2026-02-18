@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$CLAUDE_FILE_PATH\" in */capabilities/default.json|*/Cargo.lock|*/bun.lock|*/gen/*) echo 'BLOCKED: This file should not be edited directly.' >&2; exit 1 ;; esac; exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "dprint fmt --config /Users/sloveless/Development/projects/kamerz/dprint.jsonc \"$CLAUDE_FILE_PATH\" 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_FILE_PATH\" | grep -q 'src-tauri/.*\\.rs$'; then cd /Users/sloveless/Development/projects/kamerz/src-tauri && cargo check --message-format=short 2>&1 | tail -5; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

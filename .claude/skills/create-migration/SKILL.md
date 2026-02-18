@@ -1,6 +1,6 @@
 ---
 name: create-migration
-description: Create a new SeaORM migration for the Kamerz SQLite database
+description: Create a new SeaORM migration for the Kammerz SQLite database
 disable-model-invocation: true
 ---
 # Create Migration

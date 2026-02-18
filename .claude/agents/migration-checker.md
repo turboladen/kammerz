@@ -10,7 +10,7 @@ model: sonnet
 ---
 # Migration Checker
 
-Verify that a SeaORM migration is consistent with the rest of the Kamerz stack.
+Verify that a SeaORM migration is consistent with the rest of the Kammerz stack.
 
 ## Checks
 1. Migration file follows naming convention and compiles (`cargo check` in src-tauri/)

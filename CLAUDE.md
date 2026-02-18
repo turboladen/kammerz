@@ -1,4 +1,4 @@
-# Kamerz
+# Kammerz
 
 Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 

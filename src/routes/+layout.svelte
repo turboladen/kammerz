@@ -6,7 +6,7 @@
 </script>
 
 <svelte:head>
-	<title>Kamerz</title>
+	<title>Kammerz</title>
 </svelte:head>
 
 <div class="flex h-screen overflow-hidden">

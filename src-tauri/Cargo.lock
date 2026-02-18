@@ -1944,7 +1944,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamerz"
+name = "kammerz"
 version = "0.1.0"
 dependencies = [
  "chrono",

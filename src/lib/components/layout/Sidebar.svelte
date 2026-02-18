@@ -22,7 +22,7 @@
 <nav class="flex h-full w-56 flex-col border-r border-border-subtle bg-gradient-to-b from-surface-raised to-surface">
 	<!-- Brand area -->
 	<div class="border-b border-border-subtle px-5 py-4">
-		<span class="font-display text-xl tracking-wide text-accent">Kamerz</span>
+		<span class="font-display text-xl tracking-wide text-accent">Kammerz</span>
 		<p class="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-text-faint">film log</p>
 	</div>
 

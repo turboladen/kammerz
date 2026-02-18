@@ -1,6 +1,6 @@
 # UI Design System: "The Darkroom Ledger"
 
-Kamerz's visual identity draws from two analog photography metaphors:
+Kammerz's visual identity draws from two analog photography metaphors:
 
 1. **The darkroom** — warm amber safelight glow, deep blacks, chemical warmth
 2. **The field log** — photographer's notebook, precise frame numbers, monospaced data, ledger-style precision
@@ -79,7 +79,7 @@ Fonts are self-hosted in `static/fonts/` and loaded via `@font-face` declaration
 
 - **DM Sans** — All body text, labels, buttons, descriptions. Geometric with humanist warmth; evokes camera body markings.
 - **IBM Plex Mono** — Roll IDs, serial numbers, ISO values, aperture values, stat numbers. Industrial/mechanical; evokes stamped serial numbers and frame counters.
-- **Instrument Serif** — Brand name ("Kamerz"), page titles, dialog titles. Editorial quality, used sparingly for warmth. Applied via `.font-display` utility class or Tailwind's `font-display`.
+- **Instrument Serif** — Brand name ("Kammerz"), page titles, dialog titles. Editorial quality, used sparingly for warmth. Applied via `.font-display` utility class or Tailwind's `font-display`.
 
 ### Never Use
 
@@ -157,7 +157,7 @@ Centered message with optional CTA button. Used when lists are empty.
 
 ### Sidebar (`src/lib/components/layout/Sidebar.svelte`)
 
-- **Brand**: "Kamerz" in Instrument Serif (amber), "film log" subtitle in IBM Plex Mono (uppercase, tracked)
+- **Brand**: "Kammerz" in Instrument Serif (amber), "film log" subtitle in IBM Plex Mono (uppercase, tracked)
 - **Background**: Gradient from `surface-raised` to `surface` (top to bottom)
 - **Border**: `border-subtle` (softer than regular border)
 - **Icons**: Lucide icons at 16px, `strokeWidth={1.75}`
