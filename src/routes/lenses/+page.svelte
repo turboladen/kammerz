@@ -18,12 +18,21 @@
 	let showAddDialog = $state(false);
 	let editingLens: Lens | null = $state(null);
 	let deletingLens: Lens | null = $state(null);
+	let filterOwned = $state('all');
 	let error = $state('');
 
 	// Autocomplete options
 	let brandOptions: string[] = $state([]);
 	let lensSystemOptions: string[] = $state([]);
 	let vendorOptions: string[] = $state([]);
+
+	const filtered = $derived(
+		filterOwned === 'all'
+			? lenses
+			: filterOwned === 'owned'
+				? lenses.filter((l) => !l.date_sold)
+				: lenses.filter((l) => l.date_sold)
+	);
 
 	// Form state
 	let brand = $state('');
@@ -167,16 +176,34 @@
 		<div class="mb-4 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 	{/if}
 
+	<div class="mb-4 flex gap-2">
+		<Button
+			variant={filterOwned === 'all' ? 'primary' : 'ghost'}
+			size="sm"
+			onclick={() => (filterOwned = 'all')}
+		>All</Button>
+		<Button
+			variant={filterOwned === 'owned' ? 'primary' : 'ghost'}
+			size="sm"
+			onclick={() => (filterOwned = 'owned')}
+		>Owned</Button>
+		<Button
+			variant={filterOwned === 'sold' ? 'primary' : 'ghost'}
+			size="sm"
+			onclick={() => (filterOwned = 'sold')}
+		>Sold</Button>
+	</div>
+
 	{#if loading}
 		<p class="text-sm text-text-muted">Loading...</p>
-	{:else if lenses.length === 0}
+	{:else if filtered.length === 0}
 		<EmptyState title="No Lenses" message="Add your first lens to get started.">
 			{#snippet icon()}<Aperture size={24} strokeWidth={1.5} />{/snippet}
 			<Button variant="primary" onclick={() => (showAddDialog = true)}>+ Add Lens</Button>
 		</EmptyState>
 	{:else}
 		<div class="grid gap-3">
-			{#each lenses as lens}
+			{#each filtered as lens}
 				<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px">
 					<div>
 						<div class="flex items-center gap-2">

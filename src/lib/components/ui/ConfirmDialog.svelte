@@ -55,6 +55,7 @@
 		onclick={handleBackdropClick}
 	>
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
 			class="w-full max-w-sm rounded-lg border border-border bg-surface-raised p-6 shadow-2xl"
 			style="animation: dialog-enter 150ms ease-out"

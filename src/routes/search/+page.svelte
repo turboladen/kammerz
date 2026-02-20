@@ -57,6 +57,7 @@
 		<div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-faint">
 			<Search size={16} strokeWidth={1.75} />
 		</div>
+		<!-- svelte-ignore a11y_autofocus -->
 		<input
 			bind:value={query}
 			type="text"
