@@ -56,6 +56,7 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 ### UX Rules
 - **Always confirm destructive actions.** Never delete data without user confirmation.
 - Back navigation: Detail pages use `PageHeader`'s `backHref`/`backLabel` props for consistent back links.
+- Owned/Sold filtering: List pages with `date_sold` fields (cameras, lenses) use client-side All/Owned/Sold tab buttons with a `$derived()` filter. No backend changes needed to add this to a new list page.
 
 ### Svelte 5 Patterns
 - Use `$state()`, `$derived()`, `$effect()`, `$props()`, `$bindable()` — no legacy `let` reactivity.
