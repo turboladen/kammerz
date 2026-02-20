@@ -19,7 +19,8 @@ impl MigrationTrait for Migration {
                 ('Kodak', 'Ultramax 400', '135', 36, 'color-negative', 400),
                 ('Kodak', 'ColorPlus 200', '135', 36, 'color-negative', 200),
                 ('Fujifilm', 'Superia X-TRA 400', '135', 36, 'color-negative', 400),
-                ('Fujifilm', 'C200', '135', 36, 'color-negative', 200)"
+                ('Fujifilm', 'C200', '135', 36, 'color-negative', 200),
+                ('Fujifilm', 'Pro 400H', '135', 36, 'color-negative', 400)"
         ).await?;
 
         // Color Negative - 120
@@ -28,7 +29,8 @@ impl MigrationTrait for Migration {
                 ('Kodak', 'Portra 160', '120', NULL, 'color-negative', 160),
                 ('Kodak', 'Portra 400', '120', NULL, 'color-negative', 400),
                 ('Kodak', 'Portra 800', '120', NULL, 'color-negative', 800),
-                ('Kodak', 'Ektar 100', '120', NULL, 'color-negative', 100)"
+                ('Kodak', 'Ektar 100', '120', NULL, 'color-negative', 100),
+                ('Fujifilm', 'Pro 400H', '120', NULL, 'color-negative', 400)"
         ).await?;
 
         // B&W Negative - 35mm
