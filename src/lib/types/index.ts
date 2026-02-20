@@ -1,3 +1,12 @@
+// --- Lens Mounts ---
+
+export interface LensMount {
+	id: number;
+	name: string;
+	created_at: string;
+	updated_at: string;
+}
+
 // --- Cameras ---
 
 export interface Camera {
@@ -6,6 +15,7 @@ export interface Camera {
 	model: string;
 	prefix: string | null;
 	format: string;
+	lens_mount_id: number;
 	camera_type: string | null;
 	serial_number: string | null;
 	date_purchased: string | null;
@@ -37,6 +47,7 @@ export type CameraMaintenanceInsert = Omit<CameraMaintenance, 'id' | 'created_at
 export interface Lens {
 	id: number;
 	brand: string;
+	lens_mount_id: number;
 	lens_system: string | null;
 	name_on_lens: string | null;
 	focal_length: string | null;
@@ -296,6 +307,7 @@ export interface CatalogStats {
 	top_lenses: RankedItem[];
 	rolls_by_format: RankedItem[];
 	rolls_by_status: RankedItem[];
+	rolls_by_mount: RankedItem[];
 }
 
 // --- AI Import ---

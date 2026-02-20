@@ -40,6 +40,7 @@ pub struct CatalogStats {
     pub top_lenses: Vec<RankedItem>,
     pub rolls_by_format: Vec<RankedItem>,
     pub rolls_by_status: Vec<RankedItem>,
+    pub rolls_by_mount: Vec<RankedItem>,
 }
 
 impl StatsService {
@@ -199,6 +200,20 @@ impl StatsService {
         .all(db)
         .await?;
 
+        // --- Rolls by lens mount ---
+        let rolls_by_mount = RankedItem::find_by_statement(Statement::from_string(
+            backend,
+            "SELECT lm.name AS label, COUNT(*) AS count \
+             FROM rolls r \
+             JOIN cameras c ON r.camera_id = c.id \
+             JOIN lens_mounts lm ON c.lens_mount_id = lm.id \
+             GROUP BY c.lens_mount_id \
+             ORDER BY count DESC"
+                .to_owned(),
+        ))
+        .all(db)
+        .await?;
+
         Ok(CatalogStats {
             total_rolls,
             total_shots,
@@ -213,6 +228,7 @@ impl StatsService {
             top_lenses,
             rolls_by_format,
             rolls_by_status,
+            rolls_by_mount,
         })
     }
 }

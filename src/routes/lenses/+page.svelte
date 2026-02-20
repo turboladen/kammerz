@@ -2,15 +2,18 @@
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
+	import DateInput from '$lib/components/ui/DateInput.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
 	import { Aperture } from 'lucide-svelte';
-	import { listLenses, createLens, updateLens, deleteLens, listDistinctLensBrands, listDistinctLensSystems } from '$lib/api/lenses';
+	import { listLenses, createLens, updateLens, deleteLens, listDistinctLensBrands } from '$lib/api/lenses';
 	import { listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
-	import type { Lens, LensInsert } from '$lib/types';
+	import { listLensMounts } from '$lib/api/lens-mounts';
+	import type { Lens, LensInsert, LensMount } from '$lib/types';
 	import { lensDisplayName } from '$lib/utils/lens';
 
 	let lenses: Lens[] = $state([]);
@@ -23,7 +26,7 @@
 
 	// Autocomplete options
 	let brandOptions: string[] = $state([]);
-	let lensSystemOptions: string[] = $state([]);
+	let lensMounts: LensMount[] = $state([]);
 	let vendorOptions: string[] = $state([]);
 
 	const filtered = $derived(
@@ -34,9 +37,18 @@
 				: lenses.filter((l) => l.date_sold)
 	);
 
+	const lensMountOptions = $derived([
+		{ value: '', label: 'Select mount...' },
+		...lensMounts.map((m) => ({ value: String(m.id), label: m.name }))
+	]);
+
+	const mountNameById = $derived(
+		Object.fromEntries(lensMounts.map((m) => [m.id, m.name]))
+	);
+
 	// Form state
 	let brand = $state('');
-	let lensSystem = $state('');
+	let lensMountId = $state('');
 	let nameOnLens = $state('');
 	let focalLength = $state('');
 	let maxAperture = $state('');
@@ -51,16 +63,16 @@
 
 	async function load() {
 		try {
-			const [l, lensBrands, camBrands, systems, vendors] = await Promise.all([
+			const [l, lensBrands, camBrands, mounts, vendors] = await Promise.all([
 				listLenses(),
 				listDistinctLensBrands(),
 				listDistinctCameraBrands(),
-				listDistinctLensSystems(),
+				listLensMounts(),
 				listDistinctVendors()
 			]);
 			lenses = l;
 			brandOptions = [...new Set([...lensBrands, ...camBrands])].sort();
-			lensSystemOptions = systems;
+			lensMounts = mounts;
 			vendorOptions = vendors;
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -71,7 +83,7 @@
 
 	function resetForm() {
 		brand = '';
-		lensSystem = '';
+		lensMountId = '';
 		nameOnLens = '';
 		focalLength = '';
 		maxAperture = '';
@@ -88,7 +100,8 @@
 	function buildInsert(): LensInsert {
 		return {
 			brand,
-			lens_system: lensSystem || null,
+			lens_mount_id: Number(lensMountId),
+			lens_system: null,
 			name_on_lens: nameOnLens || null,
 			focal_length: focalLength || null,
 			max_aperture: maxAperture || null,
@@ -118,7 +131,7 @@
 	function startEdit(lens: Lens) {
 		editingLens = lens;
 		brand = lens.brand;
-		lensSystem = lens.lens_system ?? '';
+		lensMountId = String(lens.lens_mount_id);
 		nameOnLens = lens.name_on_lens ?? '';
 		focalLength = lens.focal_length ?? '';
 		maxAperture = lens.max_aperture ?? '';
@@ -213,8 +226,8 @@
 							{/if}
 						</div>
 						<div class="mt-1 flex flex-wrap gap-3 text-xs text-text-muted">
-							{#if lens.lens_system}
-								<span>{lens.lens_system} mount</span>
+							{#if mountNameById[lens.lens_mount_id]}
+								<span>{mountNameById[lens.lens_mount_id]}</span>
 							{/if}
 							{#if lens.focal_length}
 								<span>{lens.focal_length}mm</span>
@@ -242,7 +255,7 @@
 	<div class="space-y-4">
 		<div class="grid grid-cols-2 gap-4">
 			<ComboInput label="Brand/Manufacturer" bind:value={brand} placeholder="Minolta" options={brandOptions} />
-			<ComboInput label="Lens System (Mount)" bind:value={lensSystem} placeholder="Minolta MD" options={lensSystemOptions} />
+			<Select label="Lens Mount" bind:value={lensMountId} options={lensMountOptions} />
 		</div>
 		<Input label="Name on Lens" bind:value={nameOnLens} placeholder="MD Rokkor 50mm 1:1.4" />
 		<div class="grid grid-cols-2 gap-4">
@@ -258,10 +271,10 @@
 			<Input label="Serial Number" bind:value={serialNumber} />
 		</div>
 		<div class="grid grid-cols-2 gap-4">
-			<Input label="Date Purchased" bind:value={datePurchased} type="date" />
+			<DateInput label="Date Purchased" bind:value={datePurchased} />
 			<ComboInput label="Purchased From" bind:value={purchasedFrom} options={vendorOptions} />
 		</div>
-		<Input label="Date Sold" bind:value={dateSold} type="date" />
+		<DateInput label="Date Sold" bind:value={dateSold} hint="Leave empty if you still own it" />
 		<Textarea label="Notes" bind:value={notes} />
 		{#if error}
 			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
@@ -279,7 +292,7 @@
 		<div class="space-y-4">
 			<div class="grid grid-cols-2 gap-4">
 				<ComboInput label="Brand/Manufacturer" bind:value={brand} options={brandOptions} />
-				<ComboInput label="Lens System (Mount)" bind:value={lensSystem} options={lensSystemOptions} />
+				<Select label="Lens Mount" bind:value={lensMountId} options={lensMountOptions} />
 			</div>
 			<Input label="Name on Lens" bind:value={nameOnLens} />
 			<div class="grid grid-cols-2 gap-4">
@@ -295,10 +308,10 @@
 				<Input label="Serial Number" bind:value={serialNumber} />
 			</div>
 			<div class="grid grid-cols-2 gap-4">
-				<Input label="Date Purchased" bind:value={datePurchased} type="date" />
+				<DateInput label="Date Purchased" bind:value={datePurchased} />
 				<ComboInput label="Purchased From" bind:value={purchasedFrom} options={vendorOptions} />
 			</div>
-			<Input label="Date Sold" bind:value={dateSold} type="date" />
+			<DateInput label="Date Sold" bind:value={dateSold} hint="Leave empty if you still own it" />
 			<Textarea label="Notes" bind:value={notes} />
 			{#if error}
 				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>

@@ -2,6 +2,7 @@
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
+	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
@@ -11,9 +12,11 @@
 	import { Camera as CameraIcon } from 'lucide-svelte';
 	import { listCameras, createCamera, deleteCamera, listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
 	import { listDistinctLensBrands } from '$lib/api/lenses';
-	import type { Camera, CameraInsert } from '$lib/types';
+	import { listLensMounts } from '$lib/api/lens-mounts';
+	import type { Camera, CameraInsert, LensMount } from '$lib/types';
 
 	let cameras: Camera[] = $state([]);
+	let lensMounts: LensMount[] = $state([]);
 	let loading = $state(true);
 	let showAddDialog = $state(false);
 	let filterOwned = $state('all');
@@ -31,11 +34,16 @@
 				: cameras.filter((c) => c.date_sold)
 	);
 
+	const mountNameById = $derived(
+		Object.fromEntries(lensMounts.map((m) => [m.id, m.name]))
+	);
+
 	// Form state
 	let brand = $state('');
 	let model = $state('');
 	let prefix = $state('');
 	let format = $state('35mm');
+	let lensMountId = $state('');
 	let cameraType = $state('');
 	let serialNumber = $state('');
 	let datePurchased = $state('');
@@ -58,6 +66,11 @@
 		{ value: 'instant', label: 'Instant' }
 	];
 
+	const lensMountOptions = $derived([
+		{ value: '', label: 'Select mount...' },
+		...lensMounts.map((m) => ({ value: String(m.id), label: m.name }))
+	]);
+
 	const typeOptions = [
 		{ value: '', label: 'Not specified' },
 		{ value: 'SLR', label: 'SLR' },
@@ -70,15 +83,17 @@
 
 	async function load() {
 		try {
-			const [cams, camBrands, lensBrands, vendors] = await Promise.all([
+			const [cams, camBrands, lensBrands, vendors, mounts] = await Promise.all([
 				listCameras(),
 				listDistinctCameraBrands(),
 				listDistinctLensBrands(),
-				listDistinctVendors()
+				listDistinctVendors(),
+				listLensMounts()
 			]);
 			cameras = cams;
 			brandOptions = [...new Set([...camBrands, ...lensBrands])].sort();
 			vendorOptions = vendors;
+			lensMounts = mounts;
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -91,6 +106,7 @@
 		model = '';
 		prefix = '';
 		format = '35mm';
+		lensMountId = '';
 		cameraType = '';
 		serialNumber = '';
 		datePurchased = '';
@@ -107,6 +123,7 @@
 				model,
 				prefix: prefix || null,
 				format,
+				lens_mount_id: Number(lensMountId),
 				camera_type: cameraType || null,
 				serial_number: serialNumber || null,
 				date_purchased: datePurchased || null,
@@ -187,6 +204,9 @@
 							</div>
 							<div class="mt-1 flex gap-3 text-xs text-text-muted">
 								<span>{camera.format}</span>
+								{#if mountNameById[camera.lens_mount_id]}
+									<span>{mountNameById[camera.lens_mount_id]}</span>
+								{/if}
 								{#if camera.camera_type}
 									<span>{camera.camera_type}</span>
 								{/if}
@@ -210,8 +230,9 @@
 			<ComboInput label="Brand" bind:value={brand} placeholder="Minolta" options={brandOptions} />
 			<Input label="Model" bind:value={model} placeholder="XD-7" />
 		</div>
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-3 gap-4">
 			<Select label="Format" bind:value={format} options={formatOptions} />
+			<Select label="Lens Mount" bind:value={lensMountId} options={lensMountOptions} />
 			<Select label="Type" bind:value={cameraType} options={typeOptions} />
 		</div>
 		<div class="grid grid-cols-2 gap-4">
@@ -219,10 +240,10 @@
 			<Input label="Serial Number" bind:value={serialNumber} placeholder="1234567" />
 		</div>
 		<div class="grid grid-cols-2 gap-4">
-			<Input label="Date Purchased" bind:value={datePurchased} type="date" />
+			<DateInput label="Date Purchased" bind:value={datePurchased} />
 			<ComboInput label="Purchased From" bind:value={purchasedFrom} placeholder="eBay, KEH, etc." options={vendorOptions} />
 		</div>
-		<Input label="Date Sold" bind:value={dateSold} type="date" hint="Leave empty if you still own it" />
+		<DateInput label="Date Sold" bind:value={dateSold} hint="Leave empty if you still own it" />
 		<Textarea label="Notes" bind:value={notes} placeholder="Any notes about this camera..." />
 		{#if error}
 			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>

@@ -1,0 +1,34 @@
+use sea_orm::entity::prelude::*;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[sea_orm(table_name = "lens_mounts")]
+pub struct Model {
+    #[sea_orm(primary_key)]
+    pub id: i32,
+    pub name: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    #[sea_orm(has_many = "super::camera::Entity")]
+    Cameras,
+    #[sea_orm(has_many = "super::lens::Entity")]
+    Lenses,
+}
+
+impl Related<super::camera::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Cameras.def()
+    }
+}
+
+impl Related<super::lens::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Lenses.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}

@@ -4,6 +4,7 @@
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
+	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
@@ -12,9 +13,10 @@
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
 	import { getCamera, updateCamera, deleteCamera, listMaintenanceForCamera, createMaintenance, deleteMaintenance, listDistinctCameraBrands, listDistinctVendors, listDistinctMaintProviders, getLensesForCamera, linkLensToCamera, unlinkLensFromCamera } from '$lib/api/cameras';
 	import { listDistinctLensBrands, listLenses } from '$lib/api/lenses';
+	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { listRollsForCamera } from '$lib/api/rolls';
 	import { lensDisplayName } from '$lib/utils/lens';
-	import type { Camera, CameraMaintenance, CameraMaintenanceInsert, Lens, RollWithDetails } from '$lib/types';
+	import type { Camera, CameraMaintenance, CameraMaintenanceInsert, Lens, LensMount, RollWithDetails } from '$lib/types';
 
 	const id = $derived(Number(page.params.id));
 
@@ -22,6 +24,7 @@
 	let maintenance: CameraMaintenance[] = $state([]);
 	let rolls: RollWithDetails[] = $state([]);
 	let allLenses: Lens[] = $state([]);
+	let lensMounts: LensMount[] = $state([]);
 	let linkedLensIds: number[] = $state([]);
 	let showLinkLensDialog = $state(false);
 	let linkLensId = $state('');
@@ -41,6 +44,7 @@
 	let editModel = $state('');
 	let editPrefix = $state('');
 	let editFormat = $state('35mm');
+	let editLensMountId = $state('');
 	let editCameraType = $state('');
 	let editSerialNumber = $state('');
 	let editDatePurchased = $state('');
@@ -55,6 +59,15 @@
 	let maintCost = $state('');
 	let maintNotes = $state('');
 	let error = $state('');
+
+	const lensMountOptions = $derived([
+		{ value: '', label: 'Select mount...' },
+		...lensMounts.map((m) => ({ value: String(m.id), label: m.name }))
+	]);
+
+	const mountNameById = $derived(
+		Object.fromEntries(lensMounts.map((m) => [m.id, m.name]))
+	);
 
 	const linkedLenses = $derived(allLenses.filter((l) => linkedLensIds.includes(l.id)));
 	const unlinkedLenses = $derived(allLenses.filter((l) => !linkedLensIds.includes(l.id) && !l.date_sold));
@@ -98,7 +111,7 @@
 
 	async function load() {
 		try {
-			const [cam, maint, r, lenses, camLensIds, camBrands, lensBrands, vendors, maintProviders] = await Promise.all([
+			const [cam, maint, r, lenses, camLensIds, camBrands, lensBrands, vendors, maintProviders, mounts] = await Promise.all([
 				getCamera(id),
 				listMaintenanceForCamera(id),
 				listRollsForCamera(id),
@@ -107,7 +120,8 @@
 				listDistinctCameraBrands(),
 				listDistinctLensBrands(),
 				listDistinctVendors(),
-				listDistinctMaintProviders()
+				listDistinctMaintProviders(),
+				listLensMounts()
 			]);
 			camera = cam;
 			maintenance = maint;
@@ -117,6 +131,7 @@
 			brandOptions = [...new Set([...camBrands, ...lensBrands])].sort();
 			vendorOptions = vendors;
 			maintProviderOptions = maintProviders;
+			lensMounts = mounts;
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -130,6 +145,7 @@
 		editModel = camera.model;
 		editPrefix = camera.prefix ?? '';
 		editFormat = camera.format;
+		editLensMountId = String(camera.lens_mount_id);
 		editCameraType = camera.camera_type ?? '';
 		editSerialNumber = camera.serial_number ?? '';
 		editDatePurchased = camera.date_purchased ?? '';
@@ -147,6 +163,7 @@
 				model: editModel,
 				prefix: editPrefix || null,
 				format: editFormat,
+				lens_mount_id: Number(editLensMountId),
 				camera_type: editCameraType || null,
 				serial_number: editSerialNumber || null,
 				date_purchased: editDatePurchased || null,
@@ -261,8 +278,9 @@
 				<ComboInput label="Brand" bind:value={editBrand} options={brandOptions} />
 				<Input label="Model" bind:value={editModel} required />
 			</div>
-			<div class="grid grid-cols-2 gap-4">
+			<div class="grid grid-cols-3 gap-4">
 				<Select label="Format" bind:value={editFormat} options={formatOptions} />
+				<Select label="Lens Mount" bind:value={editLensMountId} options={lensMountOptions} />
 				<Select label="Type" bind:value={editCameraType} options={typeOptions} />
 			</div>
 			<div class="grid grid-cols-2 gap-4">
@@ -270,10 +288,10 @@
 				<Input label="Serial Number" bind:value={editSerialNumber} />
 			</div>
 			<div class="grid grid-cols-2 gap-4">
-				<Input label="Date Purchased" bind:value={editDatePurchased} type="date" />
+				<DateInput label="Date Purchased" bind:value={editDatePurchased} />
 				<ComboInput label="Purchased From" bind:value={editPurchasedFrom} options={vendorOptions} />
 			</div>
-			<Input label="Date Sold" bind:value={editDateSold} type="date" hint="Leave empty if you still own it" />
+			<DateInput label="Date Sold" bind:value={editDateSold} hint="Leave empty if you still own it" />
 			<Textarea label="Notes" bind:value={editNotes} />
 			{#if error}
 				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
@@ -296,6 +314,10 @@
 			<div>
 				<span class="text-xs text-text-muted">Format</span>
 				<p class="text-sm">{camera.format}</p>
+			</div>
+			<div>
+				<span class="text-xs text-text-muted">Lens Mount</span>
+				<p class="text-sm">{mountNameById[camera.lens_mount_id] ?? '—'}</p>
 			</div>
 			{#if camera.camera_type}
 				<div>
@@ -385,8 +407,8 @@
 						<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-3">
 							<div class="flex items-center gap-2">
 								<span class="text-sm">{lensDisplayName(lens)}</span>
-								{#if lens.lens_system}
-									<span class="text-xs text-text-faint">{lens.lens_system}</span>
+								{#if mountNameById[lens.lens_mount_id]}
+									<span class="text-xs text-text-faint">{mountNameById[lens.lens_mount_id]}</span>
 								{/if}
 								{#if lens.date_sold}
 									<span class="rounded bg-red-500/15 px-1.5 py-0.5 text-xs text-red-400">Sold</span>
@@ -432,7 +454,7 @@
 		<Select label="Type" bind:value={maintType} options={maintTypeOptions} />
 		<ComboInput label="Done By" bind:value={maintDoneBy} placeholder="Garry's Camera Repair" options={maintProviderOptions} />
 		<div class="grid grid-cols-2 gap-4">
-			<Input label="Date" bind:value={maintDateDone} type="date" />
+			<DateInput label="Date" bind:value={maintDateDone} />
 			<Input label="Cost ($)" bind:value={maintCost} type="number" step="0.01" placeholder="0.00" />
 		</div>
 		<Textarea label="Notes" bind:value={maintNotes} placeholder="What was done..." />

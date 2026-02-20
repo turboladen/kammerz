@@ -15,6 +15,7 @@ pub struct CreateCameraDto {
     pub model: String,
     pub prefix: Option<String>,
     pub format: String,
+    pub lens_mount_id: i32,
     pub camera_type: Option<String>,
     pub serial_number: Option<String>,
     pub date_purchased: Option<String>,
@@ -31,6 +32,7 @@ pub struct UpdateCameraDto {
     #[serde(deserialize_with = "double_option")]
     pub prefix: Option<Option<String>>,
     pub format: Option<String>,
+    pub lens_mount_id: Option<i32>,
     #[serde(deserialize_with = "double_option")]
     pub camera_type: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
@@ -102,6 +104,7 @@ pub async fn create_camera(
         model: Set(data.model),
         prefix: Set(data.prefix),
         format: Set(data.format),
+        lens_mount_id: Set(data.lens_mount_id),
         camera_type: Set(data.camera_type),
         serial_number: Set(data.serial_number),
         date_purchased: Set(data.date_purchased),
@@ -137,6 +140,7 @@ pub async fn update_camera(
     if let Some(v) = data.model { model.model = Set(v); }
     if let Some(v) = data.prefix { model.prefix = Set(v); }
     if let Some(v) = data.format { model.format = Set(v); }
+    if let Some(v) = data.lens_mount_id { model.lens_mount_id = Set(v); }
     if let Some(v) = data.camera_type { model.camera_type = Set(v); }
     if let Some(v) = data.serial_number { model.serial_number = Set(v); }
     if let Some(v) = data.date_purchased { model.date_purchased = Set(v); }

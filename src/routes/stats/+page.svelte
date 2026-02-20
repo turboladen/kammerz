@@ -216,7 +216,7 @@
 
 		<!-- Distribution Row -->
 		<FadeIn delay={200}>
-			<div class="grid gap-6 sm:grid-cols-2">
+			<div class="grid gap-6 sm:grid-cols-3">
 				<!-- Rolls by Format -->
 				{#if stats.rolls_by_format.length > 0}
 					{@const maxFormat = Math.max(...stats.rolls_by_format.map((f) => f.count), 1)}
@@ -234,6 +234,33 @@
 											<div
 												class="h-5 rounded-r bg-accent/60 transition-all duration-300"
 												style="width: {(item.count / maxFormat) * 100}%"
+											></div>
+										</div>
+										<span class="w-8 font-mono text-xs text-text-faint">{item.count}</span>
+									</div>
+								{/each}
+							</div>
+						</div>
+					</div>
+				{/if}
+
+				<!-- Rolls by Lens Mount -->
+				{#if stats.rolls_by_mount.length > 0}
+					{@const maxMount = Math.max(...stats.rolls_by_mount.map((m) => m.count), 1)}
+					<div>
+						<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+							Rolls by Lens Mount
+							<div class="flex-1 border-b border-border-subtle"></div>
+						</h2>
+						<div class="rounded-lg border border-border bg-surface-raised p-4">
+							<div class="space-y-2">
+								{#each stats.rolls_by_mount as item}
+									<div class="flex items-center gap-3">
+										<span class="w-20 text-right text-xs text-text-muted">{item.label}</span>
+										<div class="flex-1">
+											<div
+												class="h-5 rounded-r bg-accent/60 transition-all duration-300"
+												style="width: {(item.count / maxMount) * 100}%"
 											></div>
 										</div>
 										<span class="w-8 font-mono text-xs text-text-faint">{item.count}</span>

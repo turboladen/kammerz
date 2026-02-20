@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
+	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
@@ -348,8 +349,8 @@
 		<div class="space-y-4">
 			<Select label="Lab" bind:value={devLabId} options={labOptions} />
 			<div class="grid grid-cols-2 gap-3">
-				<Input label="Date Dropped Off" bind:value={devDateDroppedOff} type="date" />
-				<Input label="Date Received" bind:value={devDateReceived} type="date" />
+				<DateInput label="Date Dropped Off" bind:value={devDateDroppedOff} />
+				<DateInput label="Date Received" bind:value={devDateReceived} />
 			</div>
 			<Input label="Cost" bind:value={devCost} placeholder="15.00" />
 			<Textarea label="Notes" bind:value={devLabNotes} placeholder="Processing notes..." />
@@ -370,7 +371,7 @@
 	<Dialog open={true} title={selfDev ? 'Edit Self Development' : 'Self Development'} onclose={() => { showSelfDevDialog = false; resetSelfDevForm(); }}>
 		<div class="space-y-4">
 			<div class="grid grid-cols-2 gap-3">
-				<Input label="Date Processed" bind:value={devDateProcessed} type="date" />
+				<DateInput label="Date Processed" bind:value={devDateProcessed} />
 				<Input label="Temperature" bind:value={devTemperature} placeholder="20°C" />
 			</div>
 

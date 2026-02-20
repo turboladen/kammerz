@@ -5,18 +5,19 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
+	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import DevelopmentSection from '$lib/components/rolls/DevelopmentSection.svelte';
 	import { getRoll, updateRoll, deleteRoll } from '$lib/api/rolls';
-	import { listCameras, getLensesForCamera } from '$lib/api/cameras';
+	import { listCameras } from '$lib/api/cameras';
 	import { listLenses } from '$lib/api/lenses';
 	import { listShotsForRoll, createShot, updateShot, deleteShot, getLensesForShot, suggestNextFrame } from '$lib/api/shots';
 	import { getLabDevForRoll, getSelfDevForRoll, listDevStages } from '$lib/api/development';
 	import { listLabs } from '$lib/api/labs';
-	import { lensDisplayName } from '$lib/utils/lens';
+	import { lensDisplayName, buildLensOptions } from '$lib/utils/lens';
 	import type { RollWithDetails, Camera, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus } from '$lib/types';
 
 	const id = $derived(Number(page.params.id));
@@ -32,7 +33,6 @@
 	// Shot state
 	let shots: Shot[] = $state([]);
 	let allLenses: Lens[] = $state([]);
-	let cameraLensIds: number[] = $state([]);
 	let shotLensMap: Record<number, number[]> = $state({});
 	let showShotDialog = $state(false);
 	let editingShotId: number | null = $state(null);
@@ -64,32 +64,23 @@
 		...cameras.map((c) => ({ value: String(c.id), label: `${c.brand} ${c.model}` }))
 	]);
 
-	// Lenses sorted: camera-linked first, then others. Only owned (not sold).
+	const selectedCamera = $derived(
+		roll?.camera_id ? cameras.find((c) => c.id === roll.camera_id) ?? null : null
+	);
+
+	// Lenses sorted: mount-compatible first, then others. Only owned (not sold).
 	const availableLenses = $derived.by(() => {
 		const owned = allLenses.filter((l) => !l.date_sold);
-		const linked = owned.filter((l) => cameraLensIds.includes(l.id));
-		const other = owned.filter((l) => !cameraLensIds.includes(l.id));
-		return [...linked, ...other];
+		if (selectedCamera?.lens_mount_id) {
+			const matching = owned.filter((l) => l.lens_mount_id === selectedCamera.lens_mount_id);
+			const rest = owned.filter((l) => l.lens_mount_id !== selectedCamera.lens_mount_id);
+			return [...matching, ...rest];
+		}
+		return owned;
 	});
 
 	// Roll-level default lens dropdown options
-	const rollLensOptions = $derived.by(() => {
-		const options: { value: string; label: string; disabled?: boolean }[] = [
-			{ value: '', label: 'No default lens' }
-		];
-		const linked = availableLenses.filter((l) => cameraLensIds.includes(l.id));
-		const other = availableLenses.filter((l) => !cameraLensIds.includes(l.id));
-		for (const l of linked) {
-			options.push({ value: String(l.id), label: lensDisplayName(l) });
-		}
-		if (linked.length > 0 && other.length > 0) {
-			options.push({ value: '__divider__', label: '── Other lenses ──', disabled: true });
-		}
-		for (const l of other) {
-			options.push({ value: String(l.id), label: lensDisplayName(l) });
-		}
-		return options;
-	});
+	const rollLensOptions = $derived(buildLensOptions(allLenses, selectedCamera));
 
 	// Frame progress
 	const frameProgress = $derived.by(() => {
@@ -123,13 +114,6 @@
 				devStages = await listDevStages(sd.id);
 			} else {
 				devStages = [];
-			}
-
-			// Load camera-lens associations if camera is set
-			if (roll?.camera_id) {
-				cameraLensIds = await getLensesForCamera(roll.camera_id);
-			} else {
-				cameraLensIds = [];
 			}
 
 			// Batch-load lens IDs per shot
@@ -519,7 +503,7 @@
 				<Input label="Shutter Speed" bind:value={shotShutterSpeed} placeholder="1/125" />
 			</div>
 			<div class="grid grid-cols-2 gap-3">
-				<Input label="Date" bind:value={shotDate} type="date" />
+				<DateInput label="Date" bind:value={shotDate} />
 				<Input label="Location" bind:value={shotLocation} placeholder="Central Park" />
 			</div>
 
@@ -529,7 +513,7 @@
 					<span class="mb-1.5 block text-xs font-medium text-text-muted">Lens</span>
 					<div class="max-h-36 space-y-1 overflow-y-auto rounded-lg border border-border bg-surface p-2">
 						{#each availableLenses as lens}
-							{@const isLinked = cameraLensIds.includes(lens.id)}
+							{@const isMountMatch = selectedCamera?.lens_mount_id === lens.lens_mount_id}
 							<label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm transition-colors hover:bg-surface-overlay">
 								<input
 									type="checkbox"
@@ -538,8 +522,8 @@
 									class="rounded border-border accent-accent"
 								/>
 								<span>{lensDisplayName(lens)}</span>
-								{#if isLinked}
-									<span class="text-xs text-text-faint">(camera)</span>
+								{#if isMountMatch}
+									<span class="text-xs text-text-faint">(mount match)</span>
 								{/if}
 							</label>
 						{/each}

@@ -10,6 +10,7 @@ pub struct Model {
     pub model: String,
     pub prefix: Option<String>,
     pub format: String,
+    pub lens_mount_id: i32,
     pub camera_type: Option<String>,
     pub serial_number: Option<String>,
     pub date_purchased: Option<String>,
@@ -28,6 +29,12 @@ pub enum Relation {
     Rolls,
     #[sea_orm(has_many = "super::camera_lens::Entity")]
     CameraLenses,
+    #[sea_orm(
+        belongs_to = "super::lens_mount::Entity",
+        from = "Column::LensMountId",
+        to = "super::lens_mount::Column::Id"
+    )]
+    LensMount,
 }
 
 impl Related<super::camera_maintenance::Entity> for Entity {
@@ -45,6 +52,12 @@ impl Related<super::roll::Entity> for Entity {
 impl Related<super::camera_lens::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::CameraLenses.def()
+    }
+}
+
+impl Related<super::lens_mount::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::LensMount.def()
     }
 }
 

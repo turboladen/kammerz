@@ -5,17 +5,17 @@
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import { listRolls } from '$lib/api/rolls';
-	import { getLensesForCamera } from '$lib/api/cameras';
+	import { listCameras } from '$lib/api/cameras';
 	import { listLenses } from '$lib/api/lenses';
 	import { listShotsForRoll, createShot, suggestNextFrame } from '$lib/api/shots';
-	import { lensDisplayName } from '$lib/utils/lens';
-	import type { RollWithDetails, Lens, Shot } from '$lib/types';
+	import { buildLensOptions } from '$lib/utils/lens';
+	import type { RollWithDetails, Camera, Lens, Shot } from '$lib/types';
 
 	let rolls: RollWithDetails[] = $state([]);
+	let cameras: Camera[] = $state([]);
 	let allLenses: Lens[] = $state([]);
 	let selectedRollId = $state('');
 	let shots: Shot[] = $state([]);
-	let cameraLensIds: number[] = $state([]);
 	let loading = $state(true);
 	let saving = $state(false);
 	let error = $state('');
@@ -54,28 +54,11 @@
 
 	const selectedRoll = $derived(rolls.find((r) => String(r.id) === selectedRollId));
 
-	// Lens options for the selected camera
-	const lensOptions = $derived.by(() => {
-		const owned = allLenses.filter((l) => !l.date_sold);
-		// Camera-linked first, then others
-		const linked = owned.filter((l) => cameraLensIds.includes(l.id));
-		const other = owned.filter((l) => !cameraLensIds.includes(l.id));
-		const options: { value: string; label: string; disabled?: boolean }[] = [
-			{ value: '', label: 'No lens selected' }
-		];
-		if (linked.length > 0) {
-			for (const l of linked) {
-				options.push({ value: String(l.id), label: lensDisplayName(l) });
-			}
-			if (other.length > 0) {
-				options.push({ value: '__divider__', label: '── Other lenses ──', disabled: true });
-			}
-		}
-		for (const l of other) {
-			options.push({ value: String(l.id), label: lensDisplayName(l) });
-		}
-		return options;
-	});
+	const selectedCamera = $derived(
+		selectedRoll?.camera_id ? cameras.find((c) => c.id === selectedRoll.camera_id) ?? null : null
+	);
+
+	const lensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens selected'));
 
 	// Frame progress for selected roll
 	const frameInfo = $derived.by(() => {
@@ -87,8 +70,9 @@
 
 	async function loadInitial() {
 		try {
-			const [r, lenses] = await Promise.all([listRolls(), listLenses()]);
+			const [r, cams, lenses] = await Promise.all([listRolls(), listCameras(), listLenses()]);
 			rolls = r;
+			cameras = cams;
 			allLenses = lenses;
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -100,18 +84,7 @@
 	async function loadRollData(rollId: number) {
 		error = '';
 		try {
-			const [s, roll] = await Promise.all([
-				listShotsForRoll(rollId),
-				Promise.resolve(rolls.find((r) => r.id === rollId))
-			]);
-			shots = s;
-
-			// Load camera-lens associations
-			if (roll?.camera_id) {
-				cameraLensIds = await getLensesForCamera(roll.camera_id);
-			} else {
-				cameraLensIds = [];
-			}
+			shots = await listShotsForRoll(rollId);
 
 			// Suggest next frame
 			try {
@@ -190,7 +163,6 @@
 			loadRollData(Number(selectedRollId));
 		} else {
 			shots = [];
-			cameraLensIds = [];
 			frameNumber = '';
 		}
 	});

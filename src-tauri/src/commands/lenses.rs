@@ -12,6 +12,7 @@ use crate::AppState;
 #[derive(Debug, Deserialize)]
 pub struct CreateLensDto {
     pub brand: String,
+    pub lens_mount_id: i32,
     pub lens_system: Option<String>,
     pub name_on_lens: Option<String>,
     pub focal_length: Option<String>,
@@ -30,6 +31,7 @@ pub struct CreateLensDto {
 #[serde(default)]
 pub struct UpdateLensDto {
     pub brand: Option<String>,
+    pub lens_mount_id: Option<i32>,
     #[serde(deserialize_with = "double_option")]
     pub lens_system: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
@@ -82,6 +84,7 @@ pub async fn create_lens(state: State<'_, AppState>, data: CreateLensDto) -> Res
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let model = lens::ActiveModel {
         brand: Set(data.brand),
+        lens_mount_id: Set(data.lens_mount_id),
         lens_system: Set(data.lens_system),
         name_on_lens: Set(data.name_on_lens),
         focal_length: Set(data.focal_length),
@@ -120,6 +123,7 @@ pub async fn update_lens(
     let mut model: lens::ActiveModel = existing.into();
 
     if let Some(v) = data.brand { model.brand = Set(v); }
+    if let Some(v) = data.lens_mount_id { model.lens_mount_id = Set(v); }
     if let Some(v) = data.lens_system { model.lens_system = Set(v); }
     if let Some(v) = data.name_on_lens { model.name_on_lens = Set(v); }
     if let Some(v) = data.focal_length { model.focal_length = Set(v); }

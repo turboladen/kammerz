@@ -3,6 +3,7 @@
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
+	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import { listModels, parseNote, importParsedRoll } from '$lib/api/import';
 	import { getSetting, setSetting } from '$lib/api/settings';
@@ -524,8 +525,8 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 						{/if}
 					</div>
 					<Input label="Frame Count" type="number" bind:value={frameCount} />
-					<Input label="Date Loaded" type="date" bind:value={dateLoaded} />
-					<Input label="Date Finished" type="date" bind:value={dateFinished} />
+					<DateInput label="Date Loaded" bind:value={dateLoaded} />
+					<DateInput label="Date Finished" bind:value={dateFinished} />
 					<div class="col-span-2">
 						<Input label="Notes" bind:value={rollNotes} />
 					</div>
@@ -576,8 +577,9 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 										<td class="px-1 py-1">
 											<input
 												bind:value={shot.date}
-												type="date"
-												class="rounded border border-border bg-surface px-1.5 py-1 text-xs text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+												type="text"
+												placeholder="YYYY-MM-DD"
+												class="w-28 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs text-text placeholder-text-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 											/>
 										</td>
 										<td class="px-1 py-1">

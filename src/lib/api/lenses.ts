@@ -16,8 +16,6 @@ export const deleteLens = (id: number) => invoke<void>('delete_lens', { id });
 
 export const listDistinctLensBrands = () => invoke<string[]>('list_distinct_lens_brands');
 
-export const listDistinctLensSystems = () => invoke<string[]>('list_distinct_lens_systems');
-
 // --- Camera associations (reverse lookup, Phase 4) ---
 
 export const getCamerasForLens = (lensId: number) =>

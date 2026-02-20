@@ -1,6 +1,7 @@
 pub mod camera;
 pub mod camera_maintenance;
 pub mod lens;
+pub mod lens_mount;
 pub mod camera_lens;
 pub mod film_stock;
 pub mod lab;
