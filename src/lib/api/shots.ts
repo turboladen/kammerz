@@ -17,6 +17,9 @@ export const deleteShot = (id: number) => invoke<void>('delete_shot', { id });
 export const getLensesForShot = (shotId: number) =>
 	invoke<number[]>('get_lenses_for_shot', { shotId });
 
+export const getLensesForRollShots = (rollId: number) =>
+	invoke<[number, number][]>('get_lenses_for_roll_shots', { rollId });
+
 export const suggestNextFrame = (rollId: number) =>
 	invoke<string>('suggest_next_frame', { rollId });
 

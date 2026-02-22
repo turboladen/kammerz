@@ -69,10 +69,19 @@
 
 	const linkedLenses = $derived(allLenses.filter((l) => linkedLensIds.includes(l.id)));
 	const unlinkedLenses = $derived(allLenses.filter((l) => !linkedLensIds.includes(l.id) && !l.date_sold));
-	const linkLensOptions = $derived([
-		{ value: '', label: 'Select a lens...' },
-		...unlinkedLenses.map((l) => ({ value: String(l.id), label: lensDisplayName(l) }))
-	]);
+	const linkLensOptions = $derived.by(() => {
+		const compatible = unlinkedLenses.filter((l) => l.lens_mount_id === camera?.lens_mount_id);
+		const rest = unlinkedLenses.filter((l) => l.lens_mount_id !== camera?.lens_mount_id);
+		const options: { value: string; label: string; disabled?: boolean }[] = [
+			{ value: '', label: 'Select a lens...' }
+		];
+		for (const l of compatible) options.push({ value: String(l.id), label: lensDisplayName(l) });
+		if (compatible.length > 0 && rest.length > 0) {
+			options.push({ value: '__divider__', label: '── Other mounts ──', disabled: true });
+		}
+		for (const l of rest) options.push({ value: String(l.id), label: lensDisplayName(l) });
+		return options;
+	});
 
 	// Default lens dropdown options (from linked lenses only)
 	const defaultLensOptions = $derived([
@@ -453,7 +462,7 @@
 				<Button size="sm" onclick={() => { linkLensId = ''; showLinkLensDialog = true; }}>+ Link Lens</Button>
 			</div>
 			{#if linkedLenses.length === 0}
-				<p class="text-sm text-text-faint">No lenses linked. Link lenses to filter them first in shot entry.</p>
+				<p class="text-sm text-text-faint">No lenses linked yet. Link your {mountNameById[camera.lens_mount_id] ?? ''} mount lenses to set a default for new rolls.</p>
 			{:else}
 				<div class="mb-3">
 					<Select

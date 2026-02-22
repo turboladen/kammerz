@@ -16,7 +16,7 @@
 	import { listCameras } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
 	import { listLenses } from '$lib/api/lenses';
-	import { listShotsForRoll, createShot, updateShot, deleteShot, getLensesForShot, suggestNextFrame } from '$lib/api/shots';
+	import { listShotsForRoll, createShot, updateShot, deleteShot, getLensesForShot, getLensesForRollShots, suggestNextFrame } from '$lib/api/shots';
 	import { getLabDevForRoll, getSelfDevForRoll, listDevStages } from '$lib/api/development';
 	import { listLabs } from '$lib/api/labs';
 	import { lensDisplayName, buildLensOptions } from '$lib/utils/lens';
@@ -71,6 +71,10 @@
 	let selfDev: DevelopmentSelf | null = $state(null);
 	let devStages: DevStage[] = $state([]);
 	let devAutoPrompt: 'lab' | 'self' | null = $state(null);
+
+	// Status backward-move confirmation
+	let pendingStatus: RollStatus | null = $state(null);
+	const currentStatusIdx = $derived(roll ? statusOrder.indexOf(roll.status as RollStatus) : -1);
 
 	// Roll-full nudge state
 	let rollFullDismissed = $state(false);
@@ -207,13 +211,12 @@
 				devStages = [];
 			}
 
-			// Batch-load lens IDs per shot
+			// Batch-load all shot-lens associations in a single query
+			const pairs = await getLensesForRollShots(id);
 			const map: Record<number, number[]> = {};
-			await Promise.all(
-				s.map(async (shot) => {
-					map[shot.id] = await getLensesForShot(shot.id);
-				})
-			);
+			for (const [shotId, lensId] of pairs) {
+				(map[shotId] ??= []).push(lensId);
+			}
 			shotLensMap = map;
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -319,6 +322,42 @@
 		}
 	}
 
+	async function handleSaveShotAndNext() {
+		shotError = '';
+		if (!shotFrameNumber.trim()) {
+			shotError = 'Frame number is required.';
+			return;
+		}
+		const lensIds = shotLensId ? [Number(shotLensId)] : [];
+		const savedLensId = shotLensId;
+		try {
+			await createShot({
+				roll_id: id,
+				frame_number: shotFrameNumber.trim(),
+				aperture: shotAperture || null,
+				shutter_speed: shotShutterSpeed || null,
+				date: shotDate || null,
+				date_fuzzy: null,
+				location: shotLocation || null,
+				gps_lat: null,
+				gps_lon: null,
+				notes: shotNotes || null,
+				lens_ids: lensIds
+			});
+			await load();
+			// Reset per-shot fields but keep session defaults (date, location, lens)
+			const nextFrame = await suggestNextFrame(id);
+			shotFrameNumber = nextFrame;
+			shotAperture = '';
+			shotShutterSpeed = '';
+			shotNotes = '';
+			shotLensId = savedLensId;
+			shotError = '';
+		} catch (err) {
+			shotError = err instanceof Error ? err.message : String(err);
+		}
+	}
+
 	async function confirmDeleteShot() {
 		if (deletingShotId === null) return;
 		error = '';
@@ -365,6 +404,18 @@
 			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	function handleStatusClick(status: RollStatus) {
+		if (!roll) return;
+		const currentIdx = statusOrder.indexOf(roll.status as RollStatus);
+		const targetIdx = statusOrder.indexOf(status);
+		if (targetIdx < currentIdx) {
+			// Backward move — ask for confirmation
+			pendingStatus = status;
+		} else {
+			updateStatus(status);
 		}
 	}
 
@@ -542,14 +593,25 @@
 				Status
 				<div class="flex-1 border-b border-border-subtle"></div>
 			</h2>
-			<div class="flex flex-wrap gap-2">
-				{#each statusOrder as status}
+			<div class="flex items-center gap-[2px]">
+				{#each statusOrder as status, idx}
+					{@const isFirst = idx === 0}
+					{@const isLast = idx === statusOrder.length - 1}
+					{@const clipPath = isFirst
+						? 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%)'
+						: isLast
+							? 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 8px 50%)'
+							: 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)'}
 					<button
-						onclick={() => updateStatus(status)}
-						class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors
+						onclick={() => handleStatusClick(status)}
+						style="clip-path: {clipPath}"
+						class="py-1.5 text-xs font-medium transition-colors
+							{isFirst ? 'pl-3 pr-4' : isLast ? 'pl-4 pr-3' : 'px-4'}
 							{roll.status === status
 							? 'bg-accent text-surface'
-							: 'bg-surface-overlay text-text-muted hover:text-text'}"
+							: idx < currentStatusIdx
+								? 'bg-accent/10 text-accent/70 hover:bg-accent/20'
+								: 'bg-surface-overlay text-text-muted hover:text-text'}"
 					>
 						{statusConfig[status].label}
 					</button>
@@ -608,7 +670,10 @@
 						</div>
 					{/if}
 				</div>
-				<Button size="sm" onclick={openAddShotDialog}>+ Add Shot</Button>
+				<div class="flex gap-2">
+					<Button size="sm" variant="ghost" href="/quick-entry?roll={roll?.id}">Quick Entry</Button>
+					<Button size="sm" onclick={openAddShotDialog}>+ Add Shot</Button>
+				</div>
 			</div>
 
 			{#if showRollFullNudge}
@@ -719,6 +784,9 @@
 			{/if}
 			<div class="flex justify-end gap-2 pt-2">
 				<Button variant="ghost" onclick={() => { showShotDialog = false; resetShotForm(); }}>Cancel</Button>
+				{#if !editingShotId}
+					<Button variant="ghost" onclick={handleSaveShotAndNext}>Save & Next</Button>
+				{/if}
 				<Button variant="primary" onclick={handleSaveShot}>
 					{editingShotId ? 'Save' : 'Add Shot'}
 				</Button>
@@ -746,5 +814,17 @@
 		confirmLabel="Delete Shot"
 		onconfirm={confirmDeleteShot}
 		oncancel={() => { deletingShotId = null; }}
+	/>
+{/if}
+
+<!-- Backward Status Move Confirmation -->
+{#if pendingStatus}
+	<ConfirmDialog
+		open={true}
+		title="Move Status Back"
+		message={`Move status back to ${statusConfig[pendingStatus].label}? This will revert progress.`}
+		confirmLabel="Move Back"
+		onconfirm={() => { updateStatus(pendingStatus!); pendingStatus = null; }}
+		oncancel={() => { pendingStatus = null; }}
 	/>
 {/if}

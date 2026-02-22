@@ -26,7 +26,7 @@
 	let filmStockId = $state('');
 	let lensId = $state('');
 	let frameCount = $state('');
-	let dateLoaded = $state('');
+	let dateLoaded = $state(new Date().toISOString().split('T')[0]);
 	let dateFuzzy = $state('');
 	let pushPull = $state('');
 	let notes = $state('');
@@ -163,6 +163,17 @@
 			lensId = String(cam.default_lens_id);
 		} else {
 			lensId = '';
+		}
+	});
+
+	// Auto-fill frame count from film stock's exposure_count
+	$effect(() => {
+		const stockId = filmStockId;
+		if (stockId) {
+			const stock = filmStocks.find((s) => s.id === Number(stockId));
+			if (stock?.exposure_count && !frameCount) {
+				frameCount = String(stock.exposure_count);
+			}
 		}
 	});
 </script>

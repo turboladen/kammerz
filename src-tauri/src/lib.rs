@@ -86,6 +86,7 @@ pub fn run() {
             commands::shots::update_shot,
             commands::shots::delete_shot,
             commands::shots::get_lenses_for_shot,
+            commands::shots::get_lenses_for_roll_shots,
             commands::shots::suggest_next_frame,
             commands::shots::count_shots_for_roll,
             // Development

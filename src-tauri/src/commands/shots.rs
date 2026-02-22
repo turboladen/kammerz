@@ -211,6 +211,19 @@ pub async fn get_lenses_for_shot(
 }
 
 #[tauri::command]
+pub async fn get_lenses_for_roll_shots(
+    state: State<'_, AppState>,
+    roll_id: i32,
+) -> Result<Vec<(i32, i32)>, String> {
+    ShotService::get_lenses_for_roll_shots(&state.db, roll_id)
+        .await
+        .map_err(|e| {
+            log::error!("Failed to get lenses for roll shots {roll_id}: {e}");
+            format!("Could not get shot lenses: {e}")
+        })
+}
+
+#[tauri::command]
 pub async fn suggest_next_frame(
     state: State<'_, AppState>,
     roll_id: i32,

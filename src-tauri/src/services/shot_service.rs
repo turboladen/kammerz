@@ -104,6 +104,29 @@ impl ShotService {
         Ok(())
     }
 
+    /// Batch-load all shot-lens associations for every shot in a roll (single query).
+    pub async fn get_lenses_for_roll_shots(
+        db: &DatabaseConnection,
+        roll_id: i32,
+    ) -> Result<Vec<(i32, i32)>, DbErr> {
+        #[derive(Debug, FromQueryResult)]
+        struct ShotLensRow {
+            shot_id: i32,
+            lens_id: i32,
+        }
+        let rows = ShotLensRow::find_by_statement(Statement::from_sql_and_values(
+            db.get_database_backend(),
+            r#"SELECT sl.shot_id, sl.lens_id
+               FROM shot_lenses sl
+               JOIN shots s ON s.id = sl.shot_id
+               WHERE s.roll_id = $1"#,
+            vec![roll_id.into()],
+        ))
+        .all(db)
+        .await?;
+        Ok(rows.into_iter().map(|r| (r.shot_id, r.lens_id)).collect())
+    }
+
     // --- Helpers ---
 
     pub async fn suggest_next_frame(

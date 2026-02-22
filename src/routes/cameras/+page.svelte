@@ -129,6 +129,9 @@
 
 	async function handleAdd() {
 		error = '';
+		if (!brand.trim()) { error = 'Brand is required.'; return; }
+		if (!model.trim()) { error = 'Model is required.'; return; }
+		if (!lensMountId) { error = 'Lens mount is required.'; return; }
 		try {
 			const camera: CameraInsert = {
 				brand,

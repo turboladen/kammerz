@@ -132,6 +132,8 @@
 
 	async function handleAdd() {
 		error = '';
+		if (!brand.trim()) { error = 'Brand is required.'; return; }
+		if (!lensMountId) { error = 'Lens mount is required.'; return; }
 		try {
 			await createLens(buildInsert());
 			showAddDialog = false;
@@ -162,6 +164,8 @@
 	async function handleEdit() {
 		if (!editingLens) return;
 		error = '';
+		if (!brand.trim()) { error = 'Brand is required.'; return; }
+		if (!lensMountId) { error = 'Lens mount is required.'; return; }
 		try {
 			await updateLens(editingLens.id, buildInsert());
 			editingLens = null;

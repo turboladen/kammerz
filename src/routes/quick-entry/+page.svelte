@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -99,6 +100,12 @@
 			cameras = cams;
 			allLenses = lenses;
 			lensMounts = mounts;
+
+			// Pre-select roll from query param (e.g., /quick-entry?roll=42)
+			const rollParam = page.url.searchParams.get('roll');
+			if (rollParam && r.some((roll) => String(roll.id) === rollParam)) {
+				selectedRollId = rollParam;
+			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
