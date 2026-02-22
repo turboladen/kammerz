@@ -160,6 +160,37 @@ Export, bulk operations, media attachments, and fit-and-finish improvements.
 
 ---
 
+## Future Feature Ideas
+
+### Film Holder Support (Large Format)
+
+Large format cameras use sheet film loaded into holders (typically double-dark holders with an A and B side). Currently, rolls serve as the container for LF sheets too, but there's no structured way to track which holder a shot came from. Three tiers of potential support:
+
+**Tier 1: Notation Convention (no code changes)**
+Document a convention: each "roll" = one shooting session's worth of holders. Frame numbers map to holder sides (1, 2, 3... or 1A/1B style). The existing `notes` field on rolls and shots captures holder IDs as free text. Works today with zero dev cost.
+
+*Limitation*: No structured data — can't search "which shots were on holder #3" or track holder inventory.
+
+**Tier 2: Holder Field on Shots (small feature — recommended first step)**
+Add an optional `holder_id` TEXT column to the `shots` table and a text input to the shot entry UI. Users type "H3-A" or similar. Simple free-text, no validation or foreign key. Allows filtering/grouping shots by holder in search and on the roll detail page.
+
+*Scope*: 1 migration + 1 entity field + minor UI (text input in shot entry + display in shot list). Smallest useful increment.
+
+*Note*: `suggest_next_frame()` in `shot_service.rs` is numeric-only (parses as i32). Non-numeric frame identifiers like "3B" are silently skipped for auto-suggest. Acceptable for Tier 2, but worth revisiting if holder-side notation becomes structured.
+
+**Tier 3: Full Holder Entity (larger feature)**
+A `film_holders` table: `id`, `label` ("Fidelity Elite #3"), `format` (4x5), `type` (double-dark, Grafmatic, Polaroid 545), `condition`, `notes`. Shots reference a holder FK + side (A/B). Enables holder inventory management, tracking which holders have light leaks, usage history, etc.
+
+*Scope*: New entity + service + commands + UI page + shot-entry integration. Significant, similar to the labs feature in scope.
+
+### Self-Development UX Improvements
+
+**Stage presets**: Self-dev dialog starts with empty stages every time. Standard B&W dev stages (pre-soak, developer, stop, fixer, wash, wetting agent) could be offered as a one-click template.
+
+**Copy from previous roll**: Batch home dev with identical chemistry requires re-entering all fields per roll. A "Copy chemistry from roll X" dropdown would reduce friction significantly for multi-roll sessions.
+
+---
+
 ## Schema Status
 
 All 13 database tables exist. Phases 1–3 created the core 12 tables; Phase 6 added `settings`.

@@ -51,13 +51,16 @@
 		cameraId ? cameras.find((c) => c.id === Number(cameraId)) : null
 	);
 
-	// Hint for medium format variable-back cameras (120 film has no fixed exposure_count)
+	// Hint for medium format variable-back cameras and large format sheet film
 	const frameCountHint = $derived.by(() => {
 		const matchingFormat = selectedCamera
 			? cameraFormatToStockFormat[selectedCamera.format]
 			: null;
 		if (matchingFormat === '120' && !frameCount) {
 			return '120 film: 6\u00d74.5=15 \u00b7 6\u00d76=12 \u00b7 6\u00d77=10 \u00b7 6\u00d78=9 \u00b7 6\u00d79=8';
+		}
+		if (['4x5', '5x7', '8x10'].includes(matchingFormat ?? '') && !frameCount) {
+			return 'Sheet film: total sheets loaded (e.g. 6 holders \u00d7 2 = 12)';
 		}
 		return undefined;
 	});
@@ -193,7 +196,7 @@
 		const stockId = filmStockId;
 		if (stockId) {
 			const stock = filmStocks.find((s) => s.id === Number(stockId));
-			if (stock?.exposure_count && !frameCount) {
+			if (stock?.exposure_count && stock.exposure_count > 1 && !frameCount) {
 				frameCount = String(stock.exposure_count);
 			}
 		}

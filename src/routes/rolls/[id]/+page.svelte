@@ -170,13 +170,16 @@
 
 	const editLensOptions = $derived(buildLensOptions(allLenses, editSelectedCamera, 'No default lens', lensMounts));
 
-	// Hint for medium format variable-back cameras (120 film has no fixed exposure_count)
+	// Hint for medium format variable-back cameras and large format sheet film
 	const editFrameCountHint = $derived.by(() => {
 		const matchingFormat = editSelectedCamera
 			? cameraFormatToStockFormat[editSelectedCamera.format]
 			: null;
 		if (matchingFormat === '120' && !editFrameCount) {
 			return '120 film: 6\u00d74.5=15 \u00b7 6\u00d76=12 \u00b7 6\u00d77=10 \u00b7 6\u00d78=9 \u00b7 6\u00d79=8';
+		}
+		if (['4x5', '5x7', '8x10'].includes(matchingFormat ?? '') && !editFrameCount) {
+			return 'Sheet film: total sheets loaded (e.g. 6 holders \u00d7 2 = 12)';
 		}
 		return undefined;
 	});

@@ -81,7 +81,8 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - Includes generic "Medium Format" and "Large Format" options for cameras that support multiple backs (e.g., Mamiya RB67).
 - Format labels use "Medium Format: 6x6" style (not "6x6 (Medium Format)").
 - Camera format → film stock format mapping: `35mm`→`135`, all medium format variants (`6x4.5`–`6x9`)→`120`, large format sizes map directly (`4x5`→`4x5`, etc.). Don't filter out non-matching formats — only reorder (cameras can use different backs).
-- 120 film stocks have `exposure_count: NULL` by design — frame count depends on back size (6×4.5=15, 6×6=12, 6×7=10, 6×8=9, 6×9=8). When camera format maps to '120' and frame count is empty, show the back-size hint via `frameCountHint` derived state.
+- 120 film stocks have `exposure_count: NULL` by design — frame count depends on back size (6×4.5=15, 6×6=12, 6×7=10, 6×8=9, 6×9=8). Sheet film stocks (4x5, 5x7, 8x10) have `exposure_count: 1` (one sheet per holder side) — auto-fill uses `> 1` guard to skip these. `frameCountHint` derived state shows format-specific guidance for both 120 and sheet film when frame count is empty.
+- Generic "Large Format" lens mount was removed (migration 009). LF cameras should use a specific shutter mount (Copal #0/#1/#3, Compur #0/#1/#3, Barrel Mount). Cross-mount compatibility within the LF family is handled by `isLargeFormatMount()` in `$lib/utils/lens.ts`.
 
 ### Component Patterns
 - `ComboInput` dropdown options use `onmousedown` (not `onclick`) to beat the blur/click race condition.
