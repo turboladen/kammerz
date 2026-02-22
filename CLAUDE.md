@@ -57,8 +57,9 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - **Always confirm destructive actions.** Never delete data without user confirmation.
 - Back navigation: Detail pages use `PageHeader`'s `backHref`/`backLabel` props for consistent back links.
 - Owned/Sold filtering: List pages with `date_sold` fields (cameras, lenses) use client-side All/Owned/Sold tab buttons with a `$derived()` filter. No backend changes needed to add this to a new list page.
-- Fixed-lens cameras: Show read-only lens indicators everywhere — lens list cards ("Fixed on [Camera]"), lens edit dialog (accent banner), roll default lens (locked text), shot lens dropdown (read-only). Detect via mount name: `lensMounts.find(m => m.id === mountId)?.name === 'Fixed Lens'` — never hardcode mount IDs.
+- Fixed-lens cameras: Structural invariant — camera creation with "Fixed Lens" mount MUST always call `createCameraWithLens()` (never plain `createCamera()`). Show read-only lens indicators everywhere — lens list cards ("Fixed on [Camera]"), lens edit dialog (accent banner), roll default lens (locked text), shot lens dropdown (read-only), Quick Entry (locked text). Camera detail page shows "Built-in Lens" section (no unlink/link/default-change controls). Camera edit locks the mount field to read-only. Detect via mount name: `lensMounts.find(m => m.id === mountId)?.name === 'Fixed Lens'` or `lensMounts.some(m => m.id === mountId && m.name === 'Fixed Lens')` — never hardcode mount IDs.
 - Shot lens defaults: Smart cascade — fixed lens (auto-locked) > last-used lens on roll > `roll.lens_id` (roll default) > `camera.default_lens_id` (camera default) > empty.
+- Shot dialog "Save & Next": Keeps dialog open after save, resets per-shot fields (aperture, shutter, notes), preserves session defaults (date, location, lens), auto-suggests next frame number. Only shown in add mode (not edit).
 
 ### Svelte 5 Patterns
 - Use `$state()`, `$derived()`, `$effect()`, `$props()`, `$bindable()` — no legacy `let` reactivity.
@@ -71,6 +72,7 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - Services are static async methods on unit structs (e.g., `CameraService::list_all(&db)`)
 - Entities use `String` for timestamps (SQLite TEXT), `Option<T>` for nullable fields
 - For joined queries (e.g., rolls with camera/film stock), use `#[derive(FromQueryResult)]` with raw SQL
+- For junction table data (e.g., shot↔lens), prefer batch queries per parent (e.g., `get_lenses_for_roll_shots(roll_id)`) over per-row queries. Avoids N+1 IPC round-trips through Tauri's `invoke()`.
 - DTOs in command files handle create/update payloads; services work with `ActiveModel` directly
 - Changes to `src-tauri/` files (Rust, capabilities, Cargo.toml) require Tauri to recompile
 
@@ -82,17 +84,20 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 ### Component Patterns
 - `ComboInput` dropdown options use `onmousedown` (not `onclick`) to beat the blur/click race condition.
 - `Select` options support an optional `disabled` property (used for visual dividers like `── Other formats ──`).
+- `Select` uses explicit `h-[38px]` to match `Input`/`DateInput` height — WebKit renders `<select>` shorter than `<input>` with identical padding classes.
 - Use `$derived.by(() => { ... })` when derived state needs multi-line logic; `$derived(expr)` for one-liners.
 - Always use the `<Badge>` component for roll statuses — never inline status pills with raw classes.
 - Wrap page content sections in `<FadeIn>` with staggered `delay` props (typically 50ms increments) for consistent entrance animations.
 - Section headers use the ledger-line pattern: `text-xs font-semibold uppercase tracking-wider text-text-faint` with either a rule line (`<div class="flex-1 border-b border-border-subtle">`) or `justify-between` for headers with action buttons. Never use `text-sm font-semibold text-text-muted`.
 - Card hover borders always use `hover:border-accent/40` — never other opacities like `/30`.
 - Roll status metadata (labels, colors, CSS classes) is defined in `src/lib/utils/status.ts`. Always import from there — never define inline status maps in page components. Use `getStatusColor(status)` for typed lookups or `getStatusColorSafe(label)` for untyped strings from backend queries.
+- Roll status progression: Chevron-shaped `clip-path` buttons show directional flow (past = `bg-accent/10`, current = `bg-accent`, future = `bg-surface-overlay`). Forward status changes are instant; backward moves require `ConfirmDialog`. See `handleStatusClick()` + `currentStatusIdx` in `rolls/[id]/+page.svelte`.
 - Lens dropdowns: Always use `buildLensOptions()` from `$lib/utils/lens.ts` — handles mount-compatibility sorting with dividers. Also see `buildMountOptions()` for mount dropdowns grouped by format family.
 - Dialog component uses flex column layout with `max-h-[85vh]` and `overflow-y-auto` on content. When adding fields to dialogs (e.g., inline lens creation), scrolling is already handled.
 
 ### Error Handling
 - Frontend `invoke()` calls return promises that reject on error. Wrap in try/catch with user-visible error display.
+- Always validate required fields client-side before `invoke()` calls (brand, model, mount, etc.). Show inline `error` state text — don't rely on backend DB constraint errors which are opaque to users.
 
 ### UI Design
 - Follow the design system in `UI_DESIGN.md` — colors, typography, component styling, layout patterns, and design principles.

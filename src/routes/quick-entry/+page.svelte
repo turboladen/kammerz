@@ -10,7 +10,7 @@
 	import { listCameras } from '$lib/api/cameras';
 	import { listLenses } from '$lib/api/lenses';
 	import { listShotsForRoll, createShot, suggestNextFrame } from '$lib/api/shots';
-	import { buildLensOptions } from '$lib/utils/lens';
+	import { buildLensOptions, lensDisplayName } from '$lib/utils/lens';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import type { RollWithDetails, Camera, Lens, LensMount, Shot } from '$lib/types';
 
@@ -60,6 +60,17 @@
 
 	const selectedCamera = $derived(
 		selectedRoll?.camera_id ? cameras.find((c) => c.id === selectedRoll.camera_id) ?? null : null
+	);
+
+	const isFixedLens = $derived(
+		selectedCamera
+			? lensMounts.some((m) => m.id === selectedCamera.lens_mount_id && m.name === 'Fixed Lens')
+			: false
+	);
+	const fixedLens = $derived(
+		isFixedLens && selectedCamera?.default_lens_id
+			? allLenses.find((l) => l.id === selectedCamera.default_lens_id) ?? null
+			: null
 	);
 
 	const lensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens selected', lensMounts));
@@ -192,11 +203,18 @@
 		}
 	}
 
-	// When roll changes, reload data
+	// When roll changes, reload data and auto-populate lens
 	$effect(() => {
 		if (selectedRollId) {
 			rollFullDismissed = false;
 			loadRollData(Number(selectedRollId));
+			// Auto-populate lens from roll default or camera fixed/default lens
+			const roll = rolls.find((r) => String(r.id) === selectedRollId);
+			if (roll?.lens_id) {
+				selectedLensId = String(roll.lens_id);
+			} else if (selectedCamera?.default_lens_id) {
+				selectedLensId = String(selectedCamera.default_lens_id);
+			}
 		} else {
 			shots = [];
 			frameNumber = '';
@@ -280,7 +298,16 @@
 					<Input label="Frame" bind:value={frameNumber} placeholder="1" required />
 					<Input label="f/" bind:value={aperture} placeholder="5.6" data-field="aperture" />
 					<Input label="Speed" bind:value={shutterSpeed} placeholder="1/125" />
-					<Select label="Lens" bind:value={selectedLensId} options={lensOptions} />
+					{#if isFixedLens && fixedLens}
+						<div>
+							<span class="mb-1.5 block text-xs font-medium text-text-muted">Lens</span>
+							<div class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted truncate">
+								{lensDisplayName(fixedLens)} <span class="text-text-faint">(fixed)</span>
+							</div>
+						</div>
+					{:else}
+						<Select label="Lens" bind:value={selectedLensId} options={lensOptions} />
+					{/if}
 				</div>
 				<div class="mt-3">
 					<Textarea label="Notes" bind:value={notes} placeholder="Optional notes..." />

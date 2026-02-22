@@ -132,6 +132,7 @@
 		if (!brand.trim()) { error = 'Brand is required.'; return; }
 		if (!model.trim()) { error = 'Model is required.'; return; }
 		if (!lensMountId) { error = 'Lens mount is required.'; return; }
+		if (isFixedLens && !lensFocalLength.trim()) { error = 'Focal length is required for fixed-lens cameras.'; return; }
 		try {
 			const camera: CameraInsert = {
 				brand,
@@ -148,7 +149,7 @@
 				notes: notes || null
 			};
 
-			if (isFixedLens && (lensNameOnLens || lensFocalLength || lensMaxAperture)) {
+			if (isFixedLens) {
 				await createCameraWithLens({
 					camera,
 					lens_name_on_lens: lensNameOnLens || null,

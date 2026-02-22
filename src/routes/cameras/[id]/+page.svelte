@@ -67,6 +67,10 @@
 		Object.fromEntries(lensMounts.map((m) => [m.id, m.name]))
 	);
 
+	const isFixedLens = $derived(
+		camera ? mountNameById[camera.lens_mount_id] === 'Fixed Lens' : false
+	);
+
 	const linkedLenses = $derived(allLenses.filter((l) => linkedLensIds.includes(l.id)));
 	const unlinkedLenses = $derived(allLenses.filter((l) => !linkedLensIds.includes(l.id) && !l.date_sold));
 	const linkLensOptions = $derived.by(() => {
@@ -331,7 +335,14 @@
 			</div>
 			<div class="grid grid-cols-3 gap-4">
 				<Select label="Format" bind:value={editFormat} options={formatOptions} />
-				<Select label="Lens Mount" bind:value={editLensMountId} options={lensMountOptions} />
+				{#if isFixedLens}
+					<div>
+						<span class="mb-1.5 block text-xs font-medium text-text-muted">Lens Mount</span>
+						<div class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted">Fixed Lens</div>
+					</div>
+				{:else}
+					<Select label="Lens Mount" bind:value={editLensMountId} options={lensMountOptions} />
+				{/if}
 				<Select label="Type" bind:value={editCameraType} options={typeOptions} />
 			</div>
 			<div class="grid grid-cols-2 gap-4">
@@ -454,42 +465,61 @@
 		</div>
 		</FadeIn>
 
-		<!-- Compatible Lenses -->
+		<!-- Lenses -->
 		<FadeIn delay={100}>
-		<div class="mb-8">
-			<div class="mb-3 flex items-center justify-between">
-				<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Compatible Lenses</h2>
-				<Button size="sm" onclick={() => { linkLensId = ''; showLinkLensDialog = true; }}>+ Link Lens</Button>
-			</div>
-			{#if linkedLenses.length === 0}
-				<p class="text-sm text-text-faint">No lenses linked yet. Link your {mountNameById[camera.lens_mount_id] ?? ''} mount lenses to set a default for new rolls.</p>
-			{:else}
-				<div class="mb-3">
-					<Select
-						label="Default Lens"
-						bind:value={defaultLensId}
-						options={defaultLensOptions}
-						onchange={handleDefaultLensChange}
-					/>
-				</div>
-				<div class="space-y-2">
-					{#each linkedLenses as lens}
-						<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-3">
-							<div class="flex items-center gap-2">
-								<span class="text-sm">{lensDisplayName(lens)}</span>
-								{#if mountNameById[lens.lens_mount_id]}
-									<span class="text-xs text-text-faint">{mountNameById[lens.lens_mount_id]}</span>
-								{/if}
-								{#if lens.date_sold}
-									<span class="rounded bg-red-500/15 px-1.5 py-0.5 text-xs text-red-400">Sold</span>
-								{/if}
-							</div>
-							<Button size="sm" variant="ghost" class="opacity-0 group-hover:opacity-100 transition-opacity" onclick={() => handleUnlinkLens(lens.id)}>&times;</Button>
+		{#if isFixedLens}
+			<div class="mb-8">
+				<h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-text-faint">Built-in Lens</h2>
+				{#if linkedLenses.length > 0}
+					{@const lens = linkedLenses[0]}
+					<div class="rounded-lg border border-border bg-surface-raised p-3">
+						<div class="flex items-center gap-2">
+							<span class="text-sm">{lensDisplayName(lens)}</span>
+							{#if lens.max_aperture}
+								<span class="text-xs text-text-faint">f/{lens.max_aperture}</span>
+							{/if}
 						</div>
-					{/each}
+					</div>
+				{:else}
+					<p class="text-sm text-text-faint">No lens data recorded.</p>
+				{/if}
+			</div>
+		{:else}
+			<div class="mb-8">
+				<div class="mb-3 flex items-center justify-between">
+					<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Compatible Lenses</h2>
+					<Button size="sm" onclick={() => { linkLensId = ''; showLinkLensDialog = true; }}>+ Link Lens</Button>
 				</div>
-			{/if}
-		</div>
+				{#if linkedLenses.length === 0}
+					<p class="text-sm text-text-faint">No lenses linked yet. Link your {mountNameById[camera.lens_mount_id] ?? ''} mount lenses to set a default for new rolls.</p>
+				{:else}
+					<div class="mb-3">
+						<Select
+							label="Default Lens"
+							bind:value={defaultLensId}
+							options={defaultLensOptions}
+							onchange={handleDefaultLensChange}
+						/>
+					</div>
+					<div class="space-y-2">
+						{#each linkedLenses as lens}
+							<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-3">
+								<div class="flex items-center gap-2">
+									<span class="text-sm">{lensDisplayName(lens)}</span>
+									{#if mountNameById[lens.lens_mount_id]}
+										<span class="text-xs text-text-faint">{mountNameById[lens.lens_mount_id]}</span>
+									{/if}
+									{#if lens.date_sold}
+										<span class="rounded bg-red-500/15 px-1.5 py-0.5 text-xs text-red-400">Sold</span>
+									{/if}
+								</div>
+								<Button size="sm" variant="ghost" class="opacity-0 group-hover:opacity-100 transition-opacity" onclick={() => handleUnlinkLens(lens.id)}>&times;</Button>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{/if}
 		</FadeIn>
 
 		<!-- Rolls shot with this camera -->

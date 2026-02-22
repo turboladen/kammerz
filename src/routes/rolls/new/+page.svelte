@@ -11,7 +11,7 @@
 	import { listCameras } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
 	import { listLenses } from '$lib/api/lenses';
-	import { buildLensOptions } from '$lib/utils/lens';
+	import { buildLensOptions, lensDisplayName } from '$lib/utils/lens';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import type { Camera, FilmStock, Lens, LensMount, RollInsert } from '$lib/types';
 
@@ -49,6 +49,17 @@
 
 	const selectedCamera = $derived(
 		cameraId ? cameras.find((c) => c.id === Number(cameraId)) : null
+	);
+
+	const isFixedLens = $derived(
+		selectedCamera
+			? lensMounts.some((m) => m.id === selectedCamera.lens_mount_id && m.name === 'Fixed Lens')
+			: false
+	);
+	const fixedLens = $derived(
+		isFixedLens && selectedCamera?.default_lens_id
+			? allLenses.find((l) => l.id === selectedCamera.default_lens_id) ?? null
+			: null
 	);
 
 	const cameraOptions = $derived([
@@ -196,7 +207,16 @@
 
 			<Select label="Camera" bind:value={cameraId} options={cameraOptions} />
 			<Select label="Film Stock" bind:value={filmStockId} options={filmStockOptions} />
-			<Select label="Default Lens" bind:value={lensId} options={lensOptions} />
+			{#if isFixedLens && fixedLens}
+				<div>
+					<span class="mb-1.5 block text-xs font-medium text-text-muted">Default Lens</span>
+					<div class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted">
+						{lensDisplayName(fixedLens)} <span class="text-text-faint">(fixed)</span>
+					</div>
+				</div>
+			{:else}
+				<Select label="Default Lens" bind:value={lensId} options={lensOptions} />
+			{/if}
 
 			<div class="grid grid-cols-3 gap-4">
 				<Input label="Frame Count" bind:value={frameCount} type="number" placeholder="36" />
