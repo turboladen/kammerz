@@ -10,7 +10,7 @@
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
 	import { Camera as CameraIcon } from 'lucide-svelte';
-	import { listCameras, createCamera, createCameraWithLens, deleteCamera, listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
+	import { listCameras, createCamera, createCameraWithLens, listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
 	import { listDistinctLensBrands } from '$lib/api/lenses';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { buildMountOptions } from '$lib/utils/lens';
@@ -162,11 +162,6 @@
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
-	}
-
-	async function handleDelete(id: number) {
-		await deleteCamera(id);
-		await load();
 	}
 
 	$effect(() => {

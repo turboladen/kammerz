@@ -8,6 +8,7 @@
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
 	import { Aperture } from 'lucide-svelte';
 	import { listLenses, createLens, updateLens, deleteLens, listDistinctLensBrands } from '$lib/api/lenses';
@@ -229,7 +230,8 @@
 		</EmptyState>
 	{:else}
 		<div class="grid gap-3">
-			{#each filtered as lens}
+			{#each filtered as lens, i}
+				<FadeIn delay={Math.min(i, 10) * 30}>
 				<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px">
 					<div>
 						<div class="flex items-center gap-2">
@@ -260,6 +262,7 @@
 						<Button size="sm" variant="ghost" onclick={() => handleDelete(lens)}>&times;</Button>
 					</div>
 				</div>
+				</FadeIn>
 			{/each}
 		</div>
 	{/if}

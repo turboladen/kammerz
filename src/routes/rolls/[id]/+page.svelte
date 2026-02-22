@@ -11,6 +11,7 @@
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import DevelopmentSection from '$lib/components/rolls/DevelopmentSection.svelte';
+	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import { getRoll, updateRoll, deleteRoll } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
@@ -214,12 +215,6 @@
 				})
 			);
 			shotLensMap = map;
-
-			// Retroactive fix: if roll has shots but is still "loaded", transition to "shooting"
-			if (r.status === 'loaded' && s.length > 0) {
-				await updateRoll(id, { status: 'shooting' });
-				roll = await getRoll(id);
-			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -456,6 +451,7 @@
 		{/if}
 
 		<!-- Roll Header -->
+		<FadeIn delay={0}>
 		<div class="mb-6 rounded-lg border border-border bg-surface-raised p-5">
 			{#if editingRoll}
 				<div class="space-y-4">
@@ -537,8 +533,10 @@
 				</div>
 			{/if}
 		</div>
+		</FadeIn>
 
 		<!-- Status Progression -->
+		<FadeIn delay={50}>
 		<div class="mb-6">
 			<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 				Status
@@ -558,8 +556,10 @@
 				{/each}
 			</div>
 		</div>
+		</FadeIn>
 
 		<!-- Development -->
+		<FadeIn delay={100}>
 		<DevelopmentSection
 			rollId={id}
 			{labs}
@@ -588,8 +588,10 @@
 				</div>
 			</div>
 		{/if}
+		</FadeIn>
 
 		<!-- Shots -->
+		<FadeIn delay={150}>
 		<div>
 			<div class="mb-3 flex items-center justify-between">
 				<div class="flex items-center gap-3">
@@ -680,6 +682,7 @@
 				</div>
 			{/if}
 		</div>
+		</FadeIn>
 	</div>
 {/if}
 

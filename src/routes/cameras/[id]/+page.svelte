@@ -15,6 +15,7 @@
 	import { listDistinctLensBrands, listLenses } from '$lib/api/lenses';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { listRollsForCamera } from '$lib/api/rolls';
+	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import { lensDisplayName, buildMountOptions } from '$lib/utils/lens';
 	import type { Camera, CameraMaintenance, CameraMaintenanceInsert, Lens, LensMount, RollWithDetails } from '$lib/types';
 
@@ -351,6 +352,7 @@
 		{/if}
 
 		<!-- Camera Details -->
+		<FadeIn delay={0}>
 		<div class="mb-8 grid grid-cols-2 gap-x-8 gap-y-3 rounded-lg border border-border bg-surface-raised p-5">
 			<div>
 				<span class="text-xs text-text-muted">Format</span>
@@ -403,8 +405,10 @@
 				</div>
 			{/if}
 		</div>
+		</FadeIn>
 
 		<!-- Maintenance History -->
+		<FadeIn delay={50}>
 		<div class="mb-8">
 			<div class="mb-3 flex items-center justify-between">
 				<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Maintenance History</h2>
@@ -439,8 +443,10 @@
 				</div>
 			{/if}
 		</div>
+		</FadeIn>
 
 		<!-- Compatible Lenses -->
+		<FadeIn delay={100}>
 		<div class="mb-8">
 			<div class="mb-3 flex items-center justify-between">
 				<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Compatible Lenses</h2>
@@ -475,8 +481,10 @@
 				</div>
 			{/if}
 		</div>
+		</FadeIn>
 
 		<!-- Rolls shot with this camera -->
+		<FadeIn delay={150}>
 		<div>
 			<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 				Rolls ({rolls.length})
@@ -503,6 +511,7 @@
 				</div>
 			{/if}
 		</div>
+		</FadeIn>
 	</div>
 {/if}
 

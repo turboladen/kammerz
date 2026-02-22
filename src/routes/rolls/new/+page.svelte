@@ -6,6 +6,7 @@
 	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
+	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import { createRoll, suggestRollId } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
@@ -174,6 +175,7 @@
 	{#if loading}
 		<p class="text-sm text-text-muted">Loading...</p>
 	{:else}
+		<FadeIn delay={0}>
 		<div class="space-y-4">
 			<Input
 				label="Roll ID"
@@ -209,5 +211,6 @@
 				<Button variant="primary" onclick={handleSubmit}>Create Roll</Button>
 			</div>
 		</div>
+		</FadeIn>
 	{/if}
 </div>
