@@ -125,6 +125,7 @@
 		{ value: 'TLR', label: 'TLR' },
 		{ value: 'view', label: 'View Camera' },
 		{ value: 'point-and-shoot', label: 'Point & Shoot' },
+		{ value: 'box', label: 'Box Camera' },
 		{ value: 'instant', label: 'Instant' }
 	];
 
