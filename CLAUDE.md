@@ -59,6 +59,7 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - Owned/Sold filtering: List pages with `date_sold` fields (cameras, lenses) use client-side All/Owned/Sold tab buttons with a `$derived()` filter. No backend changes needed to add this to a new list page.
 - Fixed-lens cameras: Structural invariant — camera creation with "Fixed Lens" mount MUST always call `createCameraWithLens()` (never plain `createCamera()`). Show read-only lens indicators everywhere — lens list cards ("Fixed on [Camera]"), lens edit dialog (accent banner), roll default lens (locked text), shot lens dropdown (read-only), Quick Entry (locked text). Camera detail page shows "Built-in Lens" section (no unlink/link/default-change controls). Camera edit locks the mount field to read-only. Detect via mount name: `lensMounts.find(m => m.id === mountId)?.name === 'Fixed Lens'` or `lensMounts.some(m => m.id === mountId && m.name === 'Fixed Lens')` — never hardcode mount IDs.
 - Shot lens defaults: Smart cascade — fixed lens (auto-locked) > last-used lens on roll > `roll.lens_id` (roll default) > `camera.default_lens_id` (camera default) > empty.
+- Development auto-prompt: Moving status to "at-lab" auto-opens lab dev dialog; "developing" auto-opens self dev dialog (only if neither dev record exists). Lab and self dev are mutually exclusive — UI hides "+ Lab" / "+ Self" buttons once one exists. Dev status nudge suggests advancement when dev record exists but status hasn't caught up.
 - Shot dialog "Save & Next": Keeps dialog open after save, resets per-shot fields (aperture, shutter, notes), preserves session defaults (date, location, lens), auto-suggests next frame number. Only shown in add mode (not edit).
 
 ### Svelte 5 Patterns
@@ -80,6 +81,7 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - Includes generic "Medium Format" and "Large Format" options for cameras that support multiple backs (e.g., Mamiya RB67).
 - Format labels use "Medium Format: 6x6" style (not "6x6 (Medium Format)").
 - Camera format → film stock format mapping: `35mm`→`135`, all medium format variants (`6x4.5`–`6x9`)→`120`, large format sizes map directly (`4x5`→`4x5`, etc.). Don't filter out non-matching formats — only reorder (cameras can use different backs).
+- 120 film stocks have `exposure_count: NULL` by design — frame count depends on back size (6×4.5=15, 6×6=12, 6×7=10, 6×8=9, 6×9=8). When camera format maps to '120' and frame count is empty, show the back-size hint via `frameCountHint` derived state.
 
 ### Component Patterns
 - `ComboInput` dropdown options use `onmousedown` (not `onclick`) to beat the blur/click race condition.
@@ -88,10 +90,11 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - Use `$derived.by(() => { ... })` when derived state needs multi-line logic; `$derived(expr)` for one-liners.
 - Always use the `<Badge>` component for roll statuses — never inline status pills with raw classes.
 - Wrap page content sections in `<FadeIn>` with staggered `delay` props (typically 50ms increments) for consistent entrance animations.
+- FadeIn stacking context: CSS `animation` with `transform`/`opacity` creates a stacking context + containing block, trapping `position: fixed` children (e.g., Dialogs). FadeIn strips its animation class via `onanimationend` to clear this after the entrance plays. Never wrap a component that renders its own Dialog inside a persistent animation/transform.
 - Section headers use the ledger-line pattern: `text-xs font-semibold uppercase tracking-wider text-text-faint` with either a rule line (`<div class="flex-1 border-b border-border-subtle">`) or `justify-between` for headers with action buttons. Never use `text-sm font-semibold text-text-muted`.
 - Card hover borders always use `hover:border-accent/40` — never other opacities like `/30`.
 - Roll status metadata (labels, colors, CSS classes) is defined in `src/lib/utils/status.ts`. Always import from there — never define inline status maps in page components. Use `getStatusColor(status)` for typed lookups or `getStatusColorSafe(label)` for untyped strings from backend queries.
-- Roll status progression: Chevron-shaped `clip-path` buttons show directional flow (past = `bg-accent/10`, current = `bg-accent`, future = `bg-surface-overlay`). Forward status changes are instant; backward moves require `ConfirmDialog`. See `handleStatusClick()` + `currentStatusIdx` in `rolls/[id]/+page.svelte`.
+- Roll status progression: Chevron-shaped `clip-path` buttons show directional flow — current (`bg-accent`), past (`bg-accent/10`), skipped (`bg-surface-overlay/60 text-text-faint`), future (`bg-surface-overlay`). "At Lab" is skipped when no `labDev` exists; "Developing" is skipped when no `selfDev` exists. Forward status changes are instant; backward moves require `ConfirmDialog`. See `handleStatusClick()` + `currentStatusIdx` + `isSkipped` in `rolls/[id]/+page.svelte`.
 - Lens dropdowns: Always use `buildLensOptions()` from `$lib/utils/lens.ts` — handles mount-compatibility sorting with dividers. Also see `buildMountOptions()` for mount dropdowns grouped by format family.
 - Dialog component uses flex column layout with `max-h-[85vh]` and `overflow-y-auto` on content. When adding fields to dialogs (e.g., inline lens creation), scrolling is already handled.
 

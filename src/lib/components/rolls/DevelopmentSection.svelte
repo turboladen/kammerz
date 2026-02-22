@@ -383,10 +383,10 @@
 					<Input label="Fixer" bind:value={devFixer} placeholder="Ilford Rapid Fix" />
 					<Input label="Dilution" bind:value={devFixerDilution} placeholder="1+4" />
 					<Input label="Stop Bath" bind:value={devStopBath} placeholder="Optional" />
-					<Input label="Wetting Agent" bind:value={devWettingAgent} placeholder="Optional" />
+					<Input label="Clearing Agent" bind:value={devClearingAgent} placeholder="Optional" />
 				</div>
 				<div class="mt-3">
-					<Input label="Clearing Agent" bind:value={devClearingAgent} placeholder="Optional" />
+					<Input label="Wetting Agent" bind:value={devWettingAgent} placeholder="Optional" />
 				</div>
 			</div>
 

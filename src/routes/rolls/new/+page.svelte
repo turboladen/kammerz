@@ -51,6 +51,17 @@
 		cameraId ? cameras.find((c) => c.id === Number(cameraId)) : null
 	);
 
+	// Hint for medium format variable-back cameras (120 film has no fixed exposure_count)
+	const frameCountHint = $derived.by(() => {
+		const matchingFormat = selectedCamera
+			? cameraFormatToStockFormat[selectedCamera.format]
+			: null;
+		if (matchingFormat === '120' && !frameCount) {
+			return '120 film: 6\u00d74.5=15 \u00b7 6\u00d76=12 \u00b7 6\u00d77=10 \u00b7 6\u00d78=9 \u00b7 6\u00d79=8';
+		}
+		return undefined;
+	});
+
 	const isFixedLens = $derived(
 		selectedCamera
 			? lensMounts.some((m) => m.id === selectedCamera.lens_mount_id && m.name === 'Fixed Lens')
@@ -219,7 +230,7 @@
 			{/if}
 
 			<div class="grid grid-cols-3 gap-4">
-				<Input label="Frame Count" bind:value={frameCount} type="number" placeholder="36" />
+				<Input label="Frame Count" bind:value={frameCount} type="number" placeholder="36" hint={frameCountHint} />
 				<DateInput label="Date Loaded" bind:value={dateLoaded} />
 				<Select label="Push/Pull" bind:value={pushPull} options={pushPullOptions} />
 			</div>

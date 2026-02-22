@@ -170,6 +170,17 @@
 
 	const editLensOptions = $derived(buildLensOptions(allLenses, editSelectedCamera, 'No default lens', lensMounts));
 
+	// Hint for medium format variable-back cameras (120 film has no fixed exposure_count)
+	const editFrameCountHint = $derived.by(() => {
+		const matchingFormat = editSelectedCamera
+			? cameraFormatToStockFormat[editSelectedCamera.format]
+			: null;
+		if (matchingFormat === '120' && !editFrameCount) {
+			return '120 film: 6\u00d74.5=15 \u00b7 6\u00d76=12 \u00b7 6\u00d77=10 \u00b7 6\u00d78=9 \u00b7 6\u00d79=8';
+		}
+		return undefined;
+	});
+
 	// Shot-level lens dropdown options (uses the saved camera, not the edit form camera)
 	const shotLensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens', lensMounts));
 
@@ -508,7 +519,7 @@
 				<div class="space-y-4">
 					<div class="grid grid-cols-2 gap-4">
 						<Input label="Roll ID" bind:value={editRollId} />
-						<Input label="Frame Count" bind:value={editFrameCount} type="number" placeholder="36" />
+						<Input label="Frame Count" bind:value={editFrameCount} type="number" placeholder="36" hint={editFrameCountHint} />
 					</div>
 					<Select label="Camera" bind:value={editCameraId} options={cameraOptions} />
 					<Select label="Film Stock" bind:value={editFilmStockId} options={editFilmStockOptions} />
@@ -602,6 +613,10 @@
 						: isLast
 							? 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 8px 50%)'
 							: 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)'}
+					{@const isSkipped = idx < currentStatusIdx && (
+						(status === 'at-lab' && !labDev) ||
+						(status === 'developing' && !selfDev)
+					)}
 					<button
 						onclick={() => handleStatusClick(status)}
 						style="clip-path: {clipPath}"
@@ -609,9 +624,11 @@
 							{isFirst ? 'pl-3 pr-4' : isLast ? 'pl-4 pr-3' : 'px-4'}
 							{roll.status === status
 							? 'bg-accent text-surface'
-							: idx < currentStatusIdx
-								? 'bg-accent/10 text-accent/70 hover:bg-accent/20'
-								: 'bg-surface-overlay text-text-muted hover:text-text'}"
+							: isSkipped
+								? 'bg-surface-overlay/60 text-text-faint'
+								: idx < currentStatusIdx
+									? 'bg-accent/10 text-accent/70 hover:bg-accent/20'
+									: 'bg-surface-overlay text-text-muted hover:text-text'}"
 					>
 						{statusConfig[status].label}
 					</button>
