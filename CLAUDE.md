@@ -18,6 +18,7 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - `bun run build` — Build SvelteKit frontend only (useful for quick compile checks)
 - `cargo build` — Build Rust backend only (in `src-tauri/`)
 - `bun run dev` — Run Vite dev server only (no Tauri backend — DB calls will fail)
+- Browser-based preview tools (preview_start/preview_screenshot) cannot verify Tauri app functionality — `invoke()` requires the native IPC bridge in Tauri's WebKit webview. Verify backend changes via server logs (`preview_logs`) and direct `sqlite3` queries. Frontend-only changes (CSS, markup) can be previewed if they don't depend on `invoke()` data.
 
 ## Architecture
 
@@ -50,6 +51,8 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - Migrations run automatically via `Migrator::up()` on app start
 - Existing databases (from old tauri-plugin-sql) auto-detected and migration table bridged
 - SQLite pragmas: `journal_mode=WAL`, `busy_timeout=5000`
+- Junction table gotcha: Entity file is `camera_lens.rs` but the SQLite table name is `camera_lenses` (plural). Always check `#[sea_orm(table_name = "...")]` in entity files — don't guess from the filename.
+- DB location (macOS): `~/Library/Application Support/com.kammerz.app/kammerz.db` — can query directly with `sqlite3` for debugging.
 
 ## Important Conventions
 
@@ -76,8 +79,12 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - For junction table data (e.g., shot↔lens), prefer batch queries per parent (e.g., `get_lenses_for_roll_shots(roll_id)`) over per-row queries. Avoids N+1 IPC round-trips through Tauri's `invoke()`.
 - DTOs in command files handle create/update payloads; services work with `ActiveModel` directly
 - Changes to `src-tauri/` files (Rust, capabilities, Cargo.toml) require Tauri to recompile
+- Migration raw SQL gotcha: `execute_unprepared()` auto-commits each statement. If a migration fails midway, partial data persists but the migration isn't recorded in `seaql_migrations` — so it re-runs on next start, creating duplicates. Use `INSERT OR IGNORE` where possible; for tables without unique constraints (cameras, lenses), failures require manual cleanup via `sqlite3`.
+- Seed migration pattern: Use subqueries for FK resolution (`(SELECT id FROM lens_mounts WHERE name = 'Nikon F')`) instead of hardcoded IDs — IDs vary across environments and are fragile across migration reorders.
+- Fixed-lens seed pattern: Each fixed-lens camera requires 4 SQL statements in order: INSERT camera → INSERT lens → INSERT camera_lenses junction → UPDATE camera.default_lens_id. See migration 013 for the template.
 
 ### Camera Format Dropdown
+- Camera type options: `SLR`, `rangefinder`, `TLR`, `point-and-shoot`, `box` (Box Camera), `instant`, `view` (View/Field Camera). Defined in `typeOptions` arrays in both `cameras/+page.svelte` and `cameras/[id]/+page.svelte` — keep them in sync.
 - Includes generic "Medium Format" and "Large Format" options for cameras that support multiple backs (e.g., Mamiya RB67).
 - Format labels use "Medium Format: 6x6" style (not "6x6 (Medium Format)").
 - Camera format → film stock format mapping: `35mm`→`135`, all medium format variants (`6x4.5`–`6x9`)→`120`, large format sizes map directly (`4x5`→`4x5`, etc.), `instant`→`instant`. Don't filter out non-matching formats — only reorder (cameras can use different backs).
