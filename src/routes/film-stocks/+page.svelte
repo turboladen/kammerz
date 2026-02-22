@@ -55,7 +55,8 @@
 		{ value: '120', label: '120' },
 		{ value: '4x5', label: '4x5' },
 		{ value: '5x7', label: '5x7' },
-		{ value: '8x10', label: '8x10' }
+		{ value: '8x10', label: '8x10' },
+		{ value: 'instant', label: 'Instant' }
 	];
 
 	const typeOptions = [
@@ -157,6 +158,7 @@
 			<Button size="sm" variant={filterFormat === '135' ? 'primary' : 'ghost'} onclick={() => (filterFormat = '135')}>35mm</Button>
 			<Button size="sm" variant={filterFormat === '120' ? 'primary' : 'ghost'} onclick={() => (filterFormat = '120')}>120</Button>
 			<Button size="sm" variant={filterFormat === '4x5' ? 'primary' : 'ghost'} onclick={() => (filterFormat = '4x5')}>4x5</Button>
+			<Button size="sm" variant={filterFormat === 'instant' ? 'primary' : 'ghost'} onclick={() => (filterFormat = 'instant')}>Instant</Button>
 		</div>
 	</div>
 

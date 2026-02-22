@@ -11,6 +11,7 @@ mod m20250221_000008_rename_large_format_mount;
 mod m20250221_000009_remove_generic_large_format;
 mod m20250221_000010_seed_fixed_lens_mount;
 mod m20250221_000011_add_default_lens_id;
+mod m20260221_000012_seed_instant_film_stocks;
 
 pub struct Migrator;
 
@@ -29,6 +30,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250221_000009_remove_generic_large_format::Migration),
             Box::new(m20250221_000010_seed_fixed_lens_mount::Migration),
             Box::new(m20250221_000011_add_default_lens_id::Migration),
+            Box::new(m20260221_000012_seed_instant_film_stocks::Migration),
         ]
     }
 }

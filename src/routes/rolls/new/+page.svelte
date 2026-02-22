@@ -44,7 +44,8 @@
 		'large format': '4x5', // default large format to 4x5
 		'4x5': '4x5',
 		'5x7': '5x7',
-		'8x10': '8x10'
+		'8x10': '8x10',
+		'instant': 'instant'
 	};
 
 	const selectedCamera = $derived(

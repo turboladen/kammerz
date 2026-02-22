@@ -138,7 +138,8 @@
 		'35mm': '135',
 		'medium format': '120',
 		'6x4.5': '120', '6x6': '120', '6x7': '120', '6x8': '120', '6x9': '120',
-		'large format': '4x5', '4x5': '4x5', '5x7': '5x7', '8x10': '8x10'
+		'large format': '4x5', '4x5': '4x5', '5x7': '5x7', '8x10': '8x10',
+		'instant': 'instant'
 	};
 
 	function stockLabel(s: FilmStock): string {
@@ -618,7 +619,9 @@
 							: 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)'}
 					{@const isSkipped = idx < currentStatusIdx && (
 						(status === 'at-lab' && !labDev) ||
-						(status === 'developing' && !selfDev)
+						(status === 'developing' && !selfDev) ||
+						(status === 'developed' && !labDev && !selfDev) ||
+						(status === 'scanned' && !labDev && !selfDev)
 					)}
 					<button
 						onclick={() => handleStatusClick(status)}
