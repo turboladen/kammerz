@@ -90,6 +90,8 @@
 
 	async function handleAdd() {
 		error = '';
+		if (!brand.trim()) { error = 'Brand is required.'; return; }
+		if (!name.trim()) { error = 'Name is required.'; return; }
 		try {
 			const stock: FilmStockInsert = {
 				brand,

@@ -16,7 +16,7 @@
 	import { listCameras } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
 	import { listLenses } from '$lib/api/lenses';
-	import { listShotsForRoll, createShot, updateShot, deleteShot, getLensesForShot, getLensesForRollShots, suggestNextFrame } from '$lib/api/shots';
+	import { listShotsForRoll, createShot, updateShot, deleteShot, getLensesForRollShots, suggestNextFrame } from '$lib/api/shots';
 	import { getLabDevForRoll, getSelfDevForRoll, listDevStages } from '$lib/api/development';
 	import { listLabs } from '$lib/api/labs';
 	import { lensDisplayName, buildLensOptions } from '$lib/utils/lens';
@@ -361,8 +361,11 @@
 			});
 			await load();
 			// Reset per-shot fields but keep session defaults (date, location, lens)
-			const nextFrame = await suggestNextFrame(id);
-			shotFrameNumber = nextFrame;
+			try {
+				shotFrameNumber = await suggestNextFrame(id);
+			} catch {
+				shotFrameNumber = '';
+			}
 			shotAperture = '';
 			shotShutterSpeed = '';
 			shotNotes = '';

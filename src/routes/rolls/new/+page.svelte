@@ -26,6 +26,7 @@
 	let filmStockId = $state('');
 	let lensId = $state('');
 	let frameCount = $state('');
+	let frameCountAutoFilledFrom = $state<string | null>(null); // tracks which stock auto-filled the frame count
 	let dateLoaded = $state(new Date().toISOString().split('T')[0]);
 	let dateFuzzy = $state('');
 	let pushPull = $state('');
@@ -193,12 +194,19 @@
 	});
 
 	// Auto-fill frame count from film stock's exposure_count
+	// Re-fills when stock changes (if value was auto-filled, not manually edited)
 	$effect(() => {
 		const stockId = filmStockId;
 		if (stockId) {
 			const stock = filmStocks.find((s) => s.id === Number(stockId));
-			if (stock?.exposure_count && stock.exposure_count > 1 && !frameCount) {
-				frameCount = String(stock.exposure_count);
+			if (stock?.exposure_count && stock.exposure_count > 1) {
+				const wasAutoFilled = frameCountAutoFilledFrom !== null;
+				const isEmpty = !frameCount;
+				const wasAutoFilledByDifferentStock = wasAutoFilled && frameCountAutoFilledFrom !== stockId;
+				if (isEmpty || wasAutoFilledByDifferentStock) {
+					frameCount = String(stock.exposure_count);
+					frameCountAutoFilledFrom = stockId;
+				}
 			}
 		}
 	});
@@ -234,7 +242,7 @@
 			{/if}
 
 			<div class="grid grid-cols-3 gap-4">
-				<Input label="Frame Count" bind:value={frameCount} type="number" placeholder="36" hint={frameCountHint} />
+				<Input label="Frame Count" bind:value={frameCount} type="number" placeholder="36" hint={frameCountHint} oninput={() => (frameCountAutoFilledFrom = null)} />
 				<DateInput label="Date Loaded" bind:value={dateLoaded} />
 				<Select label="Push/Pull" bind:value={pushPull} options={pushPullOptions} />
 			</div>
