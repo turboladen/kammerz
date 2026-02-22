@@ -1,9 +1,10 @@
-use sea_orm::{DbErr, Set, TransactionTrait};
+use sea_orm::{DbErr, EntityTrait, Set, TransactionTrait};
 use serde::Deserialize;
 use tauri::State;
 
-use crate::entities::shot;
+use crate::entities::{roll, shot};
 use crate::patch::double_option;
+use crate::services::roll_service::RollService;
 use crate::services::shot_service::ShotService;
 use crate::AppState;
 
@@ -117,6 +118,20 @@ pub async fn create_shot(
                     if !lens_ids.is_empty() {
                         ShotService::set_lenses_for_shot(txn, result.id, lens_ids).await?;
                     }
+                }
+
+                // Auto-transition: loaded → shooting when first shot is added
+                let roll_record = roll::Entity::find_by_id(data.roll_id)
+                    .one(txn)
+                    .await?
+                    .ok_or_else(|| DbErr::Custom(format!("Roll {} not found", data.roll_id)))?;
+
+                if roll_record.status == "loaded" {
+                    let now_ts = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+                    let mut roll_model: roll::ActiveModel = roll_record.into();
+                    roll_model.status = Set("shooting".to_string());
+                    roll_model.updated_at = Set(now_ts);
+                    RollService::update(txn, roll_model).await?;
                 }
 
                 Ok(result.id)

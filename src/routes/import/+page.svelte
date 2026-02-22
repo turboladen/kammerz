@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
+	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import DateInput from '$lib/components/ui/DateInput.svelte';
@@ -463,13 +464,14 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 		<!-- Preview & Edit -->
 		<div class="max-w-4xl">
 			<div class="mb-4 flex items-center justify-between">
-				<h2 class="text-sm font-semibold text-text-muted">Review Parsed Data</h2>
+				<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Review Parsed Data</h2>
 				<Button size="sm" variant="ghost" onclick={() => (step = 'input')}>
 					&larr; Back to input
 				</Button>
 			</div>
 
 			<!-- Roll Info -->
+			<FadeIn>
 			<div class="mb-6 rounded-lg border border-border bg-surface-raised p-4">
 				<h3 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 					Roll Info
@@ -532,9 +534,11 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 					</div>
 				</div>
 			</div>
+			</FadeIn>
 
 			<!-- Shots -->
 			{#if shots.length > 0}
+				<FadeIn delay={50}>
 				<div class="mb-6 rounded-lg border border-border bg-surface-raised p-4">
 					<h3 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 						Shots ({shots.length})
@@ -609,12 +613,15 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 						</table>
 					</div>
 				</div>
+				</FadeIn>
 			{/if}
 
 			<!-- Import Button -->
+			<FadeIn delay={100}>
 			<Button variant="primary" onclick={handleImport}>
 				Import Roll & {shots.length} Shot{shots.length !== 1 ? 's' : ''}
 			</Button>
+			</FadeIn>
 		</div>
 	{:else if step === 'importing'}
 		<div class="flex items-center gap-3 text-sm text-text-muted">

@@ -3,6 +3,7 @@
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import { getCatalogStats } from '$lib/api/stats';
 	import type { CatalogStats } from '$lib/types';
+	import { getStatusColorSafe, getStatusLabel, isRollStatus } from '$lib/utils/status';
 
 	let stats: CatalogStats | null = $state(null);
 	let loading = $state(true);
@@ -52,7 +53,7 @@
 		<FadeIn>
 			<div class="mb-8 grid grid-cols-4 gap-4">
 				<div class="rounded-lg border border-border bg-surface-raised p-4">
-					<p class="font-display text-3xl">{stats.total_rolls}</p>
+					<p class="font-mono text-2xl font-semibold">{stats.total_rolls}</p>
 					<p class="text-xs text-text-faint">Total Rolls</p>
 				</div>
 				<div class="rounded-lg border border-border bg-surface-raised p-4">
@@ -232,7 +233,7 @@
 										<span class="w-20 text-right text-xs text-text-muted">{item.label}</span>
 										<div class="flex-1">
 											<div
-												class="h-5 rounded-r bg-accent/60 transition-all duration-300"
+												class="h-5 rounded-r bg-accent/80 transition-all duration-300"
 												style="width: {(item.count / maxFormat) * 100}%"
 											></div>
 										</div>
@@ -259,7 +260,7 @@
 										<span class="w-20 text-right text-xs text-text-muted">{item.label}</span>
 										<div class="flex-1">
 											<div
-												class="h-5 rounded-r bg-accent/60 transition-all duration-300"
+												class="h-5 rounded-r bg-accent/80 transition-all duration-300"
 												style="width: {(item.count / maxMount) * 100}%"
 											></div>
 										</div>
@@ -283,11 +284,11 @@
 							<div class="space-y-2">
 								{#each stats.rolls_by_status as item}
 									<div class="flex items-center gap-3">
-										<span class="w-20 text-right text-xs text-text-muted">{item.label}</span>
+										<span class="w-20 text-right text-xs text-text-muted">{isRollStatus(item.label) ? getStatusLabel(item.label) : item.label}</span>
 										<div class="flex-1">
 											<div
-												class="h-5 rounded-r bg-accent/60 transition-all duration-300"
-												style="width: {(item.count / maxStatus) * 100}%"
+												class="h-5 rounded-r transition-all duration-300"
+												style="width: {(item.count / maxStatus) * 100}%; background-color: {getStatusColorSafe(item.label)}"
 											></div>
 										</div>
 										<span class="w-8 font-mono text-xs text-text-faint">{item.count}</span>

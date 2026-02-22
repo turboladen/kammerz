@@ -11,6 +11,7 @@ pub struct Model {
     pub prefix: Option<String>,
     pub format: String,
     pub lens_mount_id: i32,
+    pub default_lens_id: Option<i32>,
     pub camera_type: Option<String>,
     pub serial_number: Option<String>,
     pub date_purchased: Option<String>,
@@ -35,6 +36,12 @@ pub enum Relation {
         to = "super::lens_mount::Column::Id"
     )]
     LensMount,
+    #[sea_orm(
+        belongs_to = "super::lens::Entity",
+        from = "Column::DefaultLensId",
+        to = "super::lens::Column::Id"
+    )]
+    DefaultLens,
 }
 
 impl Related<super::camera_maintenance::Entity> for Entity {
@@ -62,3 +69,7 @@ impl Related<super::lens_mount::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+// Note: Related<lens::Entity> via DefaultLens is intentionally omitted
+// because camera already relates to lens via camera_lens junction table.
+// Use the Relation::DefaultLens directly when needed.

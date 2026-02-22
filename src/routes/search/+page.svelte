@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
+	import Badge from '$lib/components/ui/Badge.svelte';
 	import { searchCatalog } from '$lib/api/search';
 	import type { SearchResults } from '$lib/types';
 	import { Camera, Aperture, Package, Film, Focus, FlaskConical, Search } from 'lucide-svelte';
@@ -196,7 +197,7 @@
 								>
 									<div class="flex items-center gap-3">
 										<span class="font-mono text-sm font-semibold">{roll.roll_id}</span>
-										<span class="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase text-accent">{roll.status}</span>
+										<Badge status={roll.status} />
 										{#if roll.camera_brand}
 											<span class="text-xs text-text-muted">{roll.camera_brand} {roll.camera_model}</span>
 										{/if}

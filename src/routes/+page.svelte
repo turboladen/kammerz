@@ -7,6 +7,7 @@
 	import { listRolls } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import type { RollWithDetails, Camera as CameraType, RollStatus } from '$lib/types';
+	import { statusOrder, statusConfig } from '$lib/utils/status';
 
 	let rolls: RollWithDetails[] = $state([]);
 	let cameras: CameraType[] = $state([]);
@@ -32,24 +33,15 @@
 		rolls.filter((r) => !r.camera_id || r.status === 'at-lab')
 	);
 
-	// Status distribution for the progress bar
-	const statusOrder: { key: RollStatus; label: string; colorVar: string }[] = [
-		{ key: 'loaded', label: 'Loaded', colorVar: 'var(--color-status-loaded)' },
-		{ key: 'shooting', label: 'Shooting', colorVar: 'var(--color-status-shooting)' },
-		{ key: 'shot', label: 'Shot', colorVar: 'var(--color-status-shot)' },
-		{ key: 'at-lab', label: 'At Lab', colorVar: 'var(--color-status-at-lab)' },
-		{ key: 'developing', label: 'Developing', colorVar: 'var(--color-status-developing)' },
-		{ key: 'developed', label: 'Developed', colorVar: 'var(--color-status-developed)' },
-		{ key: 'scanned', label: 'Scanned', colorVar: 'var(--color-status-scanned)' },
-		{ key: 'archived', label: 'Archived', colorVar: 'var(--color-status-archived)' }
-	];
-
+	// Status distribution for the progress bar (uses shared statusOrder + statusConfig)
 	const statusSegments = $derived(
 		statusOrder
-			.map((s) => ({
-				...s,
-				count: rollsByStatus[s.key] ?? 0,
-				pct: rolls.length > 0 ? ((rollsByStatus[s.key] ?? 0) / rolls.length) * 100 : 0
+			.map((key) => ({
+				key,
+				label: statusConfig[key].label,
+				colorVar: statusConfig[key].colorVar,
+				count: rollsByStatus[key] ?? 0,
+				pct: rolls.length > 0 ? ((rollsByStatus[key] ?? 0) / rolls.length) * 100 : 0
 			}))
 			.filter((s) => s.count > 0)
 	);

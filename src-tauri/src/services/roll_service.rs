@@ -107,7 +107,7 @@ impl RollService {
     }
 
     pub async fn update(
-        db: &DatabaseConnection,
+        db: &impl ConnectionTrait,
         model: roll::ActiveModel,
     ) -> Result<roll::Model, DbErr> {
         model.update(db).await

@@ -46,6 +46,7 @@ pub fn run() {
             commands::cameras::get_lenses_for_camera,
             commands::cameras::link_lens_to_camera,
             commands::cameras::unlink_lens_from_camera,
+            commands::cameras::create_camera_with_lens,
             // Lens Mounts
             commands::lens_mounts::list_lens_mounts,
             commands::lens_mounts::create_lens_mount,

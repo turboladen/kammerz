@@ -11,11 +11,13 @@
 	import { listFilmStocks } from '$lib/api/film-stocks';
 	import { listLenses } from '$lib/api/lenses';
 	import { buildLensOptions } from '$lib/utils/lens';
-	import type { Camera, FilmStock, Lens, RollInsert } from '$lib/types';
+	import { listLensMounts } from '$lib/api/lens-mounts';
+	import type { Camera, FilmStock, Lens, LensMount, RollInsert } from '$lib/types';
 
 	let cameras: Camera[] = $state([]);
 	let filmStocks: FilmStock[] = $state([]);
 	let allLenses: Lens[] = $state([]);
+	let lensMounts: LensMount[] = $state([]);
 	let loading = $state(true);
 
 	let rollId = $state('');
@@ -94,7 +96,7 @@
 		return options;
 	});
 
-	const lensOptions = $derived(buildLensOptions(allLenses, selectedCamera));
+	const lensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No default lens', lensMounts));
 
 	const pushPullOptions = [
 		{ value: '', label: 'Normal (box speed)' },
@@ -107,15 +109,17 @@
 
 	async function load() {
 		try {
-			const [cams, stocks, lenses, suggestedId] = await Promise.all([
+			const [cams, stocks, lenses, suggestedId, mounts] = await Promise.all([
 				listCameras(),
 				listFilmStocks(),
 				listLenses(),
-				suggestRollId()
+				suggestRollId(),
+				listLensMounts()
 			]);
 			cameras = cams;
 			filmStocks = stocks;
 			allLenses = lenses;
+			lensMounts = mounts;
 			rollId = suggestedId;
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -149,6 +153,16 @@
 
 	$effect(() => {
 		load();
+	});
+
+	// Auto-populate lens from camera's default_lens_id (set on camera detail page)
+	$effect(() => {
+		const cam = selectedCamera;
+		if (cam?.default_lens_id) {
+			lensId = String(cam.default_lens_id);
+		} else {
+			lensId = '';
+		}
 	});
 </script>
 

@@ -15,7 +15,7 @@
 	import { listDistinctLensBrands, listLenses } from '$lib/api/lenses';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { listRollsForCamera } from '$lib/api/rolls';
-	import { lensDisplayName } from '$lib/utils/lens';
+	import { lensDisplayName, buildMountOptions } from '$lib/utils/lens';
 	import type { Camera, CameraMaintenance, CameraMaintenanceInsert, Lens, LensMount, RollWithDetails } from '$lib/types';
 
 	const id = $derived(Number(page.params.id));
@@ -60,10 +60,7 @@
 	let maintNotes = $state('');
 	let error = $state('');
 
-	const lensMountOptions = $derived([
-		{ value: '', label: 'Select mount...' },
-		...lensMounts.map((m) => ({ value: String(m.id), label: m.name }))
-	]);
+	const lensMountOptions = $derived(buildMountOptions(lensMounts));
 
 	const mountNameById = $derived(
 		Object.fromEntries(lensMounts.map((m) => [m.id, m.name]))
@@ -75,6 +72,22 @@
 		{ value: '', label: 'Select a lens...' },
 		...unlinkedLenses.map((l) => ({ value: String(l.id), label: lensDisplayName(l) }))
 	]);
+
+	// Default lens dropdown options (from linked lenses only)
+	const defaultLensOptions = $derived([
+		{ value: '', label: 'No default' },
+		...linkedLenses.map((l) => ({ value: String(l.id), label: lensDisplayName(l) }))
+	]);
+
+	// Track default lens selection for the dropdown
+	let defaultLensId = $state('');
+
+	// Default lens display name for view mode
+	const defaultLensDisplay = $derived.by(() => {
+		if (!camera?.default_lens_id) return null;
+		const lens = linkedLenses.find((l) => l.id === camera.default_lens_id);
+		return lens ? lensDisplayName(lens) : null;
+	});
 
 	const formatOptions = [
 		{ value: '35mm', label: '35mm' },
@@ -132,6 +145,7 @@
 			vendorOptions = vendors;
 			maintProviderOptions = maintProviders;
 			lensMounts = mounts;
+			defaultLensId = String(cam?.default_lens_id ?? '');
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -236,10 +250,19 @@
 		if (!linkLensId) return;
 		error = '';
 		try {
-			await linkLensToCamera(id, Number(linkLensId));
+			const lensIdToLink = Number(linkLensId);
+			await linkLensToCamera(id, lensIdToLink);
 			showLinkLensDialog = false;
+
+			// Auto-set as default if this is the first linked lens
+			const newLinkedIds = await getLensesForCamera(id);
+			if (newLinkedIds.length === 1) {
+				await updateCamera(id, { default_lens_id: lensIdToLink });
+			}
+
 			linkLensId = '';
-			linkedLensIds = await getLensesForCamera(id);
+			linkedLensIds = newLinkedIds;
+			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -249,9 +272,27 @@
 		error = '';
 		try {
 			await unlinkLensFromCamera(id, lensId);
+			// If unlinking the default lens, clear it
+			if (camera?.default_lens_id === lensId) {
+				await updateCamera(id, { default_lens_id: null });
+			}
 			linkedLensIds = await getLensesForCamera(id);
+			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	async function handleDefaultLensChange() {
+		const newId = defaultLensId ? Number(defaultLensId) : null;
+		if (camera && newId !== camera.default_lens_id) {
+			error = '';
+			try {
+				await updateCamera(id, { default_lens_id: newId });
+				camera = { ...camera, default_lens_id: newId };
+			} catch (err) {
+				error = err instanceof Error ? err.message : String(err);
+			}
 		}
 	}
 
@@ -276,7 +317,7 @@
 		<div class="space-y-4">
 			<div class="grid grid-cols-2 gap-4">
 				<ComboInput label="Brand" bind:value={editBrand} options={brandOptions} />
-				<Input label="Model" bind:value={editModel} required />
+				<Input label="Model" bind:value={editModel} required spellcheck="false" />
 			</div>
 			<div class="grid grid-cols-3 gap-4">
 				<Select label="Format" bind:value={editFormat} options={formatOptions} />
@@ -319,6 +360,12 @@
 				<span class="text-xs text-text-muted">Lens Mount</span>
 				<p class="text-sm">{mountNameById[camera.lens_mount_id] ?? '—'}</p>
 			</div>
+			{#if defaultLensDisplay}
+				<div>
+					<span class="text-xs text-text-muted">Default Lens</span>
+					<p class="text-sm">{defaultLensDisplay}</p>
+				</div>
+			{/if}
 			{#if camera.camera_type}
 				<div>
 					<span class="text-xs text-text-muted">Type</span>
@@ -360,7 +407,7 @@
 		<!-- Maintenance History -->
 		<div class="mb-8">
 			<div class="mb-3 flex items-center justify-between">
-				<h2 class="text-sm font-semibold text-text-muted">Maintenance History</h2>
+				<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Maintenance History</h2>
 				<Button size="sm" onclick={() => (showMaintenanceDialog = true)}>+ Add Record</Button>
 			</div>
 			{#if maintenance.length === 0}
@@ -396,12 +443,20 @@
 		<!-- Compatible Lenses -->
 		<div class="mb-8">
 			<div class="mb-3 flex items-center justify-between">
-				<h2 class="text-sm font-semibold text-text-muted">Compatible Lenses</h2>
+				<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Compatible Lenses</h2>
 				<Button size="sm" onclick={() => { linkLensId = ''; showLinkLensDialog = true; }}>+ Link Lens</Button>
 			</div>
 			{#if linkedLenses.length === 0}
 				<p class="text-sm text-text-faint">No lenses linked. Link lenses to filter them first in shot entry.</p>
 			{:else}
+				<div class="mb-3">
+					<Select
+						label="Default Lens"
+						bind:value={defaultLensId}
+						options={defaultLensOptions}
+						onchange={handleDefaultLensChange}
+					/>
+				</div>
 				<div class="space-y-2">
 					{#each linkedLenses as lens}
 						<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-3">
@@ -423,7 +478,10 @@
 
 		<!-- Rolls shot with this camera -->
 		<div>
-			<h2 class="mb-3 text-sm font-semibold text-text-muted">Rolls ({rolls.length})</h2>
+			<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+				Rolls ({rolls.length})
+				<div class="flex-1 border-b border-border-subtle"></div>
+			</h2>
 			{#if rolls.length === 0}
 				<p class="text-sm text-text-faint">No rolls shot with this camera yet.</p>
 			{:else}

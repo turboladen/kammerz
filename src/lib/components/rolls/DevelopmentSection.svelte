@@ -250,7 +250,7 @@
 <!-- Development Display -->
 <div class="mb-6">
 	<div class="mb-3 flex items-center justify-between">
-		<h2 class="text-sm font-semibold text-text-muted">Development</h2>
+		<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Development</h2>
 		{#if !labDev && !selfDev}
 			<div class="flex gap-1">
 				<Button size="sm" onclick={openLabDevDialog}>+ Lab</Button>

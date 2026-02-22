@@ -11,10 +11,10 @@
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
 	import { Aperture } from 'lucide-svelte';
 	import { listLenses, createLens, updateLens, deleteLens, listDistinctLensBrands } from '$lib/api/lenses';
-	import { listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
+	import { listCameras, listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
 	import { listLensMounts } from '$lib/api/lens-mounts';
-	import type { Lens, LensInsert, LensMount } from '$lib/types';
-	import { lensDisplayName } from '$lib/utils/lens';
+	import type { Camera, Lens, LensInsert, LensMount } from '$lib/types';
+	import { lensDisplayName, buildMountOptions } from '$lib/utils/lens';
 
 	let lenses: Lens[] = $state([]);
 	let loading = $state(true);
@@ -28,6 +28,7 @@
 	let brandOptions: string[] = $state([]);
 	let lensMounts: LensMount[] = $state([]);
 	let vendorOptions: string[] = $state([]);
+	let cameras: Camera[] = $state([]);
 
 	const filtered = $derived(
 		filterOwned === 'all'
@@ -37,13 +38,23 @@
 				: lenses.filter((l) => l.date_sold)
 	);
 
-	const lensMountOptions = $derived([
-		{ value: '', label: 'Select mount...' },
-		...lensMounts.map((m) => ({ value: String(m.id), label: m.name }))
-	]);
+	const lensMountOptions = $derived(buildMountOptions(lensMounts));
 
 	const mountNameById = $derived(
 		Object.fromEntries(lensMounts.map((m) => [m.id, m.name]))
+	);
+
+	const fixedMountIds = $derived(
+		new Set(lensMounts.filter((m) => m.name === 'Fixed Lens').map((m) => m.id))
+	);
+
+	/** Maps lens ID → camera display name for lenses that are a camera's default (i.e. fixed) lens. */
+	const fixedOnCamera = $derived(
+		Object.fromEntries(
+			cameras
+				.filter((c) => c.default_lens_id != null)
+				.map((c) => [c.default_lens_id!, `${c.brand} ${c.model}`])
+		) as Record<number, string>
 	);
 
 	// Form state
@@ -63,17 +74,19 @@
 
 	async function load() {
 		try {
-			const [l, lensBrands, camBrands, mounts, vendors] = await Promise.all([
+			const [l, lensBrands, camBrands, mounts, vendors, cams] = await Promise.all([
 				listLenses(),
 				listDistinctLensBrands(),
 				listDistinctCameraBrands(),
 				listLensMounts(),
-				listDistinctVendors()
+				listDistinctVendors(),
+				listCameras()
 			]);
 			lenses = l;
 			brandOptions = [...new Set([...lensBrands, ...camBrands])].sort();
 			lensMounts = mounts;
 			vendorOptions = vendors;
+			cameras = cams;
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -226,7 +239,9 @@
 							{/if}
 						</div>
 						<div class="mt-1 flex flex-wrap gap-3 text-xs text-text-muted">
-							{#if mountNameById[lens.lens_mount_id]}
+							{#if fixedMountIds.has(lens.lens_mount_id)}
+								<span class="text-accent/70">Fixed{#if fixedOnCamera[lens.id]}{' '}on {fixedOnCamera[lens.id]}{/if}</span>
+							{:else if mountNameById[lens.lens_mount_id]}
 								<span>{mountNameById[lens.lens_mount_id]}</span>
 							{/if}
 							{#if lens.focal_length}
@@ -290,6 +305,12 @@
 {#if editingLens}
 	<Dialog open={true} title="Edit Lens" onclose={() => { editingLens = null; resetForm(); }}>
 		<div class="space-y-4">
+			{#if fixedMountIds.has(editingLens.lens_mount_id)}
+				{@const cameraName = fixedOnCamera[editingLens.id]}
+				<div class="rounded-lg border border-accent/25 bg-accent/5 px-3 py-2 text-sm text-accent">
+					Fixed lens{#if cameraName}{' '}on <span class="font-semibold">{cameraName}</span>{/if}
+				</div>
+			{/if}
 			<div class="grid grid-cols-2 gap-4">
 				<ComboInput label="Brand/Manufacturer" bind:value={brand} options={brandOptions} />
 				<Select label="Lens Mount" bind:value={lensMountId} options={lensMountOptions} />

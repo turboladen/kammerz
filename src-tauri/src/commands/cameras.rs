@@ -1,21 +1,23 @@
-use sea_orm::{EntityTrait, Set};
+use sea_orm::{DbErr, EntityTrait, Set, TransactionTrait};
 use serde::Deserialize;
 use tauri::State;
 
-use crate::entities::{camera, camera_maintenance};
+use crate::entities::{camera, camera_maintenance, lens};
 use crate::patch::double_option;
 use crate::services::camera_service::CameraService;
+use crate::services::lens_service::LensService;
 use crate::AppState;
 
 // --- DTOs ---
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct CreateCameraDto {
     pub brand: String,
     pub model: String,
     pub prefix: Option<String>,
     pub format: String,
     pub lens_mount_id: i32,
+    pub default_lens_id: Option<i32>,
     pub camera_type: Option<String>,
     pub serial_number: Option<String>,
     pub date_purchased: Option<String>,
@@ -33,6 +35,8 @@ pub struct UpdateCameraDto {
     pub prefix: Option<Option<String>>,
     pub format: Option<String>,
     pub lens_mount_id: Option<i32>,
+    #[serde(deserialize_with = "double_option")]
+    pub default_lens_id: Option<Option<i32>>,
     #[serde(deserialize_with = "double_option")]
     pub camera_type: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
@@ -105,6 +109,7 @@ pub async fn create_camera(
         prefix: Set(data.prefix),
         format: Set(data.format),
         lens_mount_id: Set(data.lens_mount_id),
+        default_lens_id: Set(data.default_lens_id),
         camera_type: Set(data.camera_type),
         serial_number: Set(data.serial_number),
         date_purchased: Set(data.date_purchased),
@@ -141,6 +146,7 @@ pub async fn update_camera(
     if let Some(v) = data.prefix { model.prefix = Set(v); }
     if let Some(v) = data.format { model.format = Set(v); }
     if let Some(v) = data.lens_mount_id { model.lens_mount_id = Set(v); }
+    if let Some(v) = data.default_lens_id { model.default_lens_id = Set(v); }
     if let Some(v) = data.camera_type { model.camera_type = Set(v); }
     if let Some(v) = data.serial_number { model.serial_number = Set(v); }
     if let Some(v) = data.date_purchased { model.date_purchased = Set(v); }
@@ -162,6 +168,92 @@ pub async fn delete_camera(state: State<'_, AppState>, id: i32) -> Result<(), St
         log::error!("Failed to delete camera {id}: {e}");
         format!("Could not delete camera: {e}")
     })
+}
+
+// --- Create camera with fixed lens (transactional) ---
+
+#[derive(Debug, Deserialize)]
+pub struct CreateCameraWithLensDto {
+    pub camera: CreateCameraDto,
+    pub lens_name_on_lens: Option<String>,
+    pub lens_focal_length: Option<String>,
+    pub lens_max_aperture: Option<String>,
+}
+
+#[tauri::command]
+pub async fn create_camera_with_lens(
+    state: State<'_, AppState>,
+    data: CreateCameraWithLensDto,
+) -> Result<i32, String> {
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    let camera_id = state
+        .db
+        .transaction::<_, i32, DbErr>(|txn| {
+            let now = now.clone();
+            Box::pin(async move {
+                // 1. Create camera (default_lens_id will be set after lens creation)
+                let cam_model = camera::ActiveModel {
+                    brand: Set(data.camera.brand.clone()),
+                    model: Set(data.camera.model),
+                    prefix: Set(data.camera.prefix),
+                    format: Set(data.camera.format),
+                    lens_mount_id: Set(data.camera.lens_mount_id),
+                    default_lens_id: Set(None),
+                    camera_type: Set(data.camera.camera_type),
+                    serial_number: Set(data.camera.serial_number.clone()),
+                    date_purchased: Set(data.camera.date_purchased.clone()),
+                    purchased_from: Set(data.camera.purchased_from.clone()),
+                    date_sold: Set(data.camera.date_sold),
+                    notes: Set(data.camera.notes),
+                    created_at: Set(now.clone()),
+                    updated_at: Set(now.clone()),
+                    ..Default::default()
+                };
+                let cam = CameraService::create(txn, cam_model).await?;
+
+                // 2. Create lens (brand + mount shared with camera)
+                let lens_model = lens::ActiveModel {
+                    brand: Set(data.camera.brand),
+                    lens_mount_id: Set(data.camera.lens_mount_id),
+                    lens_system: Set(None),
+                    name_on_lens: Set(data.lens_name_on_lens),
+                    focal_length: Set(data.lens_focal_length),
+                    max_aperture: Set(data.lens_max_aperture),
+                    min_aperture: Set(None),
+                    filter_thread_front_mm: Set(None),
+                    filter_thread_rear_mm: Set(None),
+                    serial_number: Set(data.camera.serial_number),
+                    date_purchased: Set(data.camera.date_purchased),
+                    purchased_from: Set(data.camera.purchased_from),
+                    date_sold: Set(None),
+                    notes: Set(None),
+                    created_at: Set(now.clone()),
+                    updated_at: Set(now.clone()),
+                    ..Default::default()
+                };
+                let created_lens = LensService::create(txn, lens_model).await?;
+
+                // 3. Link lens to camera
+                let cam_id = cam.id;
+                CameraService::link_lens(txn, cam_id, created_lens.id).await?;
+
+                // 4. Set default_lens_id on camera
+                let mut cam_update: camera::ActiveModel = cam.into();
+                cam_update.default_lens_id = Set(Some(created_lens.id));
+                cam_update.updated_at = Set(now);
+                CameraService::update(txn, cam_update).await?;
+
+                Ok(cam_id)
+            })
+        })
+        .await
+        .map_err(|e| {
+            log::error!("Failed to create camera with lens: {e}");
+            format!("Could not create camera with lens: {e}")
+        })?;
+
+    Ok(camera_id)
 }
 
 // --- Maintenance commands ---

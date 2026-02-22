@@ -25,6 +25,18 @@ export const updateMaintenance = (id: number, data: Partial<CameraMaintenanceIns
 
 export const deleteMaintenance = (id: number) => invoke<void>('delete_maintenance', { id });
 
+// --- Create camera with fixed lens (transactional) ---
+
+export interface CreateCameraWithLensData {
+	camera: CameraInsert;
+	lens_name_on_lens: string | null;
+	lens_focal_length: string | null;
+	lens_max_aperture: string | null;
+}
+
+export const createCameraWithLens = (data: CreateCameraWithLensData) =>
+	invoke<number>('create_camera_with_lens', { data });
+
 // --- Camera-Lens Associations ---
 
 export const getLensesForCamera = (cameraId: number) =>

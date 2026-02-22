@@ -16,6 +16,7 @@ export interface Camera {
 	prefix: string | null;
 	format: string;
 	lens_mount_id: number;
+	default_lens_id: number | null;
 	camera_type: string | null;
 	serial_number: string | null;
 	date_purchased: string | null;
@@ -244,7 +245,7 @@ export interface FilmStockSearchResult {
 export interface RollSearchResult {
 	id: number;
 	roll_id: string;
-	status: string;
+	status: RollStatus;
 	camera_brand: string | null;
 	camera_model: string | null;
 	film_stock_brand: string | null;

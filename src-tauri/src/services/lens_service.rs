@@ -18,7 +18,7 @@ impl LensService {
         Lens::find_by_id(id).one(db).await
     }
 
-    pub async fn create(db: &DatabaseConnection, model: lens::ActiveModel) -> Result<lens::Model, DbErr> {
+    pub async fn create(db: &impl ConnectionTrait, model: lens::ActiveModel) -> Result<lens::Model, DbErr> {
         model.insert(db).await
     }
 

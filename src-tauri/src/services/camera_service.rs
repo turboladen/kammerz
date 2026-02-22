@@ -19,11 +19,11 @@ impl CameraService {
         Camera::find_by_id(id).one(db).await
     }
 
-    pub async fn create(db: &DatabaseConnection, model: camera::ActiveModel) -> Result<camera::Model, DbErr> {
+    pub async fn create(db: &impl ConnectionTrait, model: camera::ActiveModel) -> Result<camera::Model, DbErr> {
         model.insert(db).await
     }
 
-    pub async fn update(db: &DatabaseConnection, model: camera::ActiveModel) -> Result<camera::Model, DbErr> {
+    pub async fn update(db: &impl ConnectionTrait, model: camera::ActiveModel) -> Result<camera::Model, DbErr> {
         model.update(db).await
     }
 
@@ -78,7 +78,7 @@ impl CameraService {
     }
 
     pub async fn link_lens(
-        db: &DatabaseConnection,
+        db: &impl ConnectionTrait,
         camera_id: i32,
         lens_id: i32,
     ) -> Result<(), DbErr> {

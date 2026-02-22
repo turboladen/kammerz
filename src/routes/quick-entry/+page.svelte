@@ -1,19 +1,22 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
+	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
-	import { listRolls } from '$lib/api/rolls';
+	import { listRolls, updateRoll } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import { listLenses } from '$lib/api/lenses';
 	import { listShotsForRoll, createShot, suggestNextFrame } from '$lib/api/shots';
 	import { buildLensOptions } from '$lib/utils/lens';
-	import type { RollWithDetails, Camera, Lens, Shot } from '$lib/types';
+	import { listLensMounts } from '$lib/api/lens-mounts';
+	import type { RollWithDetails, Camera, Lens, LensMount, Shot } from '$lib/types';
 
 	let rolls: RollWithDetails[] = $state([]);
 	let cameras: Camera[] = $state([]);
 	let allLenses: Lens[] = $state([]);
+	let lensMounts: LensMount[] = $state([]);
 	let selectedRollId = $state('');
 	let shots: Shot[] = $state([]);
 	let loading = $state(true);
@@ -58,7 +61,7 @@
 		selectedRoll?.camera_id ? cameras.find((c) => c.id === selectedRoll.camera_id) ?? null : null
 	);
 
-	const lensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens selected'));
+	const lensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens selected', lensMounts));
 
 	// Frame progress for selected roll
 	const frameInfo = $derived.by(() => {
@@ -68,12 +71,34 @@
 		return { current: shots.length, total };
 	});
 
+	// Roll-full nudge state
+	let rollFullDismissed = $state(false);
+	const showRollFullNudge = $derived(
+		selectedRoll?.status === 'shooting' &&
+		frameInfo !== null &&
+		frameInfo.total !== null &&
+		shots.length >= frameInfo.total &&
+		!rollFullDismissed
+	);
+
+	async function markRollShot() {
+		if (!selectedRoll) return;
+		try {
+			await updateRoll(selectedRoll.id, { status: 'shot' });
+			rolls = await listRolls();
+			rollFullDismissed = true;
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
 	async function loadInitial() {
 		try {
-			const [r, cams, lenses] = await Promise.all([listRolls(), listCameras(), listLenses()]);
+			const [r, cams, lenses, mounts] = await Promise.all([listRolls(), listCameras(), listLenses(), listLensMounts()]);
 			rolls = r;
 			cameras = cams;
 			allLenses = lenses;
+			lensMounts = mounts;
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -125,8 +150,11 @@
 			successMessage = `Frame ${frameNumber} saved`;
 			setTimeout(() => (successMessage = ''), 2000);
 
-			// Auto-advance: reload shots, clear fields, keep lens, suggest next frame
-			shots = await listShotsForRoll(Number(selectedRollId));
+			// Auto-advance: reload shots + rolls (status may have changed), clear fields, keep lens, suggest next frame
+			[shots, rolls] = await Promise.all([
+				listShotsForRoll(Number(selectedRollId)),
+				listRolls()
+			]);
 			aperture = '';
 			shutterSpeed = '';
 			notes = '';
@@ -160,6 +188,7 @@
 	// When roll changes, reload data
 	$effect(() => {
 		if (selectedRollId) {
+			rollFullDismissed = false;
 			loadRollData(Number(selectedRollId));
 		} else {
 			shots = [];
@@ -187,6 +216,7 @@
 
 		{#if selectedRoll}
 			<!-- Roll Info Bar -->
+			<FadeIn>
 			<div class="mb-5 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface-raised px-4 py-2.5 text-sm text-text-muted">
 				{#if selectedRoll.camera_brand}
 					<span>{selectedRoll.camera_brand} {selectedRoll.camera_model}</span>
@@ -213,8 +243,31 @@
 					{/if}
 				{/if}
 			</div>
+			</FadeIn>
+
+			{#if showRollFullNudge}
+				<FadeIn delay={50}>
+				<div class="mb-5 flex items-center justify-between rounded-lg border border-accent/30 bg-accent/10 px-4 py-3">
+					<div>
+						<p class="text-sm font-medium text-accent">Roll complete</p>
+						<p class="text-xs text-accent/70">
+							All {frameInfo?.total} frames shot. Ready to mark as done?
+						</p>
+					</div>
+					<div class="flex items-center gap-2">
+						<Button size="sm" variant="primary" onclick={markRollShot}>Mark as Shot</Button>
+						<button
+							onclick={() => { rollFullDismissed = true; }}
+							class="text-accent/60 hover:text-accent transition-colors text-lg leading-none px-1"
+							aria-label="Dismiss"
+						>&times;</button>
+					</div>
+				</div>
+				</FadeIn>
+			{/if}
 
 			<!-- Entry Form -->
+			<FadeIn delay={50}>
 			<div class="mb-6 rounded-lg border border-border bg-surface-raised p-5">
 				<div class="grid grid-cols-4 gap-3">
 					<Input label="Frame" bind:value={frameNumber} placeholder="1" required />
@@ -250,11 +303,12 @@
 					</Button>
 				</div>
 			</div>
+			</FadeIn>
 
 			<!-- Recent Shots -->
 			{#if shots.length > 0}
 				<div>
-					<h2 class="mb-2 text-sm font-semibold text-text-muted">Previous shots</h2>
+					<h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-text-faint">Previous Shots</h2>
 					<div class="space-y-1">
 						{#each [...shots].reverse().slice(0, 10) as shot, i}
 							<div class="flex items-center gap-3 rounded px-3 py-1.5 text-sm text-text-muted {i === 0 && shot.frame_number === lastSavedFrame ? 'animate-fade-in-up' : ''}"

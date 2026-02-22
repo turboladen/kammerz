@@ -37,11 +37,11 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
-			class="w-full max-w-lg rounded-lg border border-border bg-surface-raised p-6 shadow-2xl"
+			class="flex w-full max-w-lg flex-col rounded-lg border border-border bg-surface-raised shadow-2xl max-h-[85vh]"
 			style="animation: dialog-enter 150ms ease-out"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<div class="mb-4 flex items-center justify-between">
+			<div class="flex items-center justify-between px-6 pt-6 pb-4 shrink-0">
 				<h2 class="font-display text-xl">{title}</h2>
 				<button
 					onclick={handleClose}
@@ -50,7 +50,9 @@
 					&times;
 				</button>
 			</div>
-			{@render children()}
+			<div class="overflow-y-auto px-6 pb-6">
+				{@render children()}
+			</div>
 		</div>
 	</div>
 {/if}

@@ -10,9 +10,10 @@
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
 	import { Camera as CameraIcon } from 'lucide-svelte';
-	import { listCameras, createCamera, deleteCamera, listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
+	import { listCameras, createCamera, createCameraWithLens, deleteCamera, listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
 	import { listDistinctLensBrands } from '$lib/api/lenses';
 	import { listLensMounts } from '$lib/api/lens-mounts';
+	import { buildMountOptions } from '$lib/utils/lens';
 	import type { Camera, CameraInsert, LensMount } from '$lib/types';
 
 	let cameras: Camera[] = $state([]);
@@ -51,6 +52,17 @@
 	let dateSold = $state('');
 	let notes = $state('');
 
+	// Inline fixed-lens fields
+	let lensNameOnLens = $state('');
+	let lensFocalLength = $state('');
+	let lensMaxAperture = $state('');
+
+	const isFixedLens = $derived(
+		lensMountId
+			? lensMounts.find((m) => m.id === Number(lensMountId))?.name === 'Fixed Lens'
+			: false
+	);
+
 	const formatOptions = [
 		{ value: '35mm', label: '35mm' },
 		{ value: 'medium format', label: 'Medium Format' },
@@ -66,10 +78,7 @@
 		{ value: 'instant', label: 'Instant' }
 	];
 
-	const lensMountOptions = $derived([
-		{ value: '', label: 'Select mount...' },
-		...lensMounts.map((m) => ({ value: String(m.id), label: m.name }))
-	]);
+	const lensMountOptions = $derived(buildMountOptions(lensMounts));
 
 	const typeOptions = [
 		{ value: '', label: 'Not specified' },
@@ -113,6 +122,9 @@
 		purchasedFrom = '';
 		dateSold = '';
 		notes = '';
+		lensNameOnLens = '';
+		lensFocalLength = '';
+		lensMaxAperture = '';
 	}
 
 	async function handleAdd() {
@@ -124,6 +136,7 @@
 				prefix: prefix || null,
 				format,
 				lens_mount_id: Number(lensMountId),
+				default_lens_id: null,
 				camera_type: cameraType || null,
 				serial_number: serialNumber || null,
 				date_purchased: datePurchased || null,
@@ -131,7 +144,18 @@
 				date_sold: dateSold || null,
 				notes: notes || null
 			};
-			await createCamera(camera);
+
+			if (isFixedLens && (lensNameOnLens || lensFocalLength || lensMaxAperture)) {
+				await createCameraWithLens({
+					camera,
+					lens_name_on_lens: lensNameOnLens || null,
+					lens_focal_length: lensFocalLength || null,
+					lens_max_aperture: lensMaxAperture || null
+				});
+			} else {
+				await createCamera(camera);
+			}
+
 			showAddDialog = false;
 			resetForm();
 			await load();
@@ -228,13 +252,28 @@
 	<div class="space-y-4">
 		<div class="grid grid-cols-2 gap-4">
 			<ComboInput label="Brand" bind:value={brand} placeholder="Minolta" options={brandOptions} />
-			<Input label="Model" bind:value={model} placeholder="XD-7" />
+			<Input label="Model" bind:value={model} placeholder="XD-7" spellcheck="false" />
 		</div>
 		<div class="grid grid-cols-3 gap-4">
 			<Select label="Format" bind:value={format} options={formatOptions} />
 			<Select label="Lens Mount" bind:value={lensMountId} options={lensMountOptions} />
 			<Select label="Type" bind:value={cameraType} options={typeOptions} />
 		</div>
+		{#if isFixedLens}
+			<div class="border-t border-border-subtle pt-4">
+				<h3 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+					Fixed Lens Details
+					<div class="flex-1 border-b border-border-subtle"></div>
+				</h3>
+				<div class="space-y-4">
+					<Input label="Name on Lens" bind:value={lensNameOnLens} placeholder="Rokkor 75mm 1:3.5" hint="Brand, mount, and purchase info will match the camera" />
+					<div class="grid grid-cols-2 gap-4">
+						<Input label="Focal Length (mm)" bind:value={lensFocalLength} placeholder="75" />
+						<Input label="Max Aperture (f/)" bind:value={lensMaxAperture} placeholder="3.5" />
+					</div>
+				</div>
+			</div>
+		{/if}
 		<div class="grid grid-cols-2 gap-4">
 			<Input label="Prefix (Legacy ID)" bind:value={prefix} placeholder="MD7" hint="Optional, for legacy roll IDs" />
 			<Input label="Serial Number" bind:value={serialNumber} placeholder="1234567" />

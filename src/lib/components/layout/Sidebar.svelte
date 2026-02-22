@@ -2,14 +2,19 @@
 	import { page } from '$app/state';
 	import { LayoutDashboard, Search, Film, Camera, Aperture, Package, FlaskConical, BarChart3, Plus } from 'lucide-svelte';
 
-	const navItems = [
+	// Core data entity navigation
+	const mainNavItems = [
 		{ href: '/', label: 'Dashboard', icon: LayoutDashboard },
-		{ href: '/search', label: 'Search', icon: Search },
 		{ href: '/rolls', label: 'Rolls', icon: Film },
 		{ href: '/cameras', label: 'Cameras', icon: Camera },
 		{ href: '/lenses', label: 'Lenses', icon: Aperture },
 		{ href: '/film-stocks', label: 'Film Stocks', icon: Package },
-		{ href: '/labs', label: 'Labs', icon: FlaskConical },
+		{ href: '/labs', label: 'Labs', icon: FlaskConical }
+	];
+
+	// Utility / analytics navigation
+	const utilityNavItems = [
+		{ href: '/search', label: 'Search', icon: Search },
 		{ href: '/stats', label: 'Stats', icon: BarChart3 }
 	];
 
@@ -27,19 +32,35 @@
 	</div>
 
 	<!-- Navigation -->
-	<div class="flex flex-1 flex-col gap-0.5 p-3">
-		{#each navItems as item}
-			<a
-				href={item.href}
-				class="relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150
-					{isActive(item.href)
-					? 'border-l-2 border-accent bg-accent/8 text-accent'
-					: 'border-l-2 border-transparent text-text-muted hover:bg-surface-overlay hover:text-text'}"
-			>
-				<item.icon size={16} strokeWidth={1.75} class={isActive(item.href) ? 'text-accent' : 'text-text-faint'} />
-				{item.label}
-			</a>
-		{/each}
+	<div class="flex flex-1 flex-col p-3">
+		<div class="flex flex-col gap-0.5">
+			{#each mainNavItems as item}
+				<a
+					href={item.href}
+					class="relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150
+						{isActive(item.href)
+						? 'border-l-2 border-accent bg-accent/8 text-accent'
+						: 'border-l-2 border-transparent text-text-muted hover:bg-surface-overlay hover:text-text'}"
+				>
+					<item.icon size={16} strokeWidth={1.75} class={isActive(item.href) ? 'text-accent' : 'text-text-faint'} />
+					{item.label}
+				</a>
+			{/each}
+		</div>
+		<div class="mt-2 flex flex-col gap-0.5 border-t border-border-subtle pt-2">
+			{#each utilityNavItems as item}
+				<a
+					href={item.href}
+					class="relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150
+						{isActive(item.href)
+						? 'border-l-2 border-accent bg-accent/8 text-accent'
+						: 'border-l-2 border-transparent text-text-muted hover:bg-surface-overlay hover:text-text'}"
+				>
+					<item.icon size={16} strokeWidth={1.75} class={isActive(item.href) ? 'text-accent' : 'text-text-faint'} />
+					{item.label}
+				</a>
+			{/each}
+		</div>
 	</div>
 
 	<!-- Quick Entry -->

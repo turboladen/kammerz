@@ -57,11 +57,14 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - **Always confirm destructive actions.** Never delete data without user confirmation.
 - Back navigation: Detail pages use `PageHeader`'s `backHref`/`backLabel` props for consistent back links.
 - Owned/Sold filtering: List pages with `date_sold` fields (cameras, lenses) use client-side All/Owned/Sold tab buttons with a `$derived()` filter. No backend changes needed to add this to a new list page.
+- Fixed-lens cameras: Show read-only lens indicators everywhere — lens list cards ("Fixed on [Camera]"), lens edit dialog (accent banner), roll default lens (locked text), shot lens dropdown (read-only). Detect via mount name: `lensMounts.find(m => m.id === mountId)?.name === 'Fixed Lens'` — never hardcode mount IDs.
+- Shot lens defaults: Smart cascade — fixed lens (auto-locked) > last-used lens on roll > `roll.lens_id` (roll default) > `camera.default_lens_id` (camera default) > empty.
 
 ### Svelte 5 Patterns
 - Use `$state()`, `$derived()`, `$effect()`, `$props()`, `$bindable()` — no legacy `let` reactivity.
 - Use `onclick={handler}` on buttons instead of `<form onsubmit>`. Form submission events don't work reliably in Tauri's WebKit webview inside conditional Svelte blocks.
 - Button component passes `onclick` via `{...rest}` spread to the native `<button>` element.
+- Detail page edit mode: When a page has view/edit toggle, maintain parallel `$derived` vars — e.g., `selectedCamera` (from saved `roll.camera_id`) for shot defaults vs `editSelectedCamera` (from `editCameraId` form state) for edit-mode film stock/lens filtering.
 
 ### Tauri 2 / SeaORM Patterns
 - Commands receive `State<'_, AppState>`, delegate to services, return `Result<T, String>`
@@ -80,6 +83,13 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - `ComboInput` dropdown options use `onmousedown` (not `onclick`) to beat the blur/click race condition.
 - `Select` options support an optional `disabled` property (used for visual dividers like `── Other formats ──`).
 - Use `$derived.by(() => { ... })` when derived state needs multi-line logic; `$derived(expr)` for one-liners.
+- Always use the `<Badge>` component for roll statuses — never inline status pills with raw classes.
+- Wrap page content sections in `<FadeIn>` with staggered `delay` props (typically 50ms increments) for consistent entrance animations.
+- Section headers use the ledger-line pattern: `text-xs font-semibold uppercase tracking-wider text-text-faint` with either a rule line (`<div class="flex-1 border-b border-border-subtle">`) or `justify-between` for headers with action buttons. Never use `text-sm font-semibold text-text-muted`.
+- Card hover borders always use `hover:border-accent/40` — never other opacities like `/30`.
+- Roll status metadata (labels, colors, CSS classes) is defined in `src/lib/utils/status.ts`. Always import from there — never define inline status maps in page components. Use `getStatusColor(status)` for typed lookups or `getStatusColorSafe(label)` for untyped strings from backend queries.
+- Lens dropdowns: Always use `buildLensOptions()` from `$lib/utils/lens.ts` — handles mount-compatibility sorting with dividers. Also see `buildMountOptions()` for mount dropdowns grouped by format family.
+- Dialog component uses flex column layout with `max-h-[85vh]` and `overflow-y-auto` on content. When adding fields to dialogs (e.g., inline lens creation), scrolling is already handled.
 
 ### Error Handling
 - Frontend `invoke()` calls return promises that reject on error. Wrap in try/catch with user-visible error display.

@@ -110,6 +110,7 @@ Roll status pills with a small color dot indicator:
 - Background at 10% opacity of the status color
 - Text in the status color
 - `rounded-full` shape
+- Always use `<Badge>` for roll statuses — never inline status pills.
 
 ### Dialog (`src/lib/components/ui/Dialog.svelte`)
 
@@ -133,6 +134,12 @@ Same animations and styling as Dialog, smaller max-width (`max-w-sm`).
 ### EmptyState (`src/lib/components/ui/EmptyState.svelte`)
 
 Centered message with optional CTA button. Used when lists are empty.
+
+### FadeIn (`src/lib/components/ui/FadeIn.svelte`)
+
+Wraps content in staggered `fade-in-up` animation (200ms, ease-out). Use on all page sections for sequential reveal:
+- `delay` prop for staggering (typically 50ms increments between sections)
+- Every page should wrap its main content sections in `FadeIn` for consistent entrance animations
 
 ---
 
@@ -165,7 +172,10 @@ Centered message with optional CTA button. Used when lists are empty.
 - **Hover state**: `bg-surface-overlay` + text lightens
 - **Quick Entry**: Dashed border, transitions to solid accent on hover
 
-Navigation items:
+Navigation is split into two groups with a subtle separator:
+
+**Core navigation** (data entities):
+
 | Route | Label | Icon |
 |---|---|---|
 | `/` | Dashboard | `LayoutDashboard` |
@@ -174,6 +184,13 @@ Navigation items:
 | `/lenses` | Lenses | `Aperture` |
 | `/film-stocks` | Film Stocks | `Package` |
 | `/labs` | Labs | `FlaskConical` |
+
+**Utility navigation** (separated by `border-t border-border-subtle`):
+
+| Route | Label | Icon |
+|---|---|---|
+| `/search` | Search | `Search` |
+| `/stats` | Stats | `BarChart3` |
 
 ### PageHeader (`src/lib/components/layout/PageHeader.svelte`)
 
@@ -185,9 +202,37 @@ Navigation items:
 
 ---
 
+## Section Headers (Ledger-Line Pattern)
+
+All section headers use a consistent ledger-line pattern that evokes ruled notebook pages:
+
+```
+text-xs font-semibold uppercase tracking-wider text-text-faint
+```
+
+With an extending rule line:
+```svelte
+<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+    Section Title
+    <div class="flex-1 border-b border-border-subtle"></div>
+</h2>
+```
+
+When a section header has action buttons on the right (e.g., "+ Add"), use `justify-between` instead of the rule line:
+```svelte
+<div class="mb-3 flex items-center justify-between">
+    <h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Section Title</h2>
+    <Button size="sm">+ Add</Button>
+</div>
+```
+
+**Do not use** the old pattern: `text-sm font-semibold text-text-muted`.
+
+---
+
 ## Card Patterns
 
-### List Cards (rolls, cameras, lenses, labs)
+### List Cards (rolls, cameras, lenses, labs, search results)
 
 ```
 rounded-lg border border-border bg-surface-raised p-4
@@ -196,7 +241,7 @@ hover:border-accent/40 hover:-translate-y-px
 ```
 
 - `rounded-lg` (8px) — precise, tool-like
-- Hover: border glows amber, subtle 1px lift
+- Hover: border glows amber at `/40` opacity, subtle 1px lift
 - Group-hover reveals edit/delete actions at `opacity-0 → opacity-100`
 
 ### Detail Cards (camera detail, roll detail)
@@ -216,16 +261,65 @@ hover:border-accent/40 hover:-translate-y-px
 
 Warm amber tint to highlight actively shooting rolls.
 
+### Compact Table Inputs (Import shots table)
+
+For dense data entry tables, use smaller inputs with `rounded` (4px) instead of `rounded-lg`:
+```
+rounded border border-border bg-surface px-1.5 py-1 text-xs
+focus:border-accent focus:ring-1 focus:ring-accent/50 focus:outline-none
+```
+
+This is a sanctioned variant for table cells where standard Input components would be too large.
+
 ---
 
-## Dashboard Layout
+## Page Designs
+
+### Dashboard (`/`)
 
 1. **"In the Field"** — Active rolls (loaded/shooting) as prominent amber-tinted cards
-2. **Quick Stats** — 4-column grid: Total Rolls, Cameras, Currently Shooting, At Lab
-3. **Roll Pipeline** — Horizontal status distribution bar with proportional segments + legend
+2. **Quick Stats** — 4-column grid: Total Rolls, Cameras, Currently Shooting, At Lab (all `font-mono text-2xl font-semibold`)
+3. **Roll Pipeline** — Horizontal status distribution bar with proportional per-status-color segments + legend
 4. **Needs Attention** — Rolls missing camera assignment or waiting at lab, with icon indicators
 
 Empty state: Camera icon in accent circle, "Start your log" in Instrument Serif, explanatory text, CTAs.
+
+### Search (`/search`)
+
+- Debounced search input (300ms) with search icon prefix, autofocus
+- Results grouped by entity type, each section with:
+  - `border-l-2 border-accent/40` left accent for visual grouping
+  - Entity icon + uppercase category header with count
+  - List cards showing matched item + "in {match_field}" hint
+  - Staggered `FadeIn` per category (50ms increments)
+
+### Stats (`/stats`)
+
+- **Summary Cards** — 4-column grid (Total Rolls, Total Shots, Total Costs, Cameras), all `font-mono text-2xl font-semibold`
+- **Cost Breakdown** — Stacked bar (Lab Development amber, Maintenance muted) with legend
+- **Rolls Per Month** — Horizontal bar chart (`bg-accent/80`, `rounded-r`)
+- **Rankings Row** — 3-column grid: Top Film Stocks, Top Cameras, Top Lenses (numbered lists with accent count pills)
+- **Distribution Row** — 3-column grid: Rolls by Format, Rolls by Lens Mount, Rolls by Status
+  - Format and Mount charts use `bg-accent/80`
+  - Status chart uses per-status CSS variable colors (matching Dashboard Pipeline)
+
+### Import (`/import`)
+
+Multi-step flow: Input → Preview → Importing
+
+- **Input step**: Collapsible settings panel (API key + model selector), monospace textarea for note pasting
+- **Preview step**: Editable roll info form + shots table with compact inline inputs, wrapped in `FadeIn`
+  - Unmatched AI guesses shown as amber warnings with "Add X" links
+- **Importing step**: Simple loading message, redirects on success
+
+### Quick Entry (`/quick-entry`)
+
+Rapid single-frame logging optimized for active shooting sessions:
+- Roll selector (active rolls prioritized, visual divider for other rolls)
+- Roll info bar (camera, film stock, ISO, frame progress indicator)
+- 4-column entry form (Frame, f/, Speed, Lens) in a raised card
+- `⌘+Enter` keyboard shortcut, session counter, success flash animation
+- Previous shots list (reverse-chronological, last 10) with fade-in on latest entry
 
 ---
 
@@ -244,6 +338,12 @@ Defined as `@keyframes` in `src/app.css`:
 - `dialog-enter`: scale 0.95 → 1.0 + opacity 0 → 1 over 150ms ease-out
 - `backdrop-enter`: opacity 0 → 1 over 100ms ease-out
 
+### Page Section Animations
+
+- `fade-in-up`: translateY(8px) → 0 + opacity 0 → 1 over 200ms ease-out
+- Applied via `FadeIn` component with staggered `delay` props
+- `success-flash`: green highlight flash (600ms) for Quick Entry save feedback
+
 ---
 
 ## Design Principles
@@ -253,6 +353,8 @@ Defined as `@keyframes` in `src/app.css`:
 3. **Atmospheric, not decorative.** Film grain and subtle gradients create mood without adding visual noise.
 4. **Typography tells the story.** Serif for brand identity, mono for data, sans for everything else.
 5. **The accent is the safelight.** Amber `#d4915c` is the single warm light source in a dark room.
+6. **Consistent entrance.** Every page section uses `FadeIn` with staggered delays for sequential reveal.
+7. **Hover at `/40`.** Card hover borders always use `hover:border-accent/40` — never other opacities.
 
 ---
 
