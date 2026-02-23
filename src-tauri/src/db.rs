@@ -18,10 +18,12 @@ pub async fn init(app_handle: &tauri::AppHandle) -> Result<DatabaseConnection, D
     db.execute_unprepared("PRAGMA journal_mode=WAL").await?;
     db.execute_unprepared("PRAGMA busy_timeout=5000").await?;
 
-    // NOTE: foreign_keys=ON is set AFTER migrations, not before.
-    // Migrations use table-rebuild patterns (CREATE new → INSERT → DROP old → RENAME)
-    // and SQLite's DROP TABLE does an implicit DELETE when FK enforcement is on,
-    // which triggers RESTRICT violations from referencing tables.
+    // CRITICAL: SQLx sets PRAGMA foreign_keys=ON by default on SQLite connections.
+    // We must explicitly disable it before migrations because table-rebuild patterns
+    // (CREATE new → INSERT → DROP old → RENAME) trigger SQLite's implicit DELETE
+    // on DROP TABLE, which cascades through ON DELETE CASCADE/SET NULL constraints
+    // and destroys data in referencing tables.
+    db.execute_unprepared("PRAGMA foreign_keys=OFF").await?;
 
     // Handle migration from tauri-plugin-sql:
     // The old plugin tracked migrations in `_sqlx_migrations`. SeaORM uses
@@ -32,7 +34,7 @@ pub async fn init(app_handle: &tauri::AppHandle) -> Result<DatabaseConnection, D
 
     migration::Migrator::up(&db, None).await?;
 
-    // Enable FK enforcement for all runtime queries (after migrations are done)
+    // Re-enable FK enforcement for all runtime queries
     db.execute_unprepared("PRAGMA foreign_keys=ON").await?;
 
     Ok(db)
