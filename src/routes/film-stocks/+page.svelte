@@ -7,7 +7,13 @@
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
+	import ListToolbar from '$lib/components/ui/ListToolbar.svelte';
+	import GroupHeader from '$lib/components/ui/GroupHeader.svelte';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+	import FadeIn from '$lib/components/ui/FadeIn.svelte';
+	import { Film } from 'lucide-svelte';
 	import { listFilmStocks, createFilmStock, deleteFilmStock, listDistinctFilmBrands } from '$lib/api/film-stocks';
+	import { filterBySearch, groupItems, sortByString, sortByNumber, sortByDate } from '$lib/utils/list';
 	import type { FilmStock, FilmStockInsert } from '$lib/types';
 
 	let stocks: FilmStock[] = $state([]);
@@ -18,10 +24,16 @@
 	let deletingStock: FilmStock | null = $state(null);
 	let error = $state('');
 
+	// Toolbar state
+	let searchQuery = $state('');
+	let groupBy = $state('brand');
+	let sortBy = $state('brand-asc');
+
 	// Autocomplete options
 	let filmBrandOptions: string[] = $state([]);
 
-	const filtered = $derived(
+	// Pipeline: tab filter → search → sort → group
+	const afterTabFilter = $derived(
 		stocks.filter((s) => {
 			if (filterType !== 'all' && s.stock_type !== filterType) return false;
 			if (filterFormat !== 'all' && s.format !== filterFormat) return false;
@@ -29,17 +41,47 @@
 		})
 	);
 
-	const grouped = $derived(
-		filtered.reduce(
-			(acc, stock) => {
-				const key = stock.brand;
-				if (!acc[key]) acc[key] = [];
-				acc[key].push(stock);
-				return acc;
-			},
-			{} as Record<string, FilmStock[]>
+	const afterSearch = $derived(
+		filterBySearch(afterTabFilter, searchQuery, (s) =>
+			[s.brand, s.name, s.format, s.stock_type].join(' ')
 		)
 	);
+
+	const afterSort = $derived.by(() => {
+		switch (sortBy) {
+			case 'brand-desc': return sortByString(afterSearch, (s) => `${s.brand} ${s.name}`, 'desc');
+			case 'iso-asc': return sortByNumber(afterSearch, (s) => s.iso, 'asc');
+			case 'iso-desc': return sortByNumber(afterSearch, (s) => s.iso, 'desc');
+			case 'date-added-desc': return sortByDate(afterSearch, (s) => s.created_at, 'desc');
+			case 'format-asc': return sortByString(afterSearch, (s) => s.format, 'asc');
+			default: return sortByString(afterSearch, (s) => `${s.brand} ${s.name}`, 'asc');
+		}
+	});
+
+	const grouped = $derived.by(() => {
+		if (groupBy === 'none') return groupItems(afterSort, () => '');
+		if (groupBy === 'format') return groupItems(afterSort, (s) => s.format);
+		if (groupBy === 'type') return groupItems(afterSort, (s) => typeDisplayNames[s.stock_type] ?? s.stock_type);
+		return groupItems(afterSort, (s) => s.brand);
+	});
+
+	const resultCount = $derived(afterSearch.length);
+
+	const groupByOptions = [
+		{ value: 'brand', label: 'Brand' },
+		{ value: 'format', label: 'Format' },
+		{ value: 'type', label: 'Type' },
+		{ value: 'none', label: 'None' }
+	];
+
+	const sortOptions = [
+		{ value: 'brand-asc', label: 'A\u2013Z' },
+		{ value: 'brand-desc', label: 'Z\u2013A' },
+		{ value: 'iso-asc', label: 'ISO Low\u2013High' },
+		{ value: 'iso-desc', label: 'ISO High\u2013Low' },
+		{ value: 'date-added-desc', label: 'Recently Added' },
+		{ value: 'format-asc', label: 'Format' }
+	];
 
 	// Form state
 	let brand = $state('');
@@ -88,6 +130,16 @@
 		}
 	}
 
+	function resetForm() {
+		brand = '';
+		name = '';
+		format = '135';
+		exposureCount = '';
+		stockType = 'color-negative';
+		iso = '';
+		notes = '';
+	}
+
 	async function handleAdd() {
 		error = '';
 		if (!brand.trim()) { error = 'Brand is required.'; return; }
@@ -104,13 +156,7 @@
 			};
 			await createFilmStock(stock);
 			showAddDialog = false;
-			brand = '';
-			name = '';
-			format = '135';
-			exposureCount = '';
-			stockType = 'color-negative';
-			iso = '';
-			notes = '';
+			resetForm();
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -147,6 +193,18 @@
 		<div class="mb-4 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 	{/if}
 
+	<!-- Toolbar: search + group + sort -->
+	<ListToolbar
+		bind:searchQuery
+		bind:groupBy
+		bind:sortBy
+		{groupByOptions}
+		{sortOptions}
+		{resultCount}
+		totalCount={afterTabFilter.length}
+		placeholder="Search film stocks..."
+	/>
+
 	<!-- Filters -->
 	<div class="mb-4 flex gap-4">
 		<div class="flex gap-2">
@@ -166,17 +224,26 @@
 
 	{#if loading}
 		<p class="text-sm text-text-muted">Loading...</p>
+	{:else if resultCount === 0 && stocks.length === 0}
+		<EmptyState title="No Film Stocks" message="Add your first film stock to get started.">
+			{#snippet icon()}<Film size={24} strokeWidth={1.5} />{/snippet}
+			<Button variant="primary" onclick={() => (showAddDialog = true)}>+ Add Film Stock</Button>
+		</EmptyState>
+	{:else if resultCount === 0}
+		<p class="mt-6 text-center text-sm text-text-muted">
+			{searchQuery ? `No film stocks match your search.` : 'No film stocks match the current filters.'}
+		</p>
 	{:else}
-		{#each Object.entries(grouped) as [brandName, brandStocks]}
-			<div class="mb-6">
-				<h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">{brandName}</h2>
-				<div class="grid gap-2">
-					{#each brandStocks as stock}
-						<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px">
+		{#each Object.entries(grouped) as [groupKey, groupStocks]}
+			<GroupHeader label={groupKey} />
+			<div class="mb-4 grid gap-1.5">
+				{#each groupStocks as stock, i}
+					<FadeIn delay={Math.min(i, 10) * 30}>
+						<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-2.5 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px">
 							<div class="flex items-center gap-3">
-								<span class="font-medium">{stock.name}</span>
+								<span class="text-sm font-semibold leading-snug">{stock.brand} {stock.name}</span>
 								{#if stock.iso}
-									<span class="rounded bg-surface-overlay px-1.5 py-0.5 text-xs text-text-muted">ISO {stock.iso}</span>
+									<span class="rounded bg-surface-overlay px-1.5 py-0.5 font-mono text-[11px] text-text-muted">ISO {stock.iso}</span>
 								{/if}
 								<span class="text-xs text-text-faint">{stock.format}</span>
 								<span class="text-xs text-text-faint">{typeDisplayNames[stock.stock_type] ?? stock.stock_type}</span>
@@ -186,8 +253,8 @@
 							</div>
 							<Button size="sm" variant="ghost" class="opacity-0 group-hover:opacity-100" onclick={() => handleDelete(stock)}>&times;</Button>
 						</div>
-					{/each}
-				</div>
+					</FadeIn>
+				{/each}
 			</div>
 		{/each}
 	{/if}
@@ -212,7 +279,7 @@
 			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 		{/if}
 		<div class="flex justify-end gap-2 pt-2">
-			<Button variant="ghost" onclick={() => (showAddDialog = false)}>Cancel</Button>
+			<Button variant="ghost" onclick={() => { showAddDialog = false; resetForm(); }}>Cancel</Button>
 			<Button variant="primary" onclick={handleAdd}>Add Film Stock</Button>
 		</div>
 	</div>

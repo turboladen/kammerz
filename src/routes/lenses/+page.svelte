@@ -10,10 +10,13 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
+	import ListToolbar from '$lib/components/ui/ListToolbar.svelte';
+	import GroupHeader from '$lib/components/ui/GroupHeader.svelte';
 	import { Aperture } from 'lucide-svelte';
 	import { listLenses, createLens, updateLens, deleteLens, listDistinctLensBrands } from '$lib/api/lenses';
 	import { listCameras, listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
 	import { listLensMounts } from '$lib/api/lens-mounts';
+	import { filterBySearch, groupItems, sortByString, sortByNumber, sortByDate } from '$lib/utils/list';
 	import type { Camera, Lens, LensInsert, LensMount } from '$lib/types';
 	import { lensDisplayName, buildMountOptions } from '$lib/utils/lens';
 
@@ -25,19 +28,16 @@
 	let filterOwned = $state('all');
 	let error = $state('');
 
+	// Toolbar state
+	let searchQuery = $state('');
+	let groupBy = $state('brand');
+	let sortBy = $state('brand-asc');
+
 	// Autocomplete options
 	let brandOptions: string[] = $state([]);
 	let lensMounts: LensMount[] = $state([]);
 	let vendorOptions: string[] = $state([]);
 	let cameras: Camera[] = $state([]);
-
-	const filtered = $derived(
-		filterOwned === 'all'
-			? lenses
-			: filterOwned === 'owned'
-				? lenses.filter((l) => !l.date_sold)
-				: lenses.filter((l) => l.date_sold)
-	);
 
 	const lensMountOptions = $derived(buildMountOptions(lensMounts));
 
@@ -57,6 +57,57 @@
 				.map((c) => [c.default_lens_id!, `${c.brand} ${c.model}`])
 		) as Record<number, string>
 	);
+
+	// Pipeline: ownership filter → search → sort → group
+	const afterOwnerFilter = $derived(
+		filterOwned === 'all'
+			? lenses
+			: filterOwned === 'owned'
+				? lenses.filter((l) => !l.date_sold)
+				: lenses.filter((l) => l.date_sold)
+	);
+
+	const afterSearch = $derived(
+		filterBySearch(afterOwnerFilter, searchQuery, (l) =>
+			[lensDisplayName(l), l.brand, l.focal_length ?? '', l.max_aperture ?? '', l.serial_number ?? ''].join(' ')
+		)
+	);
+
+	const afterSort = $derived.by(() => {
+		switch (sortBy) {
+			case 'brand-desc': return sortByString(afterSearch, (l) => lensDisplayName(l), 'desc');
+			case 'focal-length-asc': return sortByNumber(afterSearch, (l) => { const n = parseFloat(l.focal_length ?? ''); return isNaN(n) ? null : n; }, 'asc');
+			case 'focal-length-desc': return sortByNumber(afterSearch, (l) => { const n = parseFloat(l.focal_length ?? ''); return isNaN(n) ? null : n; }, 'desc');
+			case 'date-purchased-desc': return sortByDate(afterSearch, (l) => l.date_purchased, 'desc');
+			case 'date-purchased-asc': return sortByDate(afterSearch, (l) => l.date_purchased, 'asc');
+			case 'date-added-desc': return sortByDate(afterSearch, (l) => l.created_at, 'desc');
+			default: return sortByString(afterSearch, (l) => lensDisplayName(l), 'asc');
+		}
+	});
+
+	const grouped = $derived.by(() => {
+		if (groupBy === 'none') return groupItems(afterSort, () => '');
+		if (groupBy === 'mount') return groupItems(afterSort, (l) => mountNameById[l.lens_mount_id] ?? 'Unknown');
+		return groupItems(afterSort, (l) => l.brand);
+	});
+
+	const resultCount = $derived(afterSearch.length);
+
+	const groupByOptions = [
+		{ value: 'brand', label: 'Brand' },
+		{ value: 'mount', label: 'Mount' },
+		{ value: 'none', label: 'None' }
+	];
+
+	const sortOptions = [
+		{ value: 'brand-asc', label: 'A\u2013Z' },
+		{ value: 'brand-desc', label: 'Z\u2013A' },
+		{ value: 'focal-length-asc', label: 'Focal Length \u2191' },
+		{ value: 'focal-length-desc', label: 'Focal Length \u2193' },
+		{ value: 'date-purchased-desc', label: 'Newest Purchase' },
+		{ value: 'date-purchased-asc', label: 'Oldest Purchase' },
+		{ value: 'date-added-desc', label: 'Recently Added' }
+	];
 
 	// Form state
 	let brand = $state('');
@@ -207,6 +258,18 @@
 		<div class="mb-4 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 	{/if}
 
+	<!-- Toolbar: search + group + sort -->
+	<ListToolbar
+		bind:searchQuery
+		bind:groupBy
+		bind:sortBy
+		{groupByOptions}
+		{sortOptions}
+		{resultCount}
+		totalCount={afterOwnerFilter.length}
+		placeholder="Search lenses..."
+	/>
+
 	<div class="mb-4 flex gap-2">
 		<Button
 			variant={filterOwned === 'all' ? 'primary' : 'ghost'}
@@ -227,52 +290,69 @@
 
 	{#if loading}
 		<p class="text-sm text-text-muted">Loading...</p>
-	{:else if filtered.length === 0}
+	{:else if resultCount === 0 && lenses.length === 0}
 		<EmptyState title="No Lenses" message="Add your first lens to get started.">
 			{#snippet icon()}<Aperture size={24} strokeWidth={1.5} />{/snippet}
 			<Button variant="primary" onclick={() => (showAddDialog = true)}>+ Add Lens</Button>
 		</EmptyState>
+	{:else if resultCount === 0}
+		<p class="mt-6 text-center text-sm text-text-muted">
+			{searchQuery ? `No lenses match your search.` : 'No lenses match the current filters.'}
+		</p>
 	{:else}
-		<div class="grid gap-3">
-			{#each filtered as lens, i}
-				<FadeIn delay={Math.min(i, 10) * 30}>
-				<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px">
-					<div>
-						<div class="flex items-center gap-2">
-							<span class="font-semibold">{lensDisplayName(lens)}</span>
-							{#if lens.date_sold}
-								<span class="rounded bg-red-500/15 px-1.5 py-0.5 text-xs text-red-400">Sold</span>
-							{/if}
-						</div>
-						<div class="mt-1 flex flex-wrap gap-3 text-xs text-text-muted">
-							{#if fixedMountIds.has(lens.lens_mount_id)}
-								<span class="text-accent/70">Fixed{#if fixedOnCamera[lens.id]}{' '}on {fixedOnCamera[lens.id]}{/if}</span>
-							{:else if mountNameById[lens.lens_mount_id]}
-								<span>{mountNameById[lens.lens_mount_id]}</span>
-							{/if}
-							{#if lens.focal_length}
-								<span>{lens.focal_length}mm</span>
-							{/if}
-							{#if lens.max_aperture}
-								<span>f/{lens.max_aperture}{lens.min_aperture ? ` - f/${lens.min_aperture}` : ''}</span>
-							{/if}
-							{#if lens.filter_thread_front_mm}
-								<span>{lens.filter_thread_front_mm}mm filter</span>
-							{/if}
+		{#each Object.entries(grouped) as [groupKey, groupLenses]}
+			<GroupHeader label={groupKey} />
+			<div class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5">
+				{#each groupLenses as lens, i}
+					<FadeIn delay={Math.min(i, 10) * 30}>
+					<div class="group flex h-full flex-col rounded-lg border border-border bg-surface-raised px-3.5 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px">
+						<div class="flex items-start justify-between gap-2">
+							<div class="min-w-0 flex-1">
+								<div class="flex items-center gap-2">
+									<span class="truncate text-sm font-semibold leading-snug">{lensDisplayName(lens)}</span>
+									{#if lens.date_sold}
+										<span class="shrink-0 rounded bg-red-500/15 px-1 py-0.5 text-[10px] text-red-400">Sold</span>
+									{/if}
+								</div>
+								<div class="mt-1 text-xs text-text-muted">
+									{#if fixedMountIds.has(lens.lens_mount_id)}
+										<span class="text-accent/70">Fixed{#if fixedOnCamera[lens.id]}{' '}on {fixedOnCamera[lens.id]}{/if}</span>
+									{:else if mountNameById[lens.lens_mount_id]}
+										<span>{mountNameById[lens.lens_mount_id]}</span>
+									{/if}
+									{#if lens.focal_length}
+										<span class="mx-1 text-text-faint/60">·</span><span>{lens.focal_length}mm</span>
+									{/if}
+									{#if lens.max_aperture}
+										<span class="mx-1 text-text-faint/60">·</span><span>f/{lens.max_aperture}{lens.min_aperture ? `–${lens.min_aperture}` : ''}</span>
+									{/if}
+								</div>
+								{#if lens.filter_thread_front_mm || lens.serial_number}
+									<div class="mt-1 text-[11px] text-text-faint">
+										{#if lens.filter_thread_front_mm}
+											<span>⌀{lens.filter_thread_front_mm}mm</span>
+										{/if}
+										{#if lens.serial_number}
+											{#if lens.filter_thread_front_mm}<span class="mx-1 text-text-faint/40">·</span>{/if}
+											<span class="font-mono">S/N {lens.serial_number}</span>
+										{/if}
+									</div>
+								{/if}
+							</div>
+							<div class="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+								<Button size="sm" variant="ghost" onclick={() => startEdit(lens)}>Edit</Button>
+								<Button size="sm" variant="ghost" onclick={() => handleDelete(lens)}>&times;</Button>
+							</div>
 						</div>
 					</div>
-					<div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-						<Button size="sm" variant="ghost" onclick={() => startEdit(lens)}>Edit</Button>
-						<Button size="sm" variant="ghost" onclick={() => handleDelete(lens)}>&times;</Button>
-					</div>
-				</div>
-				</FadeIn>
-			{/each}
-		</div>
+					</FadeIn>
+				{/each}
+			</div>
+		{/each}
 	{/if}
 </div>
 
-<!-- Add/Edit Lens Dialog -->
+<!-- Add Lens Dialog -->
 <Dialog bind:open={showAddDialog} title="Add Lens">
 	<div class="space-y-4">
 		<div class="grid grid-cols-2 gap-4">

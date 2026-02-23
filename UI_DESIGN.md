@@ -232,14 +232,40 @@ When a section header has action buttons on the right (e.g., "+ Add"), use `just
 
 ## Card Patterns
 
-### List Cards (rolls, cameras, lenses, labs, search results)
+### Collection Cards (cameras, lenses)
+
+Multi-column card grid for equipment with short, scannable identity data:
 
 ```
-rounded-lg border border-border bg-surface-raised p-4
+grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2.5
+```
+
+Individual card:
+```
+rounded-lg border border-border bg-surface-raised px-3.5 py-3
 transition-all duration-150
 hover:border-accent/40 hover:-translate-y-px
 ```
 
+- `h-full flex flex-col` on each card for equal heights within a row
+- Primary line: Brand + Model (`text-sm font-semibold leading-snug`)
+- Metadata line: specs joined by `·` separators (`text-xs text-text-muted`)
+- Optional tertiary line: serial number, sold badge (`text-[11px] text-text-faint`)
+- Prefix badges use `text-[10px]` for compactness
+- Lenses use `minmax(280px, 1fr)` (slightly wider to accommodate edit/delete buttons)
+- Lenses show edit/delete on group-hover at `opacity-0 → opacity-100`
+
+### List Rows (rolls, film stocks, labs, search results)
+
+Full-width rows for items with horizontal relational data:
+
+```
+rounded-lg border border-border bg-surface-raised px-4 py-2.5
+transition-all duration-150
+hover:border-accent/40 hover:-translate-y-px
+```
+
+- Row gap: `gap-1.5` (tighter than cards)
 - `rounded-lg` (8px) — precise, tool-like
 - Hover: border glows amber at `/40` opacity, subtle 1px lift
 - Group-hover reveals edit/delete actions at `opacity-0 → opacity-100`
