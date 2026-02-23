@@ -4,6 +4,8 @@ use serde::Serialize;
 use crate::entities::dev_stage::{self, Entity as DevStage};
 use crate::entities::development_lab::{self, Entity as DevelopmentLab};
 use crate::entities::development_self::{self, Entity as DevelopmentSelf};
+use crate::entities::film_stock::FilmStockType;
+use crate::entities::roll::RollStatus;
 
 /// Flat struct for self-developments joined with roll, film stock, and camera data.
 #[derive(Debug, Serialize, FromQueryResult)]
@@ -11,11 +13,11 @@ pub struct SelfDevListItem {
     pub dev_id: i32,
     pub roll_pk: i32,
     pub roll_id: String,
-    pub roll_status: String,
+    pub roll_status: RollStatus,
     pub film_stock_brand: Option<String>,
     pub film_stock_name: Option<String>,
     pub film_stock_iso: Option<i32>,
-    pub film_stock_type: Option<String>,
+    pub film_stock_type: Option<FilmStockType>,
     pub camera_brand: Option<String>,
     pub camera_model: Option<String>,
     pub date_processed: Option<String>,
@@ -58,7 +60,7 @@ const LIST_SELF_DEVS_SQL: &str = "\
         ds.notes, \
         COALESCE(ds.date_processed, ds.created_at) AS dev_date, \
         ds.created_at \
-    FROM development_self ds \
+    FROM development_selves ds \
     JOIN rolls r ON ds.roll_id = r.id \
     LEFT JOIN film_stocks fs ON r.film_stock_id = fs.id \
     LEFT JOIN cameras c ON r.camera_id = c.id \

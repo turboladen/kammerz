@@ -153,7 +153,7 @@ impl CameraService {
         }
         let rows = ProviderRow::find_by_statement(Statement::from_string(
             db.get_database_backend(),
-            "SELECT DISTINCT done_by FROM camera_maintenance WHERE done_by IS NOT NULL ORDER BY done_by"
+            "SELECT DISTINCT done_by FROM camera_maintenances WHERE done_by IS NOT NULL ORDER BY done_by"
                 .to_string(),
         ))
         .all(db)

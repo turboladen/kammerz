@@ -1,10 +1,13 @@
 use sea_orm::{EntityTrait, Set};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::entities::roll;
+use crate::entities::roll::{self, PushPull, RollStatus};
+use crate::entities::{dev_stage, development_lab, development_self, shot};
 use crate::patch::{double_option, trim, trim_opt};
+use crate::services::development_service::DevelopmentService;
 use crate::services::roll_service::{RollService, RollWithDetails};
+use crate::services::shot_service::ShotService;
 use crate::AppState;
 
 // --- DTOs ---
@@ -15,12 +18,12 @@ pub struct CreateRollDto {
     pub camera_id: Option<i32>,
     pub film_stock_id: Option<i32>,
     pub lens_id: Option<i32>,
-    pub status: String,
+    pub status: RollStatus,
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
     pub date_finished: Option<String>,
     pub date_fuzzy: Option<String>,
-    pub push_pull: Option<String>,
+    pub push_pull: Option<PushPull>,
     pub notes: Option<String>,
 }
 
@@ -34,7 +37,7 @@ pub struct UpdateRollDto {
     pub film_stock_id: Option<Option<i32>>,
     #[serde(deserialize_with = "double_option")]
     pub lens_id: Option<Option<i32>>,
-    pub status: Option<String>,
+    pub status: Option<RollStatus>,
     #[serde(deserialize_with = "double_option")]
     pub frame_count: Option<Option<i32>>,
     #[serde(deserialize_with = "double_option")]
@@ -44,7 +47,7 @@ pub struct UpdateRollDto {
     #[serde(deserialize_with = "double_option")]
     pub date_fuzzy: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
-    pub push_pull: Option<Option<String>>,
+    pub push_pull: Option<Option<PushPull>>,
     #[serde(deserialize_with = "double_option")]
     pub notes: Option<Option<String>>,
 }
@@ -82,12 +85,12 @@ pub async fn create_roll(state: State<'_, AppState>, data: CreateRollDto) -> Res
         camera_id: Set(data.camera_id),
         film_stock_id: Set(data.film_stock_id),
         lens_id: Set(data.lens_id),
-        status: trim(data.status),
+        status: Set(data.status),
         frame_count: Set(data.frame_count),
         date_loaded: trim_opt(data.date_loaded),
         date_finished: trim_opt(data.date_finished),
         date_fuzzy: trim_opt(data.date_fuzzy),
-        push_pull: trim_opt(data.push_pull),
+        push_pull: Set(data.push_pull),
         notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
         updated_at: Set(now),
@@ -95,7 +98,7 @@ pub async fn create_roll(state: State<'_, AppState>, data: CreateRollDto) -> Res
     };
     let result = RollService::create(&state.db, model).await.map_err(|e| {
         log::error!("Failed to create roll: {e}");
-        format!("Could not create roll: {e}")
+        super::friendly_err("roll", e)
     })?;
     Ok(result.id)
 }
@@ -119,18 +122,18 @@ pub async fn update_roll(
     if let Some(v) = data.camera_id { model.camera_id = Set(v); }
     if let Some(v) = data.film_stock_id { model.film_stock_id = Set(v); }
     if let Some(v) = data.lens_id { model.lens_id = Set(v); }
-    if let Some(v) = data.status { model.status = trim(v); }
+    if let Some(v) = data.status { model.status = Set(v); }
     if let Some(v) = data.frame_count { model.frame_count = Set(v); }
     if let Some(v) = data.date_loaded { model.date_loaded = trim_opt(v); }
     if let Some(v) = data.date_finished { model.date_finished = trim_opt(v); }
     if let Some(v) = data.date_fuzzy { model.date_fuzzy = trim_opt(v); }
-    if let Some(v) = data.push_pull { model.push_pull = trim_opt(v); }
+    if let Some(v) = data.push_pull { model.push_pull = Set(v); }
     if let Some(v) = data.notes { model.notes = trim_opt(v); }
     model.updated_at = Set(now);
 
     RollService::update(&state.db, model).await.map_err(|e| {
         log::error!("Failed to update roll {id}: {e}");
-        format!("Could not update roll: {e}")
+        super::friendly_err("roll", e)
     })?;
     Ok(())
 }
@@ -139,7 +142,7 @@ pub async fn update_roll(
 pub async fn delete_roll(state: State<'_, AppState>, id: i32) -> Result<(), String> {
     RollService::delete(&state.db, id).await.map_err(|e| {
         log::error!("Failed to delete roll {id}: {e}");
-        format!("Could not delete roll: {e}")
+        super::friendly_err("roll", e)
     })
 }
 
@@ -161,5 +164,79 @@ pub async fn suggest_roll_id(state: State<'_, AppState>) -> Result<String, Strin
     RollService::suggest_id(&state.db).await.map_err(|e| {
         log::error!("Failed to suggest roll ID: {e}");
         format!("Could not suggest roll ID: {e}")
+    })
+}
+
+// --- Composite roll detail (reduces IPC round-trips) ---
+
+#[derive(Debug, Serialize)]
+pub struct RollDetail {
+    pub roll: RollWithDetails,
+    pub shots: Vec<shot::Model>,
+    pub shot_lens_pairs: Vec<(i32, i32)>,
+    pub lab_dev: Option<development_lab::Model>,
+    pub self_dev: Option<development_self::Model>,
+    pub dev_stages: Vec<dev_stage::Model>,
+}
+
+#[tauri::command]
+pub async fn get_roll_detail(
+    state: State<'_, AppState>,
+    id: i32,
+) -> Result<RollDetail, String> {
+    let roll = RollService::get_with_details(&state.db, id)
+        .await
+        .map_err(|e| {
+            log::error!("Failed to get roll detail {id}: {e}");
+            format!("Could not load roll: {e}")
+        })?
+        .ok_or_else(|| format!("Roll {id} not found"))?;
+
+    let shots = ShotService::list_for_roll(&state.db, id)
+        .await
+        .map_err(|e| {
+            log::error!("Failed to load shots for roll {id}: {e}");
+            format!("Could not load shots: {e}")
+        })?;
+
+    let shot_lens_pairs = ShotService::get_lenses_for_roll_shots(&state.db, id)
+        .await
+        .map_err(|e| {
+            log::error!("Failed to load shot lenses for roll {id}: {e}");
+            format!("Could not load shot lenses: {e}")
+        })?;
+
+    let lab_dev = DevelopmentService::get_lab_dev_for_roll(&state.db, id)
+        .await
+        .map_err(|e| {
+            log::error!("Failed to load lab dev for roll {id}: {e}");
+            format!("Could not load lab development: {e}")
+        })?;
+
+    let self_dev = DevelopmentService::get_self_dev_for_roll(&state.db, id)
+        .await
+        .map_err(|e| {
+            log::error!("Failed to load self dev for roll {id}: {e}");
+            format!("Could not load self development: {e}")
+        })?;
+
+    let dev_stages = if let Some(ref sd) = self_dev {
+        DevelopmentService::list_stages(&state.db, sd.id)
+            .await
+            .map_err(|e| {
+                log::error!("Failed to load dev stages for roll {id}: {e}");
+                format!("Could not load development stages: {e}")
+            })?
+    } else {
+        vec![]
+    };
+
+    Ok(RollDetail {
+        roll,
+        shots,
+        shot_lens_pairs,
+        lab_dev,
+        self_dev,
+        dev_stages,
     })
 }

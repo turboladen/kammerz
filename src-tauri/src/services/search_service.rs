@@ -1,6 +1,10 @@
 use sea_orm::*;
 use serde::Serialize;
 
+use crate::entities::camera::CameraFormat;
+use crate::entities::film_stock::{FilmFormat, FilmStockType};
+use crate::entities::roll::RollStatus;
+
 pub struct SearchService;
 
 // --- Result types ---
@@ -10,7 +14,7 @@ pub struct CameraSearchResult {
     pub id: i32,
     pub brand: String,
     pub model: String,
-    pub format: String,
+    pub format: CameraFormat,
     pub match_field: String,
     pub match_snippet: String,
 }
@@ -30,8 +34,8 @@ pub struct FilmStockSearchResult {
     pub id: i32,
     pub brand: String,
     pub name: String,
-    pub format: String,
-    pub stock_type: String,
+    pub format: FilmFormat,
+    pub stock_type: FilmStockType,
     pub match_field: String,
     pub match_snippet: String,
 }
@@ -40,7 +44,7 @@ pub struct FilmStockSearchResult {
 pub struct RollSearchResult {
     pub id: i32,
     pub roll_id: String,
-    pub status: String,
+    pub status: RollStatus,
     pub camera_brand: Option<String>,
     pub camera_model: Option<String>,
     pub film_stock_brand: Option<String>,

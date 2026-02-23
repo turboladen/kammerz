@@ -2,7 +2,9 @@ use sea_orm::{DbErr, EntityTrait, Set, TransactionTrait};
 use serde::Deserialize;
 use tauri::State;
 
-use crate::entities::{camera, camera_maintenance, lens};
+use crate::entities::camera::{self, CameraFormat, CameraType};
+use crate::entities::camera_maintenance::{self, MaintenanceType};
+use crate::entities::lens;
 use crate::patch::{double_option, trim, trim_opt};
 use crate::services::camera_service::CameraService;
 use crate::services::lens_service::LensService;
@@ -15,10 +17,10 @@ pub struct CreateCameraDto {
     pub brand: String,
     pub model: String,
     pub prefix: Option<String>,
-    pub format: String,
+    pub format: CameraFormat,
     pub lens_mount_id: i32,
     pub default_lens_id: Option<i32>,
-    pub camera_type: Option<String>,
+    pub camera_type: Option<CameraType>,
     pub serial_number: Option<String>,
     pub date_purchased: Option<String>,
     pub purchased_from: Option<String>,
@@ -33,12 +35,12 @@ pub struct UpdateCameraDto {
     pub model: Option<String>,
     #[serde(deserialize_with = "double_option")]
     pub prefix: Option<Option<String>>,
-    pub format: Option<String>,
+    pub format: Option<CameraFormat>,
     pub lens_mount_id: Option<i32>,
     #[serde(deserialize_with = "double_option")]
     pub default_lens_id: Option<Option<i32>>,
     #[serde(deserialize_with = "double_option")]
-    pub camera_type: Option<Option<String>>,
+    pub camera_type: Option<Option<CameraType>>,
     #[serde(deserialize_with = "double_option")]
     pub serial_number: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
@@ -54,7 +56,7 @@ pub struct UpdateCameraDto {
 #[derive(Debug, Deserialize)]
 pub struct CreateMaintenanceDto {
     pub camera_id: i32,
-    pub maintenance_type: String,
+    pub maintenance_type: MaintenanceType,
     pub done_by: Option<String>,
     pub date_done: Option<String>,
     pub cost: Option<f64>,
@@ -65,7 +67,7 @@ pub struct CreateMaintenanceDto {
 #[serde(default)]
 pub struct UpdateMaintenanceDto {
     pub camera_id: Option<i32>,
-    pub maintenance_type: Option<String>,
+    pub maintenance_type: Option<MaintenanceType>,
     #[serde(deserialize_with = "double_option")]
     pub done_by: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
@@ -107,10 +109,10 @@ pub async fn create_camera(
         brand: trim(data.brand),
         model: trim(data.model),
         prefix: trim_opt(data.prefix),
-        format: trim(data.format),
+        format: Set(data.format),
         lens_mount_id: Set(data.lens_mount_id),
         default_lens_id: Set(data.default_lens_id),
-        camera_type: trim_opt(data.camera_type),
+        camera_type: Set(data.camera_type),
         serial_number: trim_opt(data.serial_number),
         date_purchased: trim_opt(data.date_purchased),
         purchased_from: trim_opt(data.purchased_from),
@@ -122,7 +124,7 @@ pub async fn create_camera(
     };
     let result = CameraService::create(&state.db, model).await.map_err(|e| {
         log::error!("Failed to create camera: {e}");
-        format!("Could not create camera: {e}")
+        super::friendly_err("camera", e)
     })?;
     Ok(result.id)
 }
@@ -144,10 +146,10 @@ pub async fn update_camera(
     if let Some(v) = data.brand { model.brand = trim(v); }
     if let Some(v) = data.model { model.model = trim(v); }
     if let Some(v) = data.prefix { model.prefix = trim_opt(v); }
-    if let Some(v) = data.format { model.format = trim(v); }
+    if let Some(v) = data.format { model.format = Set(v); }
     if let Some(v) = data.lens_mount_id { model.lens_mount_id = Set(v); }
     if let Some(v) = data.default_lens_id { model.default_lens_id = Set(v); }
-    if let Some(v) = data.camera_type { model.camera_type = trim_opt(v); }
+    if let Some(v) = data.camera_type { model.camera_type = Set(v); }
     if let Some(v) = data.serial_number { model.serial_number = trim_opt(v); }
     if let Some(v) = data.date_purchased { model.date_purchased = trim_opt(v); }
     if let Some(v) = data.purchased_from { model.purchased_from = trim_opt(v); }
@@ -157,7 +159,7 @@ pub async fn update_camera(
 
     CameraService::update(&state.db, model).await.map_err(|e| {
         log::error!("Failed to update camera {id}: {e}");
-        format!("Could not update camera: {e}")
+        super::friendly_err("camera", e)
     })?;
     Ok(())
 }
@@ -166,7 +168,7 @@ pub async fn update_camera(
 pub async fn delete_camera(state: State<'_, AppState>, id: i32) -> Result<(), String> {
     CameraService::delete(&state.db, id).await.map_err(|e| {
         log::error!("Failed to delete camera {id}: {e}");
-        format!("Could not delete camera: {e}")
+        super::friendly_err("camera", e)
     })
 }
 
@@ -203,10 +205,10 @@ pub async fn create_camera_with_lens(
                     brand: Set(brand.clone()),
                     model: Set(data.camera.model.trim().to_string()),
                     prefix: Set(data.camera.prefix.map(|s| s.trim().to_string())),
-                    format: Set(data.camera.format.trim().to_string()),
+                    format: Set(data.camera.format),
                     lens_mount_id: Set(data.camera.lens_mount_id),
                     default_lens_id: Set(None),
-                    camera_type: Set(data.camera.camera_type.map(|s| s.trim().to_string())),
+                    camera_type: Set(data.camera.camera_type),
                     serial_number: Set(serial.clone()),
                     date_purchased: Set(purchased.clone()),
                     purchased_from: Set(vendor.clone()),
@@ -256,7 +258,7 @@ pub async fn create_camera_with_lens(
         .await
         .map_err(|e| {
             log::error!("Failed to create camera with lens: {e}");
-            format!("Could not create camera with lens: {e}")
+            super::friendly_err("camera", e)
         })?;
 
     Ok(camera_id)
@@ -285,7 +287,7 @@ pub async fn create_maintenance(
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let model = camera_maintenance::ActiveModel {
         camera_id: Set(data.camera_id),
-        maintenance_type: trim(data.maintenance_type),
+        maintenance_type: Set(data.maintenance_type),
         done_by: trim_opt(data.done_by),
         date_done: trim_opt(data.date_done),
         cost: Set(data.cost),
@@ -319,7 +321,7 @@ pub async fn update_maintenance(
     let mut model: camera_maintenance::ActiveModel = existing.into();
 
     if let Some(v) = data.camera_id { model.camera_id = Set(v); }
-    if let Some(v) = data.maintenance_type { model.maintenance_type = trim(v); }
+    if let Some(v) = data.maintenance_type { model.maintenance_type = Set(v); }
     if let Some(v) = data.done_by { model.done_by = trim_opt(v); }
     if let Some(v) = data.date_done { model.date_done = trim_opt(v); }
     if let Some(v) = data.cost { model.cost = Set(v); }
@@ -330,7 +332,7 @@ pub async fn update_maintenance(
         .await
         .map_err(|e| {
             log::error!("Failed to update maintenance {id}: {e}");
-            format!("Could not update maintenance: {e}")
+            super::friendly_err("maintenance record", e)
         })?;
     Ok(())
 }

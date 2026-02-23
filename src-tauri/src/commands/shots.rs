@@ -2,7 +2,8 @@ use sea_orm::{DbErr, EntityTrait, Set, TransactionTrait};
 use serde::Deserialize;
 use tauri::State;
 
-use crate::entities::{roll, shot};
+use crate::entities::roll::{self, RollStatus};
+use crate::entities::shot;
 use crate::patch::{double_option, trim, trim_opt};
 use crate::services::roll_service::RollService;
 use crate::services::shot_service::ShotService;
@@ -114,10 +115,10 @@ pub async fn create_shot(
                     .await?
                     .ok_or_else(|| DbErr::Custom(format!("Roll {} not found", data.roll_id)))?;
 
-                if roll_record.status == "loaded" {
+                if roll_record.status == RollStatus::Loaded {
                     let now_ts = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
                     let mut roll_model: roll::ActiveModel = roll_record.into();
-                    roll_model.status = Set("shooting".to_string());
+                    roll_model.status = Set(RollStatus::Shooting);
                     roll_model.updated_at = Set(now_ts);
                     RollService::update(txn, roll_model).await?;
                 }

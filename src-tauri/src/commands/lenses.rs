@@ -103,7 +103,7 @@ pub async fn create_lens(state: State<'_, AppState>, data: CreateLensDto) -> Res
     };
     let result = LensService::create(&state.db, model).await.map_err(|e| {
         log::error!("Failed to create lens: {e}");
-        format!("Could not create lens: {e}")
+        super::friendly_err("lens", e)
     })?;
     Ok(result.id)
 }
@@ -140,7 +140,7 @@ pub async fn update_lens(
 
     LensService::update(&state.db, model).await.map_err(|e| {
         log::error!("Failed to update lens {id}: {e}");
-        format!("Could not update lens: {e}")
+        super::friendly_err("lens", e)
     })?;
     Ok(())
 }
@@ -149,7 +149,7 @@ pub async fn update_lens(
 pub async fn delete_lens(state: State<'_, AppState>, id: i32) -> Result<(), String> {
     LensService::delete(&state.db, id).await.map_err(|e| {
         log::error!("Failed to delete lens {id}: {e}");
-        format!("Could not delete lens: {e}")
+        super::friendly_err("lens", e)
     })
 }
 

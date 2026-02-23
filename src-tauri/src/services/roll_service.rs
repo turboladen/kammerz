@@ -1,7 +1,7 @@
 use sea_orm::*;
 use serde::Serialize;
 
-use crate::entities::roll::{self, Entity as Roll};
+use crate::entities::roll::{self, Entity as Roll, PushPull, RollStatus};
 use crate::entities::shot;
 use crate::services::shot_service::ShotService;
 
@@ -23,12 +23,12 @@ pub struct RollWithDetails {
     pub camera_id: Option<i32>,
     pub film_stock_id: Option<i32>,
     pub lens_id: Option<i32>,
-    pub status: String,
+    pub status: RollStatus,
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
     pub date_finished: Option<String>,
     pub date_fuzzy: Option<String>,
-    pub push_pull: Option<String>,
+    pub push_pull: Option<PushPull>,
     pub notes: Option<String>,
     pub created_at: String,
     pub updated_at: String,

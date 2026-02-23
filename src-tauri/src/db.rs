@@ -14,9 +14,14 @@ pub async fn init(app_handle: &tauri::AppHandle) -> Result<DatabaseConnection, D
     let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
     let db = Database::connect(&db_url).await?;
 
-    // SQLite pragmas for performance
+    // SQLite pragmas (performance — safe before migrations)
     db.execute_unprepared("PRAGMA journal_mode=WAL").await?;
     db.execute_unprepared("PRAGMA busy_timeout=5000").await?;
+
+    // NOTE: foreign_keys=ON is set AFTER migrations, not before.
+    // Migrations use table-rebuild patterns (CREATE new → INSERT → DROP old → RENAME)
+    // and SQLite's DROP TABLE does an implicit DELETE when FK enforcement is on,
+    // which triggers RESTRICT violations from referencing tables.
 
     // Handle migration from tauri-plugin-sql:
     // The old plugin tracked migrations in `_sqlx_migrations`. SeaORM uses
@@ -26,6 +31,9 @@ pub async fn init(app_handle: &tauri::AppHandle) -> Result<DatabaseConnection, D
     mark_existing_migrations(&db).await;
 
     migration::Migrator::up(&db, None).await?;
+
+    // Enable FK enforcement for all runtime queries (after migrations are done)
+    db.execute_unprepared("PRAGMA foreign_keys=ON").await?;
 
     Ok(db)
 }

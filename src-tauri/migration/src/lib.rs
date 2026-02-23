@@ -18,6 +18,7 @@ mod m20260222_000015_seed_qbm_and_extras;
 mod m20260222_000016_seed_user_gear_batch2;
 mod m20260222_000017_rename_name_on_lens_to_model;
 mod m20260222_000018_trim_brand_whitespace;
+mod m20260222_000019_schema_hardening;
 
 pub struct Migrator;
 
@@ -43,6 +44,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260222_000016_seed_user_gear_batch2::Migration),
             Box::new(m20260222_000017_rename_name_on_lens_to_model::Migration),
             Box::new(m20260222_000018_trim_brand_whitespace::Migration),
+            Box::new(m20260222_000019_schema_hardening::Migration),
         ]
     }
 }

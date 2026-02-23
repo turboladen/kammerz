@@ -79,6 +79,7 @@ pub fn run() {
             commands::rolls::delete_roll,
             commands::rolls::list_rolls_for_camera,
             commands::rolls::suggest_roll_id,
+            commands::rolls::get_roll_detail,
             // Shots
             commands::shots::list_shots_for_roll,
             commands::shots::get_shot,

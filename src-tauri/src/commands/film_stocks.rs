@@ -2,7 +2,7 @@ use sea_orm::Set;
 use serde::Deserialize;
 use tauri::State;
 
-use crate::entities::film_stock;
+use crate::entities::film_stock::{self, FilmFormat, FilmStockType};
 use crate::patch::{double_option, trim, trim_opt};
 use crate::services::film_stock_service::FilmStockService;
 use crate::AppState;
@@ -13,9 +13,9 @@ use crate::AppState;
 pub struct CreateFilmStockDto {
     pub brand: String,
     pub name: String,
-    pub format: String,
+    pub format: FilmFormat,
     pub exposure_count: Option<i32>,
-    pub stock_type: String,
+    pub stock_type: FilmStockType,
     pub iso: Option<i32>,
     pub notes: Option<String>,
 }
@@ -25,10 +25,10 @@ pub struct CreateFilmStockDto {
 pub struct UpdateFilmStockDto {
     pub brand: Option<String>,
     pub name: Option<String>,
-    pub format: Option<String>,
+    pub format: Option<FilmFormat>,
     #[serde(deserialize_with = "double_option")]
     pub exposure_count: Option<Option<i32>>,
-    pub stock_type: Option<String>,
+    pub stock_type: Option<FilmStockType>,
     #[serde(deserialize_with = "double_option")]
     pub iso: Option<Option<i32>>,
     #[serde(deserialize_with = "double_option")]
@@ -69,9 +69,9 @@ pub async fn create_film_stock(
     let model = film_stock::ActiveModel {
         brand: trim(data.brand),
         name: trim(data.name),
-        format: trim(data.format),
+        format: Set(data.format),
         exposure_count: Set(data.exposure_count),
-        stock_type: trim(data.stock_type),
+        stock_type: Set(data.stock_type),
         iso: Set(data.iso),
         notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
@@ -82,7 +82,7 @@ pub async fn create_film_stock(
         .await
         .map_err(|e| {
             log::error!("Failed to create film stock: {e}");
-            format!("Could not create film stock: {e}")
+            super::friendly_err("film stock", e)
         })?;
     Ok(result.id)
 }
@@ -103,9 +103,9 @@ pub async fn update_film_stock(
 
     if let Some(v) = data.brand { model.brand = trim(v); }
     if let Some(v) = data.name { model.name = trim(v); }
-    if let Some(v) = data.format { model.format = trim(v); }
+    if let Some(v) = data.format { model.format = Set(v); }
     if let Some(v) = data.exposure_count { model.exposure_count = Set(v); }
-    if let Some(v) = data.stock_type { model.stock_type = trim(v); }
+    if let Some(v) = data.stock_type { model.stock_type = Set(v); }
     if let Some(v) = data.iso { model.iso = Set(v); }
     if let Some(v) = data.notes { model.notes = trim_opt(v); }
     model.updated_at = Set(now);
@@ -114,7 +114,7 @@ pub async fn update_film_stock(
         .await
         .map_err(|e| {
             log::error!("Failed to update film stock {id}: {e}");
-            format!("Could not update film stock: {e}")
+            super::friendly_err("film stock", e)
         })?;
     Ok(())
 }
@@ -123,7 +123,7 @@ pub async fn update_film_stock(
 pub async fn delete_film_stock(state: State<'_, AppState>, id: i32) -> Result<(), String> {
     FilmStockService::delete(&state.db, id).await.map_err(|e| {
         log::error!("Failed to delete film stock {id}: {e}");
-        format!("Could not delete film stock: {e}")
+        super::friendly_err("film stock", e)
     })
 }
 

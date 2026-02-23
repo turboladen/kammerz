@@ -1,9 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { RollInsert, RollWithDetails } from '$lib/types';
+import type { RollDetail, RollInsert, RollWithDetails } from '$lib/types';
 
 export const listRolls = () => invoke<RollWithDetails[]>('list_rolls');
 
 export const getRoll = (id: number) => invoke<RollWithDetails | null>('get_roll', { id });
+
+export const getRollDetail = (id: number) => invoke<RollDetail>('get_roll_detail', { id });
 
 export const createRoll = (data: RollInsert) => invoke<number>('create_roll', { data });
 

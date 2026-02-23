@@ -87,7 +87,7 @@ impl StatsService {
         // --- Costs ---
         let total_lab_dev_cost = SumRow::find_by_statement(Statement::from_string(
             backend,
-            "SELECT COALESCE(SUM(cost), 0.0) AS total FROM development_lab".to_owned(),
+            "SELECT COALESCE(SUM(cost), 0.0) AS total FROM development_labs".to_owned(),
         ))
         .one(db)
         .await?
@@ -96,7 +96,7 @@ impl StatsService {
 
         let total_maintenance_cost = SumRow::find_by_statement(Statement::from_string(
             backend,
-            "SELECT COALESCE(SUM(cost), 0.0) AS total FROM camera_maintenance".to_owned(),
+            "SELECT COALESCE(SUM(cost), 0.0) AS total FROM camera_maintenances".to_owned(),
         ))
         .one(db)
         .await?

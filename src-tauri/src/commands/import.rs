@@ -4,7 +4,7 @@ use crate::patch::{trim, trim_opt};
 use serde::Deserialize;
 use tauri::State;
 
-use crate::entities::roll;
+use crate::entities::roll::{self, PushPull, RollStatus};
 use crate::services::import_service::{ImportService, ModelInfo, ParsedRoll};
 use crate::services::roll_service::{ImportShotEntry, RollService};
 use crate::services::settings_service::SettingsService;
@@ -20,12 +20,12 @@ pub struct ImportRollDto {
     pub camera_id: Option<i32>,
     pub film_stock_id: Option<i32>,
     pub lens_id: Option<i32>,
-    pub status: String,
+    pub status: RollStatus,
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
     pub date_finished: Option<String>,
     pub date_fuzzy: Option<String>,
-    pub push_pull: Option<String>,
+    pub push_pull: Option<PushPull>,
     pub notes: Option<String>,
     pub shots: Vec<ImportShotDto>,
 }
@@ -98,12 +98,12 @@ pub async fn import_parsed_roll(
         camera_id: Set(data.camera_id),
         film_stock_id: Set(data.film_stock_id),
         lens_id: Set(data.lens_id),
-        status: trim(data.status),
+        status: Set(data.status),
         frame_count: Set(data.frame_count),
         date_loaded: trim_opt(data.date_loaded),
         date_finished: trim_opt(data.date_finished),
         date_fuzzy: trim_opt(data.date_fuzzy),
-        push_pull: trim_opt(data.push_pull),
+        push_pull: Set(data.push_pull),
         notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
         updated_at: Set(now),

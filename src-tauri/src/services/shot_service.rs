@@ -10,34 +10,14 @@ impl ShotService {
         db: &DatabaseConnection,
         roll_id: i32,
     ) -> Result<Vec<shot::Model>, DbErr> {
-        // Order by frame_number as integer (SQLite CAST), fall back to string order
-        #[derive(Debug, FromQueryResult)]
-        struct IdRow {
-            id: i32,
-        }
-        let ordered_ids = IdRow::find_by_statement(Statement::from_sql_and_values(
+        shot::Model::find_by_statement(Statement::from_sql_and_values(
             db.get_database_backend(),
-            r#"SELECT id FROM shots WHERE roll_id = $1
+            r#"SELECT * FROM shots WHERE roll_id = $1
                ORDER BY CAST(frame_number AS INTEGER), frame_number, id"#,
             vec![roll_id.into()],
         ))
         .all(db)
-        .await?;
-
-        let ids: Vec<i32> = ordered_ids.into_iter().map(|r| r.id).collect();
-        if ids.is_empty() {
-            return Ok(vec![]);
-        }
-
-        let shots = Shot::find()
-            .filter(shot::Column::Id.is_in(ids.clone()))
-            .all(db)
-            .await?;
-
-        // Reorder to match the SQL ordering
-        let mut shot_map: std::collections::HashMap<i32, shot::Model> =
-            shots.into_iter().map(|s| (s.id, s)).collect();
-        Ok(ids.into_iter().filter_map(|id| shot_map.remove(&id)).collect())
+        .await
     }
 
     pub async fn get_by_id(
@@ -133,17 +113,19 @@ impl ShotService {
         db: &DatabaseConnection,
         roll_id: i32,
     ) -> Result<String, DbErr> {
-        let shots = Shot::find()
-            .filter(shot::Column::RollId.eq(roll_id))
-            .all(db)
-            .await?;
+        #[derive(Debug, FromQueryResult)]
+        struct MaxRow {
+            max_frame: Option<i32>,
+        }
+        let row = MaxRow::find_by_statement(Statement::from_sql_and_values(
+            db.get_database_backend(),
+            "SELECT MAX(CAST(frame_number AS INTEGER)) AS max_frame FROM shots WHERE roll_id = $1",
+            [roll_id.into()],
+        ))
+        .one(db)
+        .await?;
 
-        let max_num = shots
-            .iter()
-            .filter_map(|s| s.frame_number.parse::<i32>().ok())
-            .max()
-            .unwrap_or(0);
-
+        let max_num = row.and_then(|r| r.max_frame).unwrap_or(0);
         Ok((max_num + 1).to_string())
     }
 

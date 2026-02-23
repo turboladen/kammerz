@@ -137,7 +137,7 @@ pub async fn create_lab_dev(
         .await
         .map_err(|e| {
             log::error!("Failed to create lab dev: {e}");
-            format!("Could not create lab development: {e}")
+            super::friendly_err("lab development", e)
         })?;
     Ok(result.id)
 }
@@ -167,7 +167,7 @@ pub async fn update_lab_dev(
         .await
         .map_err(|e| {
             log::error!("Failed to update lab dev {id}: {e}");
-            format!("Could not update lab development: {e}")
+            super::friendly_err("lab development", e)
         })?;
     Ok(())
 }
@@ -241,7 +241,7 @@ pub async fn create_self_dev(
         .await
         .map_err(|e| {
             log::error!("Failed to create self dev: {e}");
-            format!("Could not create self development: {e}")
+            super::friendly_err("self development", e)
         })?;
 
     Ok(result_id)
@@ -291,7 +291,7 @@ pub async fn update_self_dev(
         .await
         .map_err(|e| {
             log::error!("Failed to update self dev {id}: {e}");
-            format!("Could not update self development: {e}")
+            super::friendly_err("self development", e)
         })?;
 
     Ok(())
