@@ -3,22 +3,10 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::{roll, shot};
-use crate::patch::double_option;
+use crate::patch::{double_option, trim, trim_opt};
 use crate::services::roll_service::RollService;
 use crate::services::shot_service::ShotService;
 use crate::AppState;
-
-/// Set ActiveModel fields from a DTO only when the DTO field is provided (Some).
-/// Works with both `Option<T>` (non-nullable) and `Option<Option<T>>` (nullable) fields.
-macro_rules! set_if_provided {
-    ($model:expr, $data:expr, $($field:ident),+ $(,)?) => {
-        $(
-            if let Some(v) = $data.$field {
-                $model.$field = Set(v);
-            }
-        )+
-    };
-}
 
 // --- DTOs ---
 
@@ -99,15 +87,15 @@ pub async fn create_shot(
             Box::pin(async move {
                 let model = shot::ActiveModel {
                     roll_id: Set(data.roll_id),
-                    frame_number: Set(data.frame_number),
-                    aperture: Set(data.aperture),
-                    shutter_speed: Set(data.shutter_speed),
-                    date: Set(data.date),
-                    date_fuzzy: Set(data.date_fuzzy),
-                    location: Set(data.location),
+                    frame_number: trim(data.frame_number),
+                    aperture: trim_opt(data.aperture),
+                    shutter_speed: trim_opt(data.shutter_speed),
+                    date: trim_opt(data.date),
+                    date_fuzzy: trim_opt(data.date_fuzzy),
+                    location: trim_opt(data.location),
                     gps_lat: Set(data.gps_lat),
                     gps_lon: Set(data.gps_lon),
-                    notes: Set(data.notes),
+                    notes: trim_opt(data.notes),
                     created_at: Set(now.clone()),
                     updated_at: Set(now),
                     ..Default::default()
@@ -165,10 +153,15 @@ pub async fn update_shot(
             Box::pin(async move {
                 let mut model: shot::ActiveModel = existing.into();
 
-                set_if_provided!(
-                    model, data, frame_number, aperture, shutter_speed, date, date_fuzzy,
-                    location, gps_lat, gps_lon, notes
-                );
+                if let Some(v) = data.frame_number { model.frame_number = trim(v); }
+                if let Some(v) = data.aperture { model.aperture = trim_opt(v); }
+                if let Some(v) = data.shutter_speed { model.shutter_speed = trim_opt(v); }
+                if let Some(v) = data.date { model.date = trim_opt(v); }
+                if let Some(v) = data.date_fuzzy { model.date_fuzzy = trim_opt(v); }
+                if let Some(v) = data.location { model.location = trim_opt(v); }
+                if let Some(v) = data.gps_lat { model.gps_lat = Set(v); }
+                if let Some(v) = data.gps_lon { model.gps_lon = Set(v); }
+                if let Some(v) = data.notes { model.notes = trim_opt(v); }
                 model.updated_at = Set(now);
 
                 ShotService::update(txn, model).await?;

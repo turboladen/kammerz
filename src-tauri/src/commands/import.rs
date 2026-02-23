@@ -1,4 +1,6 @@
 use sea_orm::Set;
+
+use crate::patch::{trim, trim_opt};
 use serde::Deserialize;
 use tauri::State;
 
@@ -92,17 +94,17 @@ pub async fn import_parsed_roll(
         .to_string();
 
     let roll_model = roll::ActiveModel {
-        roll_id: Set(data.roll_id),
+        roll_id: trim(data.roll_id),
         camera_id: Set(data.camera_id),
         film_stock_id: Set(data.film_stock_id),
         lens_id: Set(data.lens_id),
-        status: Set(data.status),
+        status: trim(data.status),
         frame_count: Set(data.frame_count),
-        date_loaded: Set(data.date_loaded),
-        date_finished: Set(data.date_finished),
-        date_fuzzy: Set(data.date_fuzzy),
-        push_pull: Set(data.push_pull),
-        notes: Set(data.notes),
+        date_loaded: trim_opt(data.date_loaded),
+        date_finished: trim_opt(data.date_finished),
+        date_fuzzy: trim_opt(data.date_fuzzy),
+        push_pull: trim_opt(data.push_pull),
+        notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
         updated_at: Set(now),
         ..Default::default()
@@ -112,13 +114,13 @@ pub async fn import_parsed_roll(
         .shots
         .into_iter()
         .map(|s| ImportShotEntry {
-            frame_number: s.frame_number,
-            aperture: s.aperture,
-            shutter_speed: s.shutter_speed,
-            date: s.date,
-            date_fuzzy: s.date_fuzzy,
-            location: s.location,
-            notes: s.notes,
+            frame_number: s.frame_number.trim().to_string(),
+            aperture: s.aperture.map(|v| v.trim().to_string()),
+            shutter_speed: s.shutter_speed.map(|v| v.trim().to_string()),
+            date: s.date.map(|v| v.trim().to_string()),
+            date_fuzzy: s.date_fuzzy.map(|v| v.trim().to_string()),
+            location: s.location.map(|v| v.trim().to_string()),
+            notes: s.notes.map(|v| v.trim().to_string()),
             lens_ids: s.lens_ids,
         })
         .collect();

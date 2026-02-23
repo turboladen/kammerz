@@ -3,7 +3,7 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::roll;
-use crate::patch::double_option;
+use crate::patch::{double_option, trim, trim_opt};
 use crate::services::roll_service::{RollService, RollWithDetails};
 use crate::AppState;
 
@@ -78,17 +78,17 @@ pub async fn get_roll(
 pub async fn create_roll(state: State<'_, AppState>, data: CreateRollDto) -> Result<i32, String> {
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let model = roll::ActiveModel {
-        roll_id: Set(data.roll_id),
+        roll_id: trim(data.roll_id),
         camera_id: Set(data.camera_id),
         film_stock_id: Set(data.film_stock_id),
         lens_id: Set(data.lens_id),
-        status: Set(data.status),
+        status: trim(data.status),
         frame_count: Set(data.frame_count),
-        date_loaded: Set(data.date_loaded),
-        date_finished: Set(data.date_finished),
-        date_fuzzy: Set(data.date_fuzzy),
-        push_pull: Set(data.push_pull),
-        notes: Set(data.notes),
+        date_loaded: trim_opt(data.date_loaded),
+        date_finished: trim_opt(data.date_finished),
+        date_fuzzy: trim_opt(data.date_fuzzy),
+        push_pull: trim_opt(data.push_pull),
+        notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
         updated_at: Set(now),
         ..Default::default()
@@ -115,17 +115,17 @@ pub async fn update_roll(
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut model: roll::ActiveModel = existing.into();
 
-    if let Some(v) = data.roll_id { model.roll_id = Set(v); }
+    if let Some(v) = data.roll_id { model.roll_id = trim(v); }
     if let Some(v) = data.camera_id { model.camera_id = Set(v); }
     if let Some(v) = data.film_stock_id { model.film_stock_id = Set(v); }
     if let Some(v) = data.lens_id { model.lens_id = Set(v); }
-    if let Some(v) = data.status { model.status = Set(v); }
+    if let Some(v) = data.status { model.status = trim(v); }
     if let Some(v) = data.frame_count { model.frame_count = Set(v); }
-    if let Some(v) = data.date_loaded { model.date_loaded = Set(v); }
-    if let Some(v) = data.date_finished { model.date_finished = Set(v); }
-    if let Some(v) = data.date_fuzzy { model.date_fuzzy = Set(v); }
-    if let Some(v) = data.push_pull { model.push_pull = Set(v); }
-    if let Some(v) = data.notes { model.notes = Set(v); }
+    if let Some(v) = data.date_loaded { model.date_loaded = trim_opt(v); }
+    if let Some(v) = data.date_finished { model.date_finished = trim_opt(v); }
+    if let Some(v) = data.date_fuzzy { model.date_fuzzy = trim_opt(v); }
+    if let Some(v) = data.push_pull { model.push_pull = trim_opt(v); }
+    if let Some(v) = data.notes { model.notes = trim_opt(v); }
     model.updated_at = Set(now);
 
     RollService::update(&state.db, model).await.map_err(|e| {

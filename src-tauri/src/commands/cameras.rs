@@ -3,7 +3,7 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::{camera, camera_maintenance, lens};
-use crate::patch::double_option;
+use crate::patch::{double_option, trim, trim_opt};
 use crate::services::camera_service::CameraService;
 use crate::services::lens_service::LensService;
 use crate::AppState;
@@ -104,18 +104,18 @@ pub async fn create_camera(
 ) -> Result<i32, String> {
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let model = camera::ActiveModel {
-        brand: Set(data.brand),
-        model: Set(data.model),
-        prefix: Set(data.prefix),
-        format: Set(data.format),
+        brand: trim(data.brand),
+        model: trim(data.model),
+        prefix: trim_opt(data.prefix),
+        format: trim(data.format),
         lens_mount_id: Set(data.lens_mount_id),
         default_lens_id: Set(data.default_lens_id),
-        camera_type: Set(data.camera_type),
-        serial_number: Set(data.serial_number),
-        date_purchased: Set(data.date_purchased),
-        purchased_from: Set(data.purchased_from),
-        date_sold: Set(data.date_sold),
-        notes: Set(data.notes),
+        camera_type: trim_opt(data.camera_type),
+        serial_number: trim_opt(data.serial_number),
+        date_purchased: trim_opt(data.date_purchased),
+        purchased_from: trim_opt(data.purchased_from),
+        date_sold: trim_opt(data.date_sold),
+        notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
         updated_at: Set(now),
         ..Default::default()
@@ -141,18 +141,18 @@ pub async fn update_camera(
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut model: camera::ActiveModel = existing.into();
 
-    if let Some(v) = data.brand { model.brand = Set(v); }
-    if let Some(v) = data.model { model.model = Set(v); }
-    if let Some(v) = data.prefix { model.prefix = Set(v); }
-    if let Some(v) = data.format { model.format = Set(v); }
+    if let Some(v) = data.brand { model.brand = trim(v); }
+    if let Some(v) = data.model { model.model = trim(v); }
+    if let Some(v) = data.prefix { model.prefix = trim_opt(v); }
+    if let Some(v) = data.format { model.format = trim(v); }
     if let Some(v) = data.lens_mount_id { model.lens_mount_id = Set(v); }
     if let Some(v) = data.default_lens_id { model.default_lens_id = Set(v); }
-    if let Some(v) = data.camera_type { model.camera_type = Set(v); }
-    if let Some(v) = data.serial_number { model.serial_number = Set(v); }
-    if let Some(v) = data.date_purchased { model.date_purchased = Set(v); }
-    if let Some(v) = data.purchased_from { model.purchased_from = Set(v); }
-    if let Some(v) = data.date_sold { model.date_sold = Set(v); }
-    if let Some(v) = data.notes { model.notes = Set(v); }
+    if let Some(v) = data.camera_type { model.camera_type = trim_opt(v); }
+    if let Some(v) = data.serial_number { model.serial_number = trim_opt(v); }
+    if let Some(v) = data.date_purchased { model.date_purchased = trim_opt(v); }
+    if let Some(v) = data.purchased_from { model.purchased_from = trim_opt(v); }
+    if let Some(v) = data.date_sold { model.date_sold = trim_opt(v); }
+    if let Some(v) = data.notes { model.notes = trim_opt(v); }
     model.updated_at = Set(now);
 
     CameraService::update(&state.db, model).await.map_err(|e| {
@@ -175,7 +175,7 @@ pub async fn delete_camera(state: State<'_, AppState>, id: i32) -> Result<(), St
 #[derive(Debug, Deserialize)]
 pub struct CreateCameraWithLensDto {
     pub camera: CreateCameraDto,
-    pub lens_name_on_lens: Option<String>,
+    pub lens_model: Option<String>,
     pub lens_focal_length: Option<String>,
     pub lens_max_aperture: Option<String>,
 }
@@ -192,20 +192,26 @@ pub async fn create_camera_with_lens(
         .transaction::<_, i32, DbErr>(|txn| {
             let now = now.clone();
             Box::pin(async move {
+                // Pre-trim shared fields used by both camera and lens
+                let brand = data.camera.brand.trim().to_string();
+                let serial = data.camera.serial_number.map(|s| s.trim().to_string());
+                let purchased = data.camera.date_purchased.map(|s| s.trim().to_string());
+                let vendor = data.camera.purchased_from.map(|s| s.trim().to_string());
+
                 // 1. Create camera (default_lens_id will be set after lens creation)
                 let cam_model = camera::ActiveModel {
-                    brand: Set(data.camera.brand.clone()),
-                    model: Set(data.camera.model),
-                    prefix: Set(data.camera.prefix),
-                    format: Set(data.camera.format),
+                    brand: Set(brand.clone()),
+                    model: Set(data.camera.model.trim().to_string()),
+                    prefix: Set(data.camera.prefix.map(|s| s.trim().to_string())),
+                    format: Set(data.camera.format.trim().to_string()),
                     lens_mount_id: Set(data.camera.lens_mount_id),
                     default_lens_id: Set(None),
-                    camera_type: Set(data.camera.camera_type),
-                    serial_number: Set(data.camera.serial_number.clone()),
-                    date_purchased: Set(data.camera.date_purchased.clone()),
-                    purchased_from: Set(data.camera.purchased_from.clone()),
-                    date_sold: Set(data.camera.date_sold),
-                    notes: Set(data.camera.notes),
+                    camera_type: Set(data.camera.camera_type.map(|s| s.trim().to_string())),
+                    serial_number: Set(serial.clone()),
+                    date_purchased: Set(purchased.clone()),
+                    purchased_from: Set(vendor.clone()),
+                    date_sold: Set(data.camera.date_sold.map(|s| s.trim().to_string())),
+                    notes: Set(data.camera.notes.map(|s| s.trim().to_string())),
                     created_at: Set(now.clone()),
                     updated_at: Set(now.clone()),
                     ..Default::default()
@@ -214,18 +220,18 @@ pub async fn create_camera_with_lens(
 
                 // 2. Create lens (brand + mount shared with camera)
                 let lens_model = lens::ActiveModel {
-                    brand: Set(data.camera.brand),
+                    brand: Set(brand),
                     lens_mount_id: Set(data.camera.lens_mount_id),
                     lens_system: Set(None),
-                    name_on_lens: Set(data.lens_name_on_lens),
-                    focal_length: Set(data.lens_focal_length),
-                    max_aperture: Set(data.lens_max_aperture),
+                    model: Set(data.lens_model.map(|s| s.trim().to_string())),
+                    focal_length: Set(data.lens_focal_length.map(|s| s.trim().to_string())),
+                    max_aperture: Set(data.lens_max_aperture.map(|s| s.trim().to_string())),
                     min_aperture: Set(None),
                     filter_thread_front_mm: Set(None),
                     filter_thread_rear_mm: Set(None),
-                    serial_number: Set(data.camera.serial_number),
-                    date_purchased: Set(data.camera.date_purchased),
-                    purchased_from: Set(data.camera.purchased_from),
+                    serial_number: Set(serial),
+                    date_purchased: Set(purchased),
+                    purchased_from: Set(vendor),
                     date_sold: Set(None),
                     notes: Set(None),
                     created_at: Set(now.clone()),
@@ -279,11 +285,11 @@ pub async fn create_maintenance(
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let model = camera_maintenance::ActiveModel {
         camera_id: Set(data.camera_id),
-        maintenance_type: Set(data.maintenance_type),
-        done_by: Set(data.done_by),
-        date_done: Set(data.date_done),
+        maintenance_type: trim(data.maintenance_type),
+        done_by: trim_opt(data.done_by),
+        date_done: trim_opt(data.date_done),
         cost: Set(data.cost),
-        notes: Set(data.notes),
+        notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
         updated_at: Set(now),
         ..Default::default()
@@ -313,11 +319,11 @@ pub async fn update_maintenance(
     let mut model: camera_maintenance::ActiveModel = existing.into();
 
     if let Some(v) = data.camera_id { model.camera_id = Set(v); }
-    if let Some(v) = data.maintenance_type { model.maintenance_type = Set(v); }
-    if let Some(v) = data.done_by { model.done_by = Set(v); }
-    if let Some(v) = data.date_done { model.date_done = Set(v); }
+    if let Some(v) = data.maintenance_type { model.maintenance_type = trim(v); }
+    if let Some(v) = data.done_by { model.done_by = trim_opt(v); }
+    if let Some(v) = data.date_done { model.date_done = trim_opt(v); }
     if let Some(v) = data.cost { model.cost = Set(v); }
-    if let Some(v) = data.notes { model.notes = Set(v); }
+    if let Some(v) = data.notes { model.notes = trim_opt(v); }
     model.updated_at = Set(now);
 
     CameraService::update_maintenance(&state.db, model)

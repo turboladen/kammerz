@@ -3,7 +3,7 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::film_stock;
-use crate::patch::double_option;
+use crate::patch::{double_option, trim, trim_opt};
 use crate::services::film_stock_service::FilmStockService;
 use crate::AppState;
 
@@ -67,13 +67,13 @@ pub async fn create_film_stock(
 ) -> Result<i32, String> {
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let model = film_stock::ActiveModel {
-        brand: Set(data.brand),
-        name: Set(data.name),
-        format: Set(data.format),
+        brand: trim(data.brand),
+        name: trim(data.name),
+        format: trim(data.format),
         exposure_count: Set(data.exposure_count),
-        stock_type: Set(data.stock_type),
+        stock_type: trim(data.stock_type),
         iso: Set(data.iso),
-        notes: Set(data.notes),
+        notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
         updated_at: Set(now),
         ..Default::default()
@@ -101,13 +101,13 @@ pub async fn update_film_stock(
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut model: film_stock::ActiveModel = existing.into();
 
-    if let Some(v) = data.brand { model.brand = Set(v); }
-    if let Some(v) = data.name { model.name = Set(v); }
-    if let Some(v) = data.format { model.format = Set(v); }
+    if let Some(v) = data.brand { model.brand = trim(v); }
+    if let Some(v) = data.name { model.name = trim(v); }
+    if let Some(v) = data.format { model.format = trim(v); }
     if let Some(v) = data.exposure_count { model.exposure_count = Set(v); }
-    if let Some(v) = data.stock_type { model.stock_type = Set(v); }
+    if let Some(v) = data.stock_type { model.stock_type = trim(v); }
     if let Some(v) = data.iso { model.iso = Set(v); }
-    if let Some(v) = data.notes { model.notes = Set(v); }
+    if let Some(v) = data.notes { model.notes = trim_opt(v); }
     model.updated_at = Set(now);
 
     FilmStockService::update(&state.db, model)

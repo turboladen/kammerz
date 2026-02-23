@@ -3,7 +3,7 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::lab;
-use crate::patch::double_option;
+use crate::patch::{double_option, trim, trim_opt};
 use crate::services::lab_service::LabService;
 use crate::AppState;
 
@@ -51,10 +51,10 @@ pub async fn get_lab(state: State<'_, AppState>, id: i32) -> Result<Option<lab::
 pub async fn create_lab(state: State<'_, AppState>, data: CreateLabDto) -> Result<i32, String> {
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let model = lab::ActiveModel {
-        name: Set(data.name),
-        location: Set(data.location),
-        website: Set(data.website),
-        notes: Set(data.notes),
+        name: trim(data.name),
+        location: trim_opt(data.location),
+        website: trim_opt(data.website),
+        notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
         updated_at: Set(now),
         ..Default::default()
@@ -80,10 +80,10 @@ pub async fn update_lab(
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut model: lab::ActiveModel = existing.into();
 
-    if let Some(v) = data.name { model.name = Set(v); }
-    if let Some(v) = data.location { model.location = Set(v); }
-    if let Some(v) = data.website { model.website = Set(v); }
-    if let Some(v) = data.notes { model.notes = Set(v); }
+    if let Some(v) = data.name { model.name = trim(v); }
+    if let Some(v) = data.location { model.location = trim_opt(v); }
+    if let Some(v) = data.website { model.website = trim_opt(v); }
+    if let Some(v) = data.notes { model.notes = trim_opt(v); }
     model.updated_at = Set(now);
 
     LabService::update(&state.db, model).await.map_err(|e| {

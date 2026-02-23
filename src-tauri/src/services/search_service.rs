@@ -19,7 +19,7 @@ pub struct CameraSearchResult {
 pub struct LensSearchResult {
     pub id: i32,
     pub brand: String,
-    pub name_on_lens: Option<String>,
+    pub model: Option<String>,
     pub focal_length: Option<String>,
     pub match_field: String,
     pub match_snippet: String,
@@ -122,10 +122,10 @@ impl SearchService {
 
         let lenses = LensSearchResult::find_by_statement(Statement::from_sql_and_values(
             backend,
-            r#"SELECT id, brand, name_on_lens, focal_length,
+            r#"SELECT id, brand, model, focal_length,
                 CASE
                     WHEN brand LIKE $1 THEN 'brand'
-                    WHEN name_on_lens LIKE $1 THEN 'name'
+                    WHEN model LIKE $1 THEN 'model'
                     WHEN focal_length LIKE $1 THEN 'focal length'
                     WHEN lens_system LIKE $1 THEN 'system'
                     WHEN max_aperture LIKE $1 THEN 'aperture'
@@ -135,7 +135,7 @@ impl SearchService {
                 END AS match_field,
                 CASE
                     WHEN brand LIKE $1 THEN brand
-                    WHEN name_on_lens LIKE $1 THEN COALESCE(name_on_lens, '')
+                    WHEN model LIKE $1 THEN COALESCE(model, '')
                     WHEN focal_length LIKE $1 THEN COALESCE(focal_length, '')
                     WHEN lens_system LIKE $1 THEN COALESCE(lens_system, '')
                     WHEN max_aperture LIKE $1 THEN COALESCE(max_aperture, '')
@@ -144,7 +144,7 @@ impl SearchService {
                     ELSE ''
                 END AS match_snippet
             FROM lenses
-            WHERE brand LIKE $1 OR name_on_lens LIKE $1 OR focal_length LIKE $1
+            WHERE brand LIKE $1 OR model LIKE $1 OR focal_length LIKE $1
                 OR lens_system LIKE $1 OR max_aperture LIKE $1 OR serial_number LIKE $1
                 OR notes LIKE $1
             LIMIT 20"#,

@@ -8,6 +8,7 @@
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import { createRoll, suggestRollId } from '$lib/api/rolls';
+	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listCameras } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
 	import { listLenses } from '$lib/api/lenses';
@@ -78,9 +79,10 @@
 			: null
 	);
 
+	const cameraLabels = $derived(buildCameraLabels(cameras));
 	const cameraOptions = $derived([
 		{ value: '', label: 'Not assigned yet' },
-		...cameras.map((c) => ({ value: String(c.id), label: `${c.brand} ${c.model}` }))
+		...cameras.map((c) => ({ value: String(c.id), label: cameraLabels.get(c.id) ?? `${c.brand} ${c.model}` }))
 	]);
 
 	function stockLabel(s: FilmStock): string {

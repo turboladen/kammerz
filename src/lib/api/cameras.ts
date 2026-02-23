@@ -29,7 +29,7 @@ export const deleteMaintenance = (id: number) => invoke<void>('delete_maintenanc
 
 export interface CreateCameraWithLensData {
 	camera: CameraInsert;
-	lens_name_on_lens: string | null;
+	lens_model: string | null;
 	lens_focal_length: string | null;
 	lens_max_aperture: string | null;
 }

@@ -9,7 +9,7 @@ impl LensService {
     pub async fn list_all(db: &DatabaseConnection) -> Result<Vec<lens::Model>, DbErr> {
         Lens::find()
             .order_by_asc(lens::Column::Brand)
-            .order_by_asc(lens::Column::NameOnLens)
+            .order_by_asc(lens::Column::Model)
             .all(db)
             .await
     }

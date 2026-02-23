@@ -3,21 +3,9 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::{dev_stage, development_lab, development_self};
-use crate::patch::double_option;
+use crate::patch::{double_option, trim_opt};
 use crate::services::development_service::{DevelopmentService, StageInput};
 use crate::AppState;
-
-/// Set ActiveModel fields from a DTO only when the DTO field is provided (Some).
-/// Works with both `Option<T>` (non-nullable) and `Option<Option<T>>` (nullable) fields.
-macro_rules! set_if_provided {
-    ($model:expr, $data:expr, $($field:ident),+ $(,)?) => {
-        $(
-            if let Some(v) = $data.$field {
-                $model.$field = Set(v);
-            }
-        )+
-    };
-}
 
 // --- DTOs ---
 
@@ -103,9 +91,9 @@ fn stages_to_inputs(stages: Vec<StageDto>) -> Vec<StageInput> {
     stages
         .into_iter()
         .map(|s| StageInput {
-            stage_name: s.stage_name,
+            stage_name: s.stage_name.trim().to_string(),
             duration_seconds: s.duration_seconds,
-            notes: s.notes,
+            notes: s.notes.map(|n| n.trim().to_string()),
             sort_order: s.sort_order,
         })
         .collect()
@@ -135,10 +123,10 @@ pub async fn create_lab_dev(
     let model = development_lab::ActiveModel {
         roll_id: Set(data.roll_id),
         lab_id: Set(data.lab_id),
-        date_dropped_off: Set(data.date_dropped_off),
-        date_received: Set(data.date_received),
+        date_dropped_off: trim_opt(data.date_dropped_off),
+        date_received: trim_opt(data.date_received),
         cost: Set(data.cost),
-        notes: Set(data.notes),
+        notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
         updated_at: Set(now),
         ..Default::default()
@@ -166,7 +154,11 @@ pub async fn update_lab_dev(
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut model: development_lab::ActiveModel = existing.into();
 
-    set_if_provided!(model, data, lab_id, date_dropped_off, date_received, cost, notes);
+    if let Some(v) = data.lab_id { model.lab_id = Set(v); }
+    if let Some(v) = data.date_dropped_off { model.date_dropped_off = trim_opt(v); }
+    if let Some(v) = data.date_received { model.date_received = trim_opt(v); }
+    if let Some(v) = data.cost { model.cost = Set(v); }
+    if let Some(v) = data.notes { model.notes = trim_opt(v); }
     model.updated_at = Set(now);
 
     DevelopmentService::update_lab_dev(&state.db, model)
@@ -219,17 +211,17 @@ pub async fn create_self_dev(
             Box::pin(async move {
                 let model = development_self::ActiveModel {
                     roll_id: Set(data.roll_id),
-                    date_processed: Set(data.date_processed),
-                    developer: Set(data.developer),
-                    developer_dilution: Set(data.developer_dilution),
-                    fixer: Set(data.fixer),
-                    fixer_dilution: Set(data.fixer_dilution),
-                    stop_bath: Set(data.stop_bath),
-                    wetting_agent: Set(data.wetting_agent),
-                    clearing_agent: Set(data.clearing_agent),
-                    temperature: Set(data.temperature),
-                    agitation_notes: Set(data.agitation_notes),
-                    notes: Set(data.notes),
+                    date_processed: trim_opt(data.date_processed),
+                    developer: trim_opt(data.developer),
+                    developer_dilution: trim_opt(data.developer_dilution),
+                    fixer: trim_opt(data.fixer),
+                    fixer_dilution: trim_opt(data.fixer_dilution),
+                    stop_bath: trim_opt(data.stop_bath),
+                    wetting_agent: trim_opt(data.wetting_agent),
+                    clearing_agent: trim_opt(data.clearing_agent),
+                    temperature: trim_opt(data.temperature),
+                    agitation_notes: trim_opt(data.agitation_notes),
+                    notes: trim_opt(data.notes),
                     created_at: Set(now.clone()),
                     updated_at: Set(now),
                     ..Default::default()
@@ -272,11 +264,17 @@ pub async fn update_self_dev(
             Box::pin(async move {
                 let mut model: development_self::ActiveModel = existing.into();
 
-                set_if_provided!(
-                    model, data, date_processed, developer, developer_dilution, fixer,
-                    fixer_dilution, stop_bath, wetting_agent, clearing_agent, temperature,
-                    agitation_notes, notes
-                );
+                if let Some(v) = data.date_processed { model.date_processed = trim_opt(v); }
+                if let Some(v) = data.developer { model.developer = trim_opt(v); }
+                if let Some(v) = data.developer_dilution { model.developer_dilution = trim_opt(v); }
+                if let Some(v) = data.fixer { model.fixer = trim_opt(v); }
+                if let Some(v) = data.fixer_dilution { model.fixer_dilution = trim_opt(v); }
+                if let Some(v) = data.stop_bath { model.stop_bath = trim_opt(v); }
+                if let Some(v) = data.wetting_agent { model.wetting_agent = trim_opt(v); }
+                if let Some(v) = data.clearing_agent { model.clearing_agent = trim_opt(v); }
+                if let Some(v) = data.temperature { model.temperature = trim_opt(v); }
+                if let Some(v) = data.agitation_notes { model.agitation_notes = trim_opt(v); }
+                if let Some(v) = data.notes { model.notes = trim_opt(v); }
                 model.updated_at = Set(now);
 
                 DevelopmentService::update_self_dev(txn, model).await?;

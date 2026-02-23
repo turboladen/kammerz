@@ -50,7 +50,7 @@ export interface Lens {
 	brand: string;
 	lens_mount_id: number;
 	lens_system: string | null;
-	name_on_lens: string | null;
+	model: string | null;
 	focal_length: string | null;
 	max_aperture: string | null;
 	min_aperture: string | null;
@@ -226,7 +226,7 @@ export interface CameraSearchResult {
 export interface LensSearchResult {
 	id: number;
 	brand: string;
-	name_on_lens: string | null;
+	model: string | null;
 	focal_length: string | null;
 	match_field: string;
 	match_snippet: string;

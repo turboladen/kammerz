@@ -151,13 +151,13 @@ impl StatsService {
         let top_lenses = RankedItem::find_by_statement(Statement::from_string(
             backend,
             "SELECT label, SUM(count) AS count FROM ( \
-                 SELECT (l.brand || ' ' || COALESCE(l.name_on_lens, l.focal_length, '')) AS label, \
+                 SELECT (l.brand || ' ' || COALESCE(l.model, l.focal_length, '')) AS label, \
                         COUNT(*) AS count \
                  FROM shot_lenses sl \
                  JOIN lenses l ON sl.lens_id = l.id \
                  GROUP BY sl.lens_id \
                UNION ALL \
-                 SELECT (l.brand || ' ' || COALESCE(l.name_on_lens, l.focal_length, '')) AS label, \
+                 SELECT (l.brand || ' ' || COALESCE(l.model, l.focal_length, '')) AS label, \
                         COUNT(*) AS count \
                  FROM shots s \
                  JOIN rolls r ON s.roll_id = r.id \

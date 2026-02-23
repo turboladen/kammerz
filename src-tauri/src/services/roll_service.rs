@@ -52,7 +52,7 @@ const ROLLS_WITH_DETAILS_SQL: &str = "\
            fs.brand AS film_stock_brand, fs.name AS film_stock_name, \
            fs.iso AS film_stock_iso, \
            l.brand AS lens_brand, \
-           COALESCE(l.name_on_lens, l.focal_length) AS lens_name \
+           COALESCE(l.model, l.focal_length) AS lens_name \
     FROM rolls r \
     LEFT JOIN cameras c ON r.camera_id = c.id \
     LEFT JOIN film_stocks fs ON r.film_stock_id = fs.id \

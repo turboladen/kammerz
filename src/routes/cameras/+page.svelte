@@ -106,7 +106,7 @@
 	let notes = $state('');
 
 	// Inline fixed-lens fields
-	let lensNameOnLens = $state('');
+	let lensModel = $state('');
 	let lensFocalLength = $state('');
 	let lensMaxAperture = $state('');
 
@@ -176,7 +176,7 @@
 		purchasedFrom = '';
 		dateSold = '';
 		notes = '';
-		lensNameOnLens = '';
+		lensModel = '';
 		lensFocalLength = '';
 		lensMaxAperture = '';
 	}
@@ -206,7 +206,7 @@
 			if (isFixedLens) {
 				await createCameraWithLens({
 					camera,
-					lens_name_on_lens: lensNameOnLens || null,
+					lens_model: lensModel || null,
 					lens_focal_length: lensFocalLength || null,
 					lens_max_aperture: lensMaxAperture || null
 				});
@@ -339,7 +339,7 @@
 					<div class="flex-1 border-b border-border-subtle"></div>
 				</h3>
 				<div class="space-y-4">
-					<Input label="Name on Lens" bind:value={lensNameOnLens} placeholder="Rokkor 75mm 1:3.5" hint="Brand, mount, and purchase info will match the camera" />
+					<Input label="Model" bind:value={lensModel} placeholder="Rokkor 75mm f/3.5" hint="Brand, mount, and purchase info will match the camera" />
 					<div class="grid grid-cols-2 gap-4">
 						<Input label="Focal Length (mm)" bind:value={lensFocalLength} placeholder="75" />
 						<Input label="Max Aperture (f/)" bind:value={lensMaxAperture} placeholder="3.5" />

@@ -20,6 +20,7 @@
 	import { getLabDevForRoll, getSelfDevForRoll, listDevStages } from '$lib/api/development';
 	import { listLabs } from '$lib/api/labs';
 	import { lensDisplayName, buildLensOptions } from '$lib/utils/lens';
+	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { statusOrder, statusConfig } from '$lib/utils/status';
 	import type { RollWithDetails, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, LensMount } from '$lib/types';
@@ -99,9 +100,10 @@
 		return null;
 	});
 
+	const cameraLabels = $derived(buildCameraLabels(cameras));
 	const cameraOptions = $derived([
 		{ value: '', label: 'Not assigned' },
-		...cameras.map((c) => ({ value: String(c.id), label: `${c.brand} ${c.model}` }))
+		...cameras.map((c) => ({ value: String(c.id), label: cameraLabels.get(c.id) ?? `${c.brand} ${c.model}` }))
 	]);
 
 	const selectedCamera = $derived(

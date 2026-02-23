@@ -132,7 +132,7 @@
 									class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 								>
 									<div class="flex items-center gap-3">
-										<span class="text-sm font-medium">{lens.brand} {lens.name_on_lens ?? ''}</span>
+										<span class="text-sm font-medium">{lens.model ? (lens.model.toLowerCase().startsWith(lens.brand.toLowerCase()) ? lens.model : `${lens.brand} ${lens.model}`) : lens.brand}</span>
 										{#if lens.focal_length}
 											<span class="text-xs text-text-faint">{lens.focal_length}</span>
 										{/if}

@@ -9,7 +9,7 @@ pub struct Model {
     pub brand: String,
     pub lens_mount_id: i32,
     pub lens_system: Option<String>,
-    pub name_on_lens: Option<String>,
+    pub model: Option<String>,
     pub focal_length: Option<String>,
     pub max_aperture: Option<String>,
     pub min_aperture: Option<String>,

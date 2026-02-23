@@ -112,7 +112,7 @@
 	// Form state
 	let brand = $state('');
 	let lensMountId = $state('');
-	let nameOnLens = $state('');
+	let lensModel = $state('');
 	let focalLength = $state('');
 	let maxAperture = $state('');
 	let minAperture = $state('');
@@ -149,7 +149,7 @@
 	function resetForm() {
 		brand = '';
 		lensMountId = '';
-		nameOnLens = '';
+		lensModel = '';
 		focalLength = '';
 		maxAperture = '';
 		minAperture = '';
@@ -167,7 +167,7 @@
 			brand,
 			lens_mount_id: Number(lensMountId),
 			lens_system: null,
-			name_on_lens: nameOnLens || null,
+			model: lensModel || null,
 			focal_length: focalLength || null,
 			max_aperture: maxAperture || null,
 			min_aperture: minAperture || null,
@@ -199,7 +199,7 @@
 		editingLens = lens;
 		brand = lens.brand;
 		lensMountId = String(lens.lens_mount_id);
-		nameOnLens = lens.name_on_lens ?? '';
+		lensModel = lens.model ?? '';
 		focalLength = lens.focal_length ?? '';
 		maxAperture = lens.max_aperture ?? '';
 		minAperture = lens.min_aperture ?? '';
@@ -359,7 +359,7 @@
 			<ComboInput label="Brand/Manufacturer" bind:value={brand} placeholder="Minolta" options={brandOptions} />
 			<Select label="Lens Mount" bind:value={lensMountId} options={lensMountOptions} />
 		</div>
-		<Input label="Name on Lens" bind:value={nameOnLens} placeholder="MD Rokkor 50mm 1:1.4" />
+		<Input label="Model" bind:value={lensModel} placeholder="MD Rokkor 50mm f/1.4" hint="Don't include the brand" />
 		<div class="grid grid-cols-2 gap-4">
 			<Input label="Focal Length (mm)" bind:value={focalLength} placeholder="50 or 28-85" />
 			<Input label="Max Aperture (f/)" bind:value={maxAperture} placeholder="1.4" />
@@ -402,7 +402,7 @@
 				<ComboInput label="Brand/Manufacturer" bind:value={brand} options={brandOptions} />
 				<Select label="Lens Mount" bind:value={lensMountId} options={lensMountOptions} />
 			</div>
-			<Input label="Name on Lens" bind:value={nameOnLens} />
+			<Input label="Model" bind:value={lensModel} hint="Don't include the brand" />
 			<div class="grid grid-cols-2 gap-4">
 				<Input label="Focal Length (mm)" bind:value={focalLength} />
 				<Input label="Max Aperture (f/)" bind:value={maxAperture} />

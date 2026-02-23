@@ -1,7 +1,12 @@
 import type { Lens, LensMount } from '$lib/types';
+import { buildDisambiguatedLabels } from './disambiguate';
 
 export function lensDisplayName(lens: Lens): string {
-	if (lens.name_on_lens) return lens.name_on_lens;
+	if (lens.model) {
+		// Avoid doubling brand when model starts with it (e.g. "Mamiya 90mm K/L")
+		if (lens.model.toLowerCase().startsWith(lens.brand.toLowerCase())) return lens.model;
+		return `${lens.brand} ${lens.model}`;
+	}
 	const parts = [lens.brand];
 	if (lens.focal_length) parts.push(`${lens.focal_length}mm`);
 	if (lens.max_aperture) parts.push(`f/${lens.max_aperture}`);
@@ -75,6 +80,10 @@ export function buildMountOptions(
 	return options;
 }
 
+export function buildLensLabels(lenses: Lens[]): Map<number, string> {
+	return buildDisambiguatedLabels(lenses, lensDisplayName);
+}
+
 /** Build lens dropdown options sorted by mount compatibility with the selected camera. */
 export function buildLensOptions(
 	allLenses: Lens[],
@@ -83,6 +92,8 @@ export function buildLensOptions(
 	lensMounts: LensMount[] = []
 ): { value: string; label: string; disabled?: boolean }[] {
 	const owned = allLenses.filter((l) => !l.date_sold);
+	const labels = buildLensLabels(owned);
+	const getLabel = (l: Lens) => labels.get(l.id) ?? lensDisplayName(l);
 	const options: { value: string; label: string; disabled?: boolean }[] = [
 		{ value: '', label: emptyLabel }
 	];
@@ -97,13 +108,13 @@ export function buildLensOptions(
 
 		const matching = owned.filter(isCompatible);
 		const rest = owned.filter((l) => !isCompatible(l));
-		for (const l of matching) options.push({ value: String(l.id), label: lensDisplayName(l) });
+		for (const l of matching) options.push({ value: String(l.id), label: getLabel(l) });
 		if (matching.length > 0 && rest.length > 0) {
 			options.push({ value: '__divider__', label: '── Other lenses ──', disabled: true });
 		}
-		for (const l of rest) options.push({ value: String(l.id), label: lensDisplayName(l) });
+		for (const l of rest) options.push({ value: String(l.id), label: getLabel(l) });
 	} else {
-		for (const l of owned) options.push({ value: String(l.id), label: lensDisplayName(l) });
+		for (const l of owned) options.push({ value: String(l.id), label: getLabel(l) });
 	}
 
 	return options;

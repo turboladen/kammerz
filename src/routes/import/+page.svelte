@@ -12,6 +12,7 @@
 	import { listFilmStocks } from '$lib/api/film-stocks';
 	import { listLenses } from '$lib/api/lenses';
 	import { lensDisplayName } from '$lib/utils/lens';
+	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import type { ParsedRoll, Camera, FilmStock, Lens, ImportRollDto, ModelInfo } from '$lib/types';
 	import { ChevronDown, ChevronUp, Eye, EyeOff, RefreshCw, Trash2 } from 'lucide-svelte';
 
@@ -93,10 +94,11 @@
 		{ value: 'archived', label: 'Archived' }
 	];
 
+	const cameraLabels = $derived(buildCameraLabels(cameras));
 	const cameraOptions = $derived(
 		cameras.map((c) => ({
 			value: String(c.id),
-			label: `${c.brand} ${c.model}`
+			label: cameraLabels.get(c.id) ?? `${c.brand} ${c.model}`
 		}))
 	);
 

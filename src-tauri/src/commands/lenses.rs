@@ -3,7 +3,7 @@ use serde::Deserialize;
 use tauri::State;
 
 use crate::entities::lens;
-use crate::patch::double_option;
+use crate::patch::{double_option, trim, trim_opt};
 use crate::services::lens_service::LensService;
 use crate::AppState;
 
@@ -14,7 +14,7 @@ pub struct CreateLensDto {
     pub brand: String,
     pub lens_mount_id: i32,
     pub lens_system: Option<String>,
-    pub name_on_lens: Option<String>,
+    pub model: Option<String>,
     pub focal_length: Option<String>,
     pub max_aperture: Option<String>,
     pub min_aperture: Option<String>,
@@ -35,7 +35,7 @@ pub struct UpdateLensDto {
     #[serde(deserialize_with = "double_option")]
     pub lens_system: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
-    pub name_on_lens: Option<Option<String>>,
+    pub model: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
     pub focal_length: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
@@ -83,20 +83,20 @@ pub async fn get_lens(
 pub async fn create_lens(state: State<'_, AppState>, data: CreateLensDto) -> Result<i32, String> {
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let model = lens::ActiveModel {
-        brand: Set(data.brand),
+        brand: trim(data.brand),
         lens_mount_id: Set(data.lens_mount_id),
-        lens_system: Set(data.lens_system),
-        name_on_lens: Set(data.name_on_lens),
-        focal_length: Set(data.focal_length),
-        max_aperture: Set(data.max_aperture),
-        min_aperture: Set(data.min_aperture),
+        lens_system: trim_opt(data.lens_system),
+        model: trim_opt(data.model),
+        focal_length: trim_opt(data.focal_length),
+        max_aperture: trim_opt(data.max_aperture),
+        min_aperture: trim_opt(data.min_aperture),
         filter_thread_front_mm: Set(data.filter_thread_front_mm),
         filter_thread_rear_mm: Set(data.filter_thread_rear_mm),
-        serial_number: Set(data.serial_number),
-        date_purchased: Set(data.date_purchased),
-        purchased_from: Set(data.purchased_from),
-        date_sold: Set(data.date_sold),
-        notes: Set(data.notes),
+        serial_number: trim_opt(data.serial_number),
+        date_purchased: trim_opt(data.date_purchased),
+        purchased_from: trim_opt(data.purchased_from),
+        date_sold: trim_opt(data.date_sold),
+        notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
         updated_at: Set(now),
         ..Default::default()
@@ -122,20 +122,20 @@ pub async fn update_lens(
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut model: lens::ActiveModel = existing.into();
 
-    if let Some(v) = data.brand { model.brand = Set(v); }
+    if let Some(v) = data.brand { model.brand = trim(v); }
     if let Some(v) = data.lens_mount_id { model.lens_mount_id = Set(v); }
-    if let Some(v) = data.lens_system { model.lens_system = Set(v); }
-    if let Some(v) = data.name_on_lens { model.name_on_lens = Set(v); }
-    if let Some(v) = data.focal_length { model.focal_length = Set(v); }
-    if let Some(v) = data.max_aperture { model.max_aperture = Set(v); }
-    if let Some(v) = data.min_aperture { model.min_aperture = Set(v); }
+    if let Some(v) = data.lens_system { model.lens_system = trim_opt(v); }
+    if let Some(v) = data.model { model.model = trim_opt(v); }
+    if let Some(v) = data.focal_length { model.focal_length = trim_opt(v); }
+    if let Some(v) = data.max_aperture { model.max_aperture = trim_opt(v); }
+    if let Some(v) = data.min_aperture { model.min_aperture = trim_opt(v); }
     if let Some(v) = data.filter_thread_front_mm { model.filter_thread_front_mm = Set(v); }
     if let Some(v) = data.filter_thread_rear_mm { model.filter_thread_rear_mm = Set(v); }
-    if let Some(v) = data.serial_number { model.serial_number = Set(v); }
-    if let Some(v) = data.date_purchased { model.date_purchased = Set(v); }
-    if let Some(v) = data.purchased_from { model.purchased_from = Set(v); }
-    if let Some(v) = data.date_sold { model.date_sold = Set(v); }
-    if let Some(v) = data.notes { model.notes = Set(v); }
+    if let Some(v) = data.serial_number { model.serial_number = trim_opt(v); }
+    if let Some(v) = data.date_purchased { model.date_purchased = trim_opt(v); }
+    if let Some(v) = data.purchased_from { model.purchased_from = trim_opt(v); }
+    if let Some(v) = data.date_sold { model.date_sold = trim_opt(v); }
+    if let Some(v) = data.notes { model.notes = trim_opt(v); }
     model.updated_at = Set(now);
 
     LensService::update(&state.db, model).await.map_err(|e| {
