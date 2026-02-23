@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use sea_orm::{DbErr, Set, TransactionTrait};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::entities::{dev_stage, development_lab, development_self};
 use crate::patch::{double_option, trim_opt};
-use crate::services::development_service::{DevelopmentService, StageInput};
+use crate::services::development_service::{DevelopmentService, SelfDevListItem, StageInput};
 use crate::AppState;
 
 // --- DTOs ---
@@ -321,4 +323,52 @@ pub async fn list_dev_stages(
             log::error!("Failed to list dev stages for {development_self_id}: {e}");
             format!("Could not list stages: {e}")
         })
+}
+
+// --- List all self-developments ---
+
+#[derive(Debug, Serialize)]
+pub struct SelfDevWithStages {
+    #[serde(flatten)]
+    pub item: SelfDevListItem,
+    pub stages: Vec<dev_stage::Model>,
+}
+
+#[tauri::command]
+pub async fn list_all_self_developments(
+    state: State<'_, AppState>,
+) -> Result<Vec<SelfDevWithStages>, String> {
+    let items = DevelopmentService::list_all_self_devs(&state.db)
+        .await
+        .map_err(|e| {
+            log::error!("Failed to list all self developments: {e}");
+            format!("Could not list developments: {e}")
+        })?;
+
+    let dev_ids: Vec<i32> = items.iter().map(|i| i.dev_id).collect();
+
+    let all_stages = DevelopmentService::list_stages_for_dev_ids(&state.db, dev_ids)
+        .await
+        .map_err(|e| {
+            log::error!("Failed to load dev stages: {e}");
+            format!("Could not load stages: {e}")
+        })?;
+
+    let mut stage_map: HashMap<i32, Vec<dev_stage::Model>> = HashMap::new();
+    for stage in all_stages {
+        stage_map
+            .entry(stage.development_self_id)
+            .or_default()
+            .push(stage);
+    }
+
+    let result = items
+        .into_iter()
+        .map(|item| {
+            let stages = stage_map.remove(&item.dev_id).unwrap_or_default();
+            SelfDevWithStages { item, stages }
+        })
+        .collect();
+
+    Ok(result)
 }

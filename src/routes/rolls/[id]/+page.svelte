@@ -27,6 +27,15 @@
 
 	const id = $derived(Number(page.params.id));
 
+	// Back navigation: read ?from= param to determine where we came from
+	const backRoutes: Record<string, { href: string; label: string }> = {
+		developments: { href: '/developments', label: 'Developing' },
+		search: { href: '/search', label: 'Search' },
+		dashboard: { href: '/', label: 'Dashboard' }
+	};
+	const fromParam = $derived(page.url.searchParams.get('from'));
+	const backNav = $derived(fromParam && backRoutes[fromParam] ? backRoutes[fromParam] : { href: '/rolls', label: 'Rolls' });
+
 	let roll: RollWithDetails | undefined = $state();
 	let cameras: Camera[] = $state([]);
 	let filmStocks: FilmStock[] = $state([]);
@@ -512,7 +521,7 @@
 		<Button href="/rolls">&larr; Back to rolls</Button>
 	</div>
 {:else}
-	<PageHeader title="Roll {roll.roll_id}" backHref="/rolls" backLabel="Rolls">
+	<PageHeader title="Roll {roll.roll_id}" backHref={backNav.href} backLabel={backNav.label}>
 		<Button variant="danger" onclick={handleDelete}>Delete</Button>
 	</PageHeader>
 

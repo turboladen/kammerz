@@ -99,7 +99,7 @@
 					<div class="grid gap-3 {activeRolls.length > 1 ? 'sm:grid-cols-2' : ''}">
 						{#each activeRolls as roll}
 							<a
-								href="/rolls/{roll.id}"
+								href="/rolls/{roll.id}?from=dashboard"
 								class="group rounded-lg border border-accent/20 bg-accent/5 p-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 							>
 								<div class="flex items-center justify-between">
@@ -192,7 +192,7 @@
 					<div class="space-y-2">
 						{#each needsAttention as roll}
 							<a
-								href="/rolls/{roll.id}"
+								href="/rolls/{roll.id}?from=dashboard"
 								class="flex items-center justify-between rounded-lg border border-border bg-surface-raised p-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 							>
 								<div class="flex items-center gap-3">

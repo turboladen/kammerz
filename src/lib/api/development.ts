@@ -5,7 +5,8 @@ import type {
 	DevelopmentSelf,
 	DevelopmentSelfInsert,
 	DevStage,
-	DevStageInsert
+	DevStageInsert,
+	SelfDevListItem
 } from '$lib/types';
 
 // --- Lab Development ---
@@ -40,3 +41,8 @@ export const deleteSelfDev = (id: number) => invoke<void>('delete_self_dev', { i
 
 export const listDevStages = (developmentSelfId: number) =>
 	invoke<DevStage[]>('list_dev_stages', { developmentSelfId });
+
+// --- List all self-developments ---
+
+export const listAllSelfDevelopments = () =>
+	invoke<SelfDevListItem[]>('list_all_self_developments');

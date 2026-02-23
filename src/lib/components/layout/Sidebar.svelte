@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { LayoutDashboard, Search, Film, Camera, Aperture, Package, FlaskConical, BarChart3, Plus } from 'lucide-svelte';
+	import { LayoutDashboard, Search, Film, Camera, Aperture, Package, FlaskConical, TestTube2, BarChart3, Plus } from 'lucide-svelte';
 
 	// Core data entity navigation
 	const mainNavItems = [
@@ -9,7 +9,8 @@
 		{ href: '/cameras', label: 'Cameras', icon: Camera },
 		{ href: '/lenses', label: 'Lenses', icon: Aperture },
 		{ href: '/film-stocks', label: 'Film Stocks', icon: Package },
-		{ href: '/labs', label: 'Labs', icon: FlaskConical }
+		{ href: '/labs', label: 'Labs', icon: FlaskConical },
+		{ href: '/developments', label: 'Developing', icon: TestTube2 }
 	];
 
 	// Utility / analytics navigation

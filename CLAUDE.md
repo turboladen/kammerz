@@ -18,7 +18,7 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - `bun run build` — Build SvelteKit frontend only (useful for quick compile checks)
 - `cargo build` — Build Rust backend only (in `src-tauri/`)
 - `bun run dev` — Run Vite dev server only (no Tauri backend — DB calls will fail)
-- Browser-based preview tools (preview_start/preview_screenshot) cannot verify Tauri app functionality — `invoke()` requires the native IPC bridge in Tauri's WebKit webview. Verify backend changes via server logs (`preview_logs`) and direct `sqlite3` queries. Frontend-only changes (CSS, markup) can be previewed if they don't depend on `invoke()` data.
+- **DO NOT use preview tools (preview_start/preview_screenshot/etc.) to validate changes.** `invoke()` requires the native IPC bridge in Tauri's WebKit webview — pages will render blank. Verify backend via `cargo build` + Tauri dev server logs. Verify frontend markup via `bun run build` (compile check). Verify data via `sqlite3` queries against `~/Library/Application Support/com.kammerz.app/kammerz.db`.
 
 ## Architecture
 
@@ -58,7 +58,7 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 
 ### UX Rules
 - **Always confirm destructive actions.** Never delete data without user confirmation.
-- Back navigation: Detail pages use `PageHeader`'s `backHref`/`backLabel` props for consistent back links.
+- Back navigation: Detail pages use `PageHeader`'s `backHref`/`backLabel` props for consistent back links. Cross-entity links (e.g., developments→roll, dashboard→roll, search→roll/camera) pass `?from=<source>` query param; detail pages read this via `$page.url.searchParams.get('from')` and map it to the correct back route. See `backRoutes` map in `rolls/[id]/+page.svelte`.
 - Owned/Sold filtering: List pages with `date_sold` fields (cameras, lenses) use client-side All/Owned/Sold tab buttons with a `$derived()` filter. No backend changes needed to add this to a new list page.
 - Fixed-lens cameras: Structural invariant — camera creation with "Fixed Lens" mount MUST always call `createCameraWithLens()` (never plain `createCamera()`). Show read-only lens indicators everywhere — lens list cards ("Fixed on [Camera]"), lens edit dialog (accent banner), roll default lens (locked text), shot lens dropdown (read-only), Quick Entry (locked text). Camera detail page shows "Built-in Lens" section (no unlink/link/default-change controls). Camera edit locks the mount field to read-only. Detect via mount name: `lensMounts.find(m => m.id === mountId)?.name === 'Fixed Lens'` or `lensMounts.some(m => m.id === mountId && m.name === 'Fixed Lens')` — never hardcode mount IDs.
 - Shot lens defaults: Smart cascade — fixed lens (auto-locked) > last-used lens on roll > `roll.lens_id` (roll default) > `camera.default_lens_id` (camera default) > empty.
@@ -82,6 +82,7 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - Migration raw SQL gotcha: `execute_unprepared()` auto-commits each statement. If a migration fails midway, partial data persists but the migration isn't recorded in `seaql_migrations` — so it re-runs on next start, creating duplicates. Use `INSERT OR IGNORE` where possible; for tables without unique constraints (cameras, lenses), failures require manual cleanup via `sqlite3`.
 - Seed migration pattern: Use subqueries for FK resolution (`(SELECT id FROM lens_mounts WHERE name = 'Nikon F')`) instead of hardcoded IDs — IDs vary across environments and are fragile across migration reorders.
 - Fixed-lens seed pattern: Each fixed-lens camera requires 4 SQL statements in order: INSERT camera → INSERT lens → INSERT camera_lenses junction → UPDATE camera.default_lens_id. See migration 013 for the template.
+- Batch child merge pattern: When a list endpoint needs parent rows + child collections (e.g., developments + stages), fetch parents first, collect IDs, batch-fetch children via `IN (...)`, merge via `HashMap<parent_id, Vec<Child>>` with `.remove()` (not `.get()`) to avoid cloning. See `list_all_self_developments` in `commands/development.rs`.
 
 ### Camera Format Dropdown
 - Camera type options: `SLR`, `rangefinder`, `TLR`, `point-and-shoot`, `box` (Box Camera), `instant`, `view` (View/Field Camera). Defined in `typeOptions` arrays in both `cameras/+page.svelte` and `cameras/[id]/+page.svelte` — keep them in sync.

@@ -97,7 +97,7 @@
 						<div class="grid gap-1.5">
 							{#each results.cameras as cam}
 								<a
-									href="/cameras/{cam.id}"
+									href="/cameras/{cam.id}?from=search"
 									class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 								>
 									<div class="flex items-center gap-3">
@@ -192,7 +192,7 @@
 						<div class="grid gap-1.5">
 							{#each results.rolls as roll}
 								<a
-									href="/rolls/{roll.id}"
+									href="/rolls/{roll.id}?from=search"
 									class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 								>
 									<div class="flex items-center gap-3">
@@ -229,7 +229,7 @@
 						<div class="grid gap-1.5">
 							{#each results.shots as shot}
 								<a
-									href="/rolls/{shot.roll_pk}"
+									href="/rolls/{shot.roll_pk}?from=search"
 									class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 								>
 									<div class="flex items-center gap-3">

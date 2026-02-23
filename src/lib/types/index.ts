@@ -212,6 +212,34 @@ export interface DevStage {
 
 export type DevStageInsert = Omit<DevStage, 'id'>;
 
+// Self-development with joined roll/film stock/camera context + stages
+export interface SelfDevListItem {
+	dev_id: number;
+	roll_pk: number;
+	roll_id: string;
+	roll_status: RollStatus;
+	film_stock_brand: string | null;
+	film_stock_name: string | null;
+	film_stock_iso: number | null;
+	film_stock_type: string | null;
+	camera_brand: string | null;
+	camera_model: string | null;
+	date_processed: string | null;
+	developer: string | null;
+	developer_dilution: string | null;
+	fixer: string | null;
+	fixer_dilution: string | null;
+	stop_bath: string | null;
+	wetting_agent: string | null;
+	clearing_agent: string | null;
+	temperature: string | null;
+	agitation_notes: string | null;
+	notes: string | null;
+	dev_date: string | null;
+	created_at: string;
+	stages: DevStage[];
+}
+
 // --- Search ---
 
 export interface CameraSearchResult {

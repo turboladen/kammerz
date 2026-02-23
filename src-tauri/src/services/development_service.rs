@@ -1,8 +1,68 @@
 use sea_orm::*;
+use serde::Serialize;
 
 use crate::entities::dev_stage::{self, Entity as DevStage};
 use crate::entities::development_lab::{self, Entity as DevelopmentLab};
 use crate::entities::development_self::{self, Entity as DevelopmentSelf};
+
+/// Flat struct for self-developments joined with roll, film stock, and camera data.
+#[derive(Debug, Serialize, FromQueryResult)]
+pub struct SelfDevListItem {
+    pub dev_id: i32,
+    pub roll_pk: i32,
+    pub roll_id: String,
+    pub roll_status: String,
+    pub film_stock_brand: Option<String>,
+    pub film_stock_name: Option<String>,
+    pub film_stock_iso: Option<i32>,
+    pub film_stock_type: Option<String>,
+    pub camera_brand: Option<String>,
+    pub camera_model: Option<String>,
+    pub date_processed: Option<String>,
+    pub developer: Option<String>,
+    pub developer_dilution: Option<String>,
+    pub fixer: Option<String>,
+    pub fixer_dilution: Option<String>,
+    pub stop_bath: Option<String>,
+    pub wetting_agent: Option<String>,
+    pub clearing_agent: Option<String>,
+    pub temperature: Option<String>,
+    pub agitation_notes: Option<String>,
+    pub notes: Option<String>,
+    pub dev_date: Option<String>,
+    pub created_at: String,
+}
+
+const LIST_SELF_DEVS_SQL: &str = "\
+    SELECT \
+        ds.id AS dev_id, \
+        r.id AS roll_pk, \
+        r.roll_id, \
+        r.status AS roll_status, \
+        fs.brand AS film_stock_brand, \
+        fs.name AS film_stock_name, \
+        fs.iso AS film_stock_iso, \
+        fs.stock_type AS film_stock_type, \
+        c.brand AS camera_brand, \
+        c.model AS camera_model, \
+        ds.date_processed, \
+        ds.developer, \
+        ds.developer_dilution, \
+        ds.fixer, \
+        ds.fixer_dilution, \
+        ds.stop_bath, \
+        ds.wetting_agent, \
+        ds.clearing_agent, \
+        ds.temperature, \
+        ds.agitation_notes, \
+        ds.notes, \
+        COALESCE(ds.date_processed, ds.created_at) AS dev_date, \
+        ds.created_at \
+    FROM development_self ds \
+    JOIN rolls r ON ds.roll_id = r.id \
+    LEFT JOIN film_stocks fs ON r.film_stock_id = fs.id \
+    LEFT JOIN cameras c ON r.camera_id = c.id \
+    ORDER BY dev_date DESC, ds.created_at DESC";
 
 pub struct DevelopmentService;
 
@@ -133,5 +193,33 @@ impl DevelopmentService {
             DevStage::insert_many(models).exec(db).await?;
         }
         Ok(())
+    }
+
+    // --- List all self-developments (with joined context) ---
+
+    pub async fn list_all_self_devs(
+        db: &DatabaseConnection,
+    ) -> Result<Vec<SelfDevListItem>, DbErr> {
+        SelfDevListItem::find_by_statement(Statement::from_string(
+            db.get_database_backend(),
+            LIST_SELF_DEVS_SQL.to_string(),
+        ))
+        .all(db)
+        .await
+    }
+
+    pub async fn list_stages_for_dev_ids(
+        db: &DatabaseConnection,
+        ids: Vec<i32>,
+    ) -> Result<Vec<dev_stage::Model>, DbErr> {
+        if ids.is_empty() {
+            return Ok(vec![]);
+        }
+        DevStage::find()
+            .filter(dev_stage::Column::DevelopmentSelfId.is_in(ids))
+            .order_by_asc(dev_stage::Column::DevelopmentSelfId)
+            .order_by_asc(dev_stage::Column::SortOrder)
+            .all(db)
+            .await
     }
 }

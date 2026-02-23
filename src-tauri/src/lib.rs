@@ -99,6 +99,7 @@ pub fn run() {
             commands::development::update_self_dev,
             commands::development::delete_self_dev,
             commands::development::list_dev_stages,
+            commands::development::list_all_self_developments,
             // Search
             commands::search::search_catalog,
             // Stats

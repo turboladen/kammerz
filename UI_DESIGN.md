@@ -184,6 +184,7 @@ Navigation is split into two groups with a subtle separator:
 | `/lenses` | Lenses | `Aperture` |
 | `/film-stocks` | Film Stocks | `Package` |
 | `/labs` | Labs | `FlaskConical` |
+| `/developments` | Developing | `TestTube2` |
 
 **Utility navigation** (separated by `border-t border-border-subtle`):
 

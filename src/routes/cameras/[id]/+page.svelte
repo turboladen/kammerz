@@ -21,6 +21,13 @@
 
 	const id = $derived(Number(page.params.id));
 
+	// Back navigation: read ?from= param to determine where we came from
+	const cameraBackRoutes: Record<string, { href: string; label: string }> = {
+		search: { href: '/search', label: 'Search' }
+	};
+	const cameraFromParam = $derived(page.url.searchParams.get('from'));
+	const cameraBackNav = $derived(cameraFromParam && cameraBackRoutes[cameraFromParam] ? cameraBackRoutes[cameraFromParam] : { href: '/cameras', label: 'Cameras' });
+
 	let camera: Camera | undefined = $state();
 	let maintenance: CameraMaintenance[] = $state([]);
 	let rolls: RollWithDetails[] = $state([]);
@@ -324,7 +331,7 @@
 		<Button href="/cameras">&larr; Back to cameras</Button>
 	</div>
 {:else if editing}
-	<PageHeader title="Edit {camera.brand} {camera.model}" backHref="/cameras" backLabel="Cameras">
+	<PageHeader title="Edit {camera.brand} {camera.model}" backHref={cameraBackNav.href} backLabel={cameraBackNav.label}>
 		<Button variant="ghost" onclick={() => (editing = false)}>Cancel</Button>
 		<Button variant="primary" onclick={saveEdit}>Save</Button>
 	</PageHeader>
@@ -362,7 +369,7 @@
 		</div>
 	</div>
 {:else}
-	<PageHeader title="{camera.brand} {camera.model}" backHref="/cameras" backLabel="Cameras">
+	<PageHeader title="{camera.brand} {camera.model}" backHref={cameraBackNav.href} backLabel={cameraBackNav.label}>
 		<Button variant="ghost" onclick={startEditing}>Edit</Button>
 		<Button variant="danger" onclick={handleDelete}>Delete</Button>
 	</PageHeader>
