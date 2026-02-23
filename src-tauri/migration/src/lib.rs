@@ -13,6 +13,9 @@ mod m20250221_000010_seed_fixed_lens_mount;
 mod m20250221_000011_add_default_lens_id;
 mod m20260221_000012_seed_instant_film_stocks;
 mod m20260221_000013_seed_user_cameras;
+mod m20260222_000014_seed_user_lenses;
+mod m20260222_000015_seed_qbm_and_extras;
+mod m20260222_000016_seed_user_gear_batch2;
 
 pub struct Migrator;
 
@@ -33,6 +36,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20250221_000011_add_default_lens_id::Migration),
             Box::new(m20260221_000012_seed_instant_film_stocks::Migration),
             Box::new(m20260221_000013_seed_user_cameras::Migration),
+            Box::new(m20260222_000014_seed_user_lenses::Migration),
+            Box::new(m20260222_000015_seed_qbm_and_extras::Migration),
+            Box::new(m20260222_000016_seed_user_gear_batch2::Migration),
         ]
     }
 }
