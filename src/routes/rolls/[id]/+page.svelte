@@ -266,6 +266,14 @@
 		resetShotForm();
 		editingShotId = null;
 
+		// Smart date default: last shot's date > roll's date_loaded > empty
+		if (shots.length > 0) {
+			const lastShot = shots[shots.length - 1];
+			if (lastShot.date) shotDate = lastShot.date;
+		} else if (roll?.date_loaded) {
+			shotDate = roll.date_loaded;
+		}
+
 		// Smart lens default: fixed lens > last-used on roll > roll default > camera default
 		if (fixedLens) {
 			shotLensId = String(fixedLens.id);
