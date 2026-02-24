@@ -3,7 +3,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
-	import { Camera, AlertTriangle, Clock } from 'lucide-svelte';
+	import { Camera, AlertTriangle } from 'lucide-svelte';
 	import { listRolls } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import type { RollWithDetails, Camera as CameraType, RollStatus } from '$lib/types';
@@ -29,8 +29,20 @@
 		rolls.filter((r) => r.status === 'loaded' || r.status === 'shooting')
 	);
 
+	// Rolls in post-shooting processing (shot through scanned)
+	const processingStatuses: RollStatus[] = ['shot', 'at-lab', 'developing', 'developed', 'scanned'];
+	const processingRolls = $derived.by(() => {
+		return rolls
+			.filter((r) => processingStatuses.includes(r.status))
+			.sort((a, b) => {
+				const statusDiff = processingStatuses.indexOf(a.status) - processingStatuses.indexOf(b.status);
+				if (statusDiff !== 0) return statusDiff;
+				return (b.date_finished ?? b.date_loaded ?? '').localeCompare(a.date_finished ?? a.date_loaded ?? '');
+			});
+	});
+
 	const needsAttention = $derived(
-		rolls.filter((r) => !r.camera_id || r.status === 'at-lab')
+		rolls.filter((r) => !r.camera_id && r.status !== 'archived')
 	);
 
 	// Status distribution for the progress bar (uses shared statusOrder + statusConfig)
@@ -88,6 +100,32 @@
 			</div>
 		</div>
 	{:else}
+		{#snippet rollCard(roll: RollWithDetails)}
+			<a
+				href="/rolls/{roll.id}?from=dashboard"
+				class="group flex h-full flex-col rounded-lg border border-border bg-surface-raised px-3.5 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+			>
+				<div class="flex items-center gap-2">
+					<span class="font-mono text-sm font-semibold">{roll.roll_id}</span>
+					<Badge status={roll.status} />
+				</div>
+				<div class="mt-1 text-xs text-text-muted">
+					{#if roll.camera_brand}
+						<span>{roll.camera_brand} {roll.camera_model}</span>
+					{/if}
+					{#if roll.camera_brand && roll.film_stock_brand}
+						<span class="mx-1 text-text-faint/60">&middot;</span>
+					{/if}
+					{#if roll.film_stock_brand}
+						<span>{roll.film_stock_brand} {roll.film_stock_name}</span>
+					{/if}
+				</div>
+				{#if roll.film_stock_iso}
+					<div class="mt-1 font-mono text-[11px] text-text-faint">ISO {roll.film_stock_iso}</div>
+				{/if}
+			</a>
+		{/snippet}
+
 		<!-- Currently Shooting -->
 		{#if activeRolls.length > 0}
 			<FadeIn>
@@ -96,31 +134,26 @@
 						In the Field
 						<div class="flex-1 border-b border-border-subtle"></div>
 					</h2>
-					<div class="grid gap-3 {activeRolls.length > 1 ? 'sm:grid-cols-2' : ''}">
+					<div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2.5">
 						{#each activeRolls as roll}
-							<a
-								href="/rolls/{roll.id}?from=dashboard"
-								class="group rounded-lg border border-accent/20 bg-accent/5 p-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
-							>
-								<div class="flex items-center justify-between">
-									<div class="flex items-center gap-3">
-										<span class="font-mono text-lg font-semibold text-accent">{roll.roll_id}</span>
-										<Badge status={roll.status} />
-									</div>
-									<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
-								</div>
-								<div class="mt-2 flex flex-wrap gap-3 text-sm text-text-muted">
-									{#if roll.camera_brand}
-										<span>{roll.camera_brand} {roll.camera_model}</span>
-									{/if}
-									{#if roll.film_stock_brand}
-										<span class="text-text-faint">{roll.film_stock_brand} {roll.film_stock_name}</span>
-									{/if}
-									{#if roll.film_stock_iso}
-										<span class="font-mono text-xs text-text-faint">ISO {roll.film_stock_iso}</span>
-									{/if}
-								</div>
-							</a>
+							{@render rollCard(roll)}
+						{/each}
+					</div>
+				</div>
+			</FadeIn>
+		{/if}
+
+		<!-- In the Darkroom -->
+		{#if processingRolls.length > 0}
+			<FadeIn delay={50}>
+				<div class="mb-8">
+					<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+						In the Darkroom
+						<div class="flex-1 border-b border-border-subtle"></div>
+					</h2>
+					<div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2.5">
+						{#each processingRolls as roll}
+							{@render rollCard(roll)}
 						{/each}
 					</div>
 				</div>
@@ -128,7 +161,7 @@
 		{/if}
 
 		<!-- Quick Stats Row -->
-		<FadeIn delay={50}>
+		<FadeIn delay={100}>
 			<div class="mb-8 grid grid-cols-4 gap-4">
 				<div class="rounded-lg border border-border bg-surface-raised p-4">
 					<p class="font-mono text-2xl font-semibold">{rolls.length}</p>
@@ -151,7 +184,7 @@
 
 		<!-- Status Distribution Bar -->
 		{#if statusSegments.length > 0}
-			<FadeIn delay={100}>
+			<FadeIn delay={150}>
 				<div class="mb-8">
 					<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 						Roll Pipeline
@@ -183,7 +216,7 @@
 
 		<!-- Needs Attention -->
 		{#if needsAttention.length > 0}
-			<FadeIn delay={150}>
+			<FadeIn delay={200}>
 				<div>
 					<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 						Needs Attention
@@ -196,20 +229,12 @@
 								class="flex items-center justify-between rounded-lg border border-border bg-surface-raised p-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 							>
 								<div class="flex items-center gap-3">
-									{#if !roll.camera_id}
-										<AlertTriangle size={14} class="text-status-at-lab" />
-									{:else}
-										<Clock size={14} class="text-status-at-lab" />
-									{/if}
+									<AlertTriangle size={14} class="text-status-at-lab" />
 									<span class="font-mono text-sm">{roll.roll_id}</span>
 									<Badge status={roll.status} />
 								</div>
 								<div class="text-xs text-text-muted">
-									{#if !roll.camera_id}
-										No camera assigned
-									{:else if roll.status === 'at-lab'}
-										Waiting at lab
-									{/if}
+									No camera assigned
 								</div>
 							</a>
 						{/each}

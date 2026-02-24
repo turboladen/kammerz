@@ -66,6 +66,7 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - Shot date defaults: Smart cascade — last shot's date on roll > `roll.date_loaded` (first shot) > empty. Date persists as a session default across "Save & Next".
 - Development auto-prompt: Moving status to "at-lab" auto-opens lab dev dialog; "developing" auto-opens self dev dialog (only if neither dev record exists). Lab and self dev are mutually exclusive — UI hides "+ Lab" / "+ Self" buttons once one exists. Dev status nudge suggests advancement when dev record exists but status hasn't caught up.
 - Shot dialog "Save & Next": Keeps dialog open after save, resets per-shot fields (aperture, shutter, notes), preserves session defaults (date, location, lens), auto-suggests next frame number. Only shown in add mode (not edit).
+- Dashboard roll sections: "In the Field" shows `loaded`/`shooting` rolls (in a camera). "In the Darkroom" shows `shot`/`at-lab`/`developing`/`developed`/`scanned` rolls (post-shooting pipeline, sorted by status progression). "Needs Attention" shows rolls with `!camera_id` (excluding archived). All non-archived rolls must appear in at least one clickable section.
 
 ### Svelte 5 Patterns
 - Use `$state()`, `$derived()`, `$effect()`, `$props()`, `$bindable()` — no legacy `let` reactivity.
@@ -111,6 +112,7 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 - `Select` options support an optional `disabled` property (used for visual dividers like `── Other formats ──`).
 - `Select` uses explicit `h-[38px]` to match `Input`/`DateInput` height — WebKit renders `<select>` shorter than `<input>` with identical padding classes.
 - Use `$derived.by(() => { ... })` when derived state needs multi-line logic; `$derived(expr)` for one-liners.
+- Use `{#snippet name(params)}` / `{@render name(params)}` for reusable template blocks within a single component — avoids duplicating markup without extracting a separate component file. See `rollCard` snippet in `+page.svelte` (Dashboard).
 - Always use the `<Badge>` component for roll statuses — never inline status pills with raw classes.
 - Wrap page content sections in `<FadeIn>` with staggered `delay` props (typically 50ms increments) for consistent entrance animations.
 - FadeIn stacking context: CSS `animation` with `transform`/`opacity` creates a stacking context + containing block, trapping `position: fixed` children (e.g., Dialogs). FadeIn strips its animation class via `onanimationend` to clear this after the entrance plays. Never wrap a component that renders its own Dialog inside a persistent animation/transform.
