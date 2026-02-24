@@ -1,12 +1,14 @@
 use std::collections::HashMap;
 
-use sea_orm::{DbErr, Set, TransactionTrait};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, PaginatorTrait, QueryFilter, Set, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
+use crate::entities::roll::RollStatus;
 use crate::entities::{dev_stage, development_lab, development_self};
 use crate::patch::{double_option, trim_opt};
 use crate::services::development_service::{DevelopmentService, SelfDevListItem, StageInput};
+use crate::services::roll_service::RollService;
 use crate::AppState;
 
 // --- DTOs ---
@@ -122,24 +124,43 @@ pub async fn create_lab_dev(
     data: CreateLabDevDto,
 ) -> Result<i32, String> {
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    let model = development_lab::ActiveModel {
-        roll_id: Set(data.roll_id),
-        lab_id: Set(data.lab_id),
-        date_dropped_off: trim_opt(data.date_dropped_off),
-        date_received: trim_opt(data.date_received),
-        cost: Set(data.cost),
-        notes: trim_opt(data.notes),
-        created_at: Set(now.clone()),
-        updated_at: Set(now),
-        ..Default::default()
-    };
-    let result = DevelopmentService::create_lab_dev(&state.db, model)
+
+    let result_id = state
+        .db
+        .transaction::<_, i32, DbErr>(|txn| {
+            Box::pin(async move {
+                let model = development_lab::ActiveModel {
+                    roll_id: Set(data.roll_id),
+                    lab_id: Set(data.lab_id),
+                    date_dropped_off: trim_opt(data.date_dropped_off),
+                    date_received: trim_opt(data.date_received),
+                    cost: Set(data.cost),
+                    notes: trim_opt(data.notes),
+                    created_at: Set(now.clone()),
+                    updated_at: Set(now),
+                    ..Default::default()
+                };
+                let result = model.insert(txn).await?;
+
+                // Auto-advance: → at-lab when lab dev record is created
+                RollService::auto_sync_status(
+                    txn,
+                    data.roll_id,
+                    &[RollStatus::Loaded, RollStatus::Shooting, RollStatus::Shot],
+                    RollStatus::AtLab,
+                )
+                .await?;
+
+                Ok(result.id)
+            })
+        })
         .await
         .map_err(|e| {
             log::error!("Failed to create lab dev: {e}");
             super::friendly_err("lab development", e)
         })?;
-    Ok(result.id)
+
+    Ok(result_id)
 }
 
 #[tauri::command]
@@ -177,7 +198,40 @@ pub async fn delete_lab_dev(
     state: State<'_, AppState>,
     id: i32,
 ) -> Result<(), String> {
-    DevelopmentService::delete_lab_dev(&state.db, id)
+    state
+        .db
+        .transaction::<_, (), DbErr>(|txn| {
+            Box::pin(async move {
+                // Look up dev record to get roll_id before deleting
+                let dev = development_lab::Entity::find_by_id(id)
+                    .one(txn)
+                    .await?
+                    .ok_or_else(|| DbErr::Custom(format!("Lab development {id} not found")))?;
+                let roll_id = dev.roll_id;
+
+                // Delete the dev record
+                development_lab::Entity::delete_by_id(id).exec(txn).await?;
+
+                // Auto-revert: at-lab/lab-done → shot when lab dev is removed
+                // (only if no self-dev record exists — sibling dev takes priority)
+                let has_self_dev = development_self::Entity::find()
+                    .filter(development_self::Column::RollId.eq(roll_id))
+                    .count(txn)
+                    .await? > 0;
+
+                if !has_self_dev {
+                    RollService::auto_sync_status(
+                        txn,
+                        roll_id,
+                        &[RollStatus::AtLab, RollStatus::LabDone],
+                        RollStatus::Shot,
+                    )
+                    .await?;
+                }
+
+                Ok(())
+            })
+        })
         .await
         .map_err(|e| {
             log::error!("Failed to delete lab dev {id}: {e}");
@@ -234,6 +288,15 @@ pub async fn create_self_dev(
                     DevelopmentService::set_stages(txn, result.id, stages_to_inputs(stages))
                         .await?;
                 }
+
+                // Auto-advance: → developing when self dev record is created
+                RollService::auto_sync_status(
+                    txn,
+                    data.roll_id,
+                    &[RollStatus::Loaded, RollStatus::Shooting, RollStatus::Shot],
+                    RollStatus::Developing,
+                )
+                .await?;
 
                 Ok(result.id)
             })
@@ -302,7 +365,40 @@ pub async fn delete_self_dev(
     state: State<'_, AppState>,
     id: i32,
 ) -> Result<(), String> {
-    DevelopmentService::delete_self_dev(&state.db, id)
+    state
+        .db
+        .transaction::<_, (), DbErr>(|txn| {
+            Box::pin(async move {
+                // Look up dev record to get roll_id before deleting
+                let dev = development_self::Entity::find_by_id(id)
+                    .one(txn)
+                    .await?
+                    .ok_or_else(|| DbErr::Custom(format!("Self development {id} not found")))?;
+                let roll_id = dev.roll_id;
+
+                // Delete the dev record (dev stages cascade-deleted by FK)
+                development_self::Entity::delete_by_id(id).exec(txn).await?;
+
+                // Auto-revert: developing/developed → shot when self dev is removed
+                // (only if no lab-dev record exists — sibling dev takes priority)
+                let has_lab_dev = development_lab::Entity::find()
+                    .filter(development_lab::Column::RollId.eq(roll_id))
+                    .count(txn)
+                    .await? > 0;
+
+                if !has_lab_dev {
+                    RollService::auto_sync_status(
+                        txn,
+                        roll_id,
+                        &[RollStatus::Developing, RollStatus::Developed],
+                        RollStatus::Shot,
+                    )
+                    .await?;
+                }
+
+                Ok(())
+            })
+        })
         .await
         .map_err(|e| {
             log::error!("Failed to delete self dev {id}: {e}");

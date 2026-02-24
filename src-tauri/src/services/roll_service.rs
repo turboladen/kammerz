@@ -183,6 +183,33 @@ impl RollService {
         Ok(roll_id)
     }
 
+    /// Conditionally update roll status if the current status is in `from_statuses`.
+    /// Used for data-driven auto-sync: when related data (shots, dev records) is
+    /// created or deleted, the roll status should reflect the data state.
+    /// Returns `true` if status was changed.
+    pub async fn auto_sync_status(
+        db: &impl ConnectionTrait,
+        roll_id: i32,
+        from_statuses: &[RollStatus],
+        to_status: RollStatus,
+    ) -> Result<bool, DbErr> {
+        let roll_record = Roll::find_by_id(roll_id)
+            .one(db)
+            .await?
+            .ok_or_else(|| DbErr::Custom(format!("Roll {roll_id} not found")))?;
+
+        if from_statuses.contains(&roll_record.status) {
+            let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+            let mut model: roll::ActiveModel = roll_record.into();
+            model.status = Set(to_status);
+            model.updated_at = Set(now);
+            model.update(db).await?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Suggest a roll ID in YYMMDD-N format.
     pub async fn suggest_id(db: &DatabaseConnection) -> Result<String, DbErr> {
         let now = chrono::Local::now();

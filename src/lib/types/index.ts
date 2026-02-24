@@ -134,6 +134,7 @@ export type RollStatus =
 	| 'shooting'
 	| 'shot'
 	| 'at-lab'
+	| 'lab-done'
 	| 'developing'
 	| 'developed'
 	| 'scanned'

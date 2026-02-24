@@ -16,6 +16,9 @@ pub enum RollStatus {
     #[sea_orm(string_value = "at-lab")]
     #[serde(rename = "at-lab")]
     AtLab,
+    #[sea_orm(string_value = "lab-done")]
+    #[serde(rename = "lab-done")]
+    LabDone,
     #[sea_orm(string_value = "developing")]
     #[serde(rename = "developing")]
     Developing,

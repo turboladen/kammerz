@@ -1,8 +1,8 @@
-use sea_orm::{DbErr, EntityTrait, Set, TransactionTrait};
+use sea_orm::{ColumnTrait, DbErr, EntityTrait, PaginatorTrait, QueryFilter, Set, TransactionTrait};
 use serde::Deserialize;
 use tauri::State;
 
-use crate::entities::roll::{self, RollStatus};
+use crate::entities::roll::RollStatus;
 use crate::entities::shot;
 use crate::patch::{double_option, trim, trim_opt};
 use crate::services::roll_service::RollService;
@@ -109,19 +109,14 @@ pub async fn create_shot(
                     }
                 }
 
-                // Auto-transition: loaded → shooting when first shot is added
-                let roll_record = roll::Entity::find_by_id(data.roll_id)
-                    .one(txn)
-                    .await?
-                    .ok_or_else(|| DbErr::Custom(format!("Roll {} not found", data.roll_id)))?;
-
-                if roll_record.status == RollStatus::Loaded {
-                    let now_ts = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-                    let mut roll_model: roll::ActiveModel = roll_record.into();
-                    roll_model.status = Set(RollStatus::Shooting);
-                    roll_model.updated_at = Set(now_ts);
-                    RollService::update(txn, roll_model).await?;
-                }
+                // Auto-advance: loaded → shooting when first shot is added
+                RollService::auto_sync_status(
+                    txn,
+                    data.roll_id,
+                    &[RollStatus::Loaded],
+                    RollStatus::Shooting,
+                )
+                .await?;
 
                 Ok(result.id)
             })
@@ -185,10 +180,44 @@ pub async fn update_shot(
 
 #[tauri::command]
 pub async fn delete_shot(state: State<'_, AppState>, id: i32) -> Result<(), String> {
-    ShotService::delete(&state.db, id).await.map_err(|e| {
-        log::error!("Failed to delete shot {id}: {e}");
-        format!("Could not delete shot: {e}")
-    })
+    state
+        .db
+        .transaction::<_, (), DbErr>(|txn| {
+            Box::pin(async move {
+                // Look up shot to get roll_id before deleting
+                let shot_record = shot::Entity::find_by_id(id)
+                    .one(txn)
+                    .await?
+                    .ok_or_else(|| DbErr::Custom(format!("Shot {id} not found")))?;
+                let roll_id = shot_record.roll_id;
+
+                // Delete the shot (shot_lenses cascade-deleted by FK)
+                shot::Entity::delete_by_id(id).exec(txn).await?;
+
+                // Auto-revert: shooting/shot → loaded when last shot is removed
+                let remaining = shot::Entity::find()
+                    .filter(shot::Column::RollId.eq(roll_id))
+                    .count(txn)
+                    .await?;
+
+                if remaining == 0 {
+                    RollService::auto_sync_status(
+                        txn,
+                        roll_id,
+                        &[RollStatus::Shooting, RollStatus::Shot],
+                        RollStatus::Loaded,
+                    )
+                    .await?;
+                }
+
+                Ok(())
+            })
+        })
+        .await
+        .map_err(|e| {
+            log::error!("Failed to delete shot {id}: {e}");
+            format!("Could not delete shot: {e}")
+        })
 }
 
 #[tauri::command]

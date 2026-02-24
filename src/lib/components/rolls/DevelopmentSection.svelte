@@ -119,6 +119,8 @@
 			devLabNotes = labDev.notes ?? '';
 		} else {
 			resetLabDevForm();
+			// Smart date default: last shot's date > roll's date_loaded > empty
+			if (defaultDate) devDateDroppedOff = defaultDate;
 		}
 		devLabError = '';
 		showLabDevDialog = true;
@@ -277,7 +279,7 @@
 					<span class="text-text-muted">{getLabName(labDev.lab_id)}</span>
 				{/if}
 				{#if labDev.date_dropped_off}
-					<span class="text-text-faint">Dropped off: {labDev.date_dropped_off}</span>
+					<span class="text-text-faint">Submitted: {labDev.date_dropped_off}</span>
 				{/if}
 				{#if labDev.date_received}
 					<span class="text-text-faint">Received: {labDev.date_received}</span>
@@ -353,7 +355,7 @@
 		<div class="space-y-4">
 			<Select label="Lab" bind:value={devLabId} options={labOptions} />
 			<div class="grid grid-cols-2 gap-3">
-				<DateInput label="Date Dropped Off" bind:value={devDateDroppedOff} />
+				<DateInput label="Date Submitted" bind:value={devDateDroppedOff} />
 				<DateInput label="Date Received" bind:value={devDateReceived} />
 			</div>
 			<Input label="Cost" bind:value={devCost} placeholder="15.00" />

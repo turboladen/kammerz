@@ -22,7 +22,7 @@
 	import { lensDisplayName, buildLensOptions } from '$lib/utils/lens';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
-	import { statusOrder, statusConfig } from '$lib/utils/status';
+	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder } from '$lib/utils/status';
 	import type { RollWithDetails, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, LensMount } from '$lib/types';
 
 	const id = $derived(Number(page.params.id));
@@ -82,9 +82,16 @@
 	let devStages: DevStage[] = $state([]);
 	let devAutoPrompt: 'lab' | 'self' | null = $state(null);
 
+	// Path-aware status flow
+	const devPath = $derived(
+		roll ? getDevPath(roll.status as RollStatus, !!labDev, !!selfDev) : 'undecided' as const
+	);
+	const statusFlow = $derived(getFlowForPath(devPath));
+	const pathLabel = $derived(getPathLabel(devPath));
+
 	// Status backward-move confirmation
 	let pendingStatus: RollStatus | null = $state(null);
-	const currentStatusIdx = $derived(roll ? statusOrder.indexOf(roll.status as RollStatus) : -1);
+	const currentStatusIdx = $derived(roll ? statusFlow.indexOf(roll.status as RollStatus) : -1);
 
 	// Roll-full nudge state
 	let rollFullDismissed = $state(false);
@@ -95,19 +102,9 @@
 		!rollFullDismissed
 	);
 
-	// Dev-status nudge: suggest status change when dev record exists but status hasn't caught up
-	let devNudgeDismissed = $state(false);
-	const devStatusNudge = $derived.by(() => {
-		if (devNudgeDismissed || !roll) return null;
-		const currentIdx = statusOrder.indexOf(roll.status as RollStatus);
-		if (labDev && currentIdx < statusOrder.indexOf('at-lab')) {
-			return { target: 'at-lab' as RollStatus, label: 'At Lab', reason: 'Lab development added' };
-		}
-		if (selfDev && currentIdx < statusOrder.indexOf('developed')) {
-			return { target: 'developed' as RollStatus, label: 'Developed', reason: 'Self development logged' };
-		}
-		return null;
-	});
+	// Status auto-sync (advance on create, revert on delete) is handled by the
+	// backend commands transactionally. The frontend just calls load() after
+	// mutations (via DevelopmentSection's onchange={load}) to pick up new status.
 
 	const cameraLabels = $derived(buildCameraLabels(cameras));
 	const cameraOptions = $derived([
@@ -220,7 +217,6 @@
 			]);
 			roll = r;
 			rollFullDismissed = false;
-			devNudgeDismissed = false;
 			cameras = cams;
 			filmStocks = stocks;
 			shots = s;
@@ -446,9 +442,8 @@
 
 	function handleStatusClick(status: RollStatus) {
 		if (!roll) return;
-		const currentIdx = statusOrder.indexOf(roll.status as RollStatus);
-		const targetIdx = statusOrder.indexOf(status);
-		if (targetIdx < currentIdx) {
+		const targetIdx = statusFlow.indexOf(status);
+		if (currentStatusIdx !== -1 && targetIdx < currentStatusIdx) {
 			// Backward move — ask for confirmation
 			pendingStatus = status;
 		} else {
@@ -630,21 +625,18 @@
 				Status
 				<div class="flex-1 border-b border-border-subtle"></div>
 			</h2>
+			{#if pathLabel}
+				<p class="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-text-faint/70">{pathLabel}</p>
+			{/if}
 			<div class="flex items-center gap-[2px]">
-				{#each statusOrder as status, idx}
+				{#each statusFlow as status, idx}
 					{@const isFirst = idx === 0}
-					{@const isLast = idx === statusOrder.length - 1}
+					{@const isLast = idx === statusFlow.length - 1}
 					{@const clipPath = isFirst
 						? 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%)'
 						: isLast
 							? 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 8px 50%)'
 							: 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)'}
-					{@const isSkipped = idx < currentStatusIdx && (
-						(status === 'at-lab' && !labDev) ||
-						(status === 'developing' && !selfDev) ||
-						(status === 'developed' && !labDev && !selfDev) ||
-						(status === 'scanned' && !labDev && !selfDev)
-					)}
 					<button
 						onclick={() => handleStatusClick(status)}
 						style="clip-path: {clipPath}"
@@ -652,14 +644,22 @@
 							{isFirst ? 'pl-3 pr-4' : isLast ? 'pl-4 pr-3' : 'px-4'}
 							{roll.status === status
 							? 'bg-accent text-surface'
-							: isSkipped
-								? 'bg-surface-overlay/60 text-text-faint'
-								: idx < currentStatusIdx
-									? 'bg-accent/10 text-accent/70 hover:bg-accent/20'
-									: 'bg-surface-overlay text-text-muted hover:text-text'}"
+							: idx < currentStatusIdx
+								? 'bg-accent/10 text-accent/70 hover:bg-accent/20'
+								: 'bg-surface-overlay text-text-muted hover:text-text'}"
 					>
 						{statusConfig[status].label}
 					</button>
+					{#if devPath === 'undecided' && status === 'shot'}
+						{#each ['·', '·'] as dot}
+							<div
+								style="clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)"
+								class="flex items-center justify-center px-4 py-1.5 text-xs font-medium bg-surface-overlay/40 text-text-faint"
+							>
+								{dot}
+							</div>
+						{/each}
+					{/if}
 				{/each}
 			</div>
 		</div>
@@ -678,24 +678,6 @@
 			onchange={load}
 		/>
 
-		{#if devStatusNudge}
-			<div class="mb-6 flex items-center justify-between rounded-lg border border-accent/30 bg-accent/10 px-4 py-3">
-				<div>
-					<p class="text-sm font-medium text-accent">{devStatusNudge.reason}</p>
-					<p class="text-xs text-accent/70">
-						Move status to {devStatusNudge.label}?
-					</p>
-				</div>
-				<div class="flex items-center gap-2">
-					<Button size="sm" variant="primary" onclick={() => updateStatus(devStatusNudge.target)}>Move to {devStatusNudge.label}</Button>
-					<button
-						onclick={() => { devNudgeDismissed = true; }}
-						class="text-accent/60 hover:text-accent transition-colors text-lg leading-none px-1"
-						aria-label="Dismiss"
-					>&times;</button>
-				</div>
-			</div>
-		{/if}
 		</FadeIn>
 
 		<!-- Shots -->

@@ -7,7 +7,7 @@
 	import { listRolls } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import type { RollWithDetails, Camera as CameraType, RollStatus } from '$lib/types';
-	import { statusOrder, statusConfig } from '$lib/utils/status';
+	import { allStatusOrder, statusConfig } from '$lib/utils/status';
 
 	let rolls: RollWithDetails[] = $state([]);
 	let cameras: CameraType[] = $state([]);
@@ -30,7 +30,7 @@
 	);
 
 	// Rolls in post-shooting processing (shot through scanned)
-	const processingStatuses: RollStatus[] = ['shot', 'at-lab', 'developing', 'developed', 'scanned'];
+	const processingStatuses: RollStatus[] = ['shot', 'at-lab', 'lab-done', 'developing', 'developed', 'scanned'];
 	const processingRolls = $derived.by(() => {
 		return rolls
 			.filter((r) => processingStatuses.includes(r.status))
@@ -45,9 +45,9 @@
 		rolls.filter((r) => !r.camera_id && r.status !== 'archived')
 	);
 
-	// Status distribution for the progress bar (uses shared statusOrder + statusConfig)
+	// Status distribution for the progress bar (uses shared allStatusOrder + statusConfig)
 	const statusSegments = $derived(
-		statusOrder
+		allStatusOrder
 			.map((key) => ({
 				key,
 				label: statusConfig[key].label,

@@ -88,6 +88,7 @@
 		{ value: 'shooting', label: 'Shooting' },
 		{ value: 'shot', label: 'Shot' },
 		{ value: 'at-lab', label: 'At Lab' },
+		{ value: 'lab-done', label: 'Lab Done' },
 		{ value: 'developing', label: 'Developing' },
 		{ value: 'developed', label: 'Developed' },
 		{ value: 'scanned', label: 'Scanned' },
