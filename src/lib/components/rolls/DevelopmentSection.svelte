@@ -25,6 +25,7 @@
 		selfDev = $bindable(),
 		devStages = $bindable(),
 		autoPrompt = $bindable(null),
+		defaultDate = '',
 		onchange
 	}: {
 		rollId: number;
@@ -33,6 +34,7 @@
 		selfDev: DevelopmentSelf | null;
 		devStages: DevStage[];
 		autoPrompt: 'lab' | 'self' | null;
+		defaultDate?: string;
 		onchange: () => Promise<void>;
 	} = $props();
 
@@ -142,6 +144,8 @@
 			}));
 		} else {
 			resetSelfDevForm();
+			// Smart date default: last shot's date > roll's date_loaded > empty
+			if (defaultDate) devDateProcessed = defaultDate;
 		}
 		devSelfError = '';
 		showSelfDevDialog = true;

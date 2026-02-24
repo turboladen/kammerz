@@ -674,6 +674,7 @@
 			bind:selfDev
 			bind:devStages
 			bind:autoPrompt={devAutoPrompt}
+			defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
 			onchange={load}
 		/>
 
