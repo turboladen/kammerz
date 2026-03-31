@@ -205,12 +205,12 @@
 					<p class="text-xs text-text-faint">Cameras</p>
 				</div>
 				<div class="rounded-lg border border-border bg-surface-raised p-4">
-					<p class="font-mono text-2xl font-semibold">{rollsByStatus['shooting'] ?? 0}</p>
-					<p class="text-xs text-text-faint">Currently Shooting</p>
+					<p class="font-mono text-2xl font-semibold">{activeRolls.length}</p>
+					<p class="text-xs text-text-faint">In the Field</p>
 				</div>
 				<div class="rounded-lg border border-border bg-surface-raised p-4">
-					<p class="font-mono text-2xl font-semibold">{rollsByStatus['at-lab'] ?? 0}</p>
-					<p class="text-xs text-text-faint">At Lab</p>
+					<p class="font-mono text-2xl font-semibold">{processingRolls.length}</p>
+					<p class="text-xs text-text-faint">In the Darkroom</p>
 				</div>
 			</div>
 		</FadeIn>
