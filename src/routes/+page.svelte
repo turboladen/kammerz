@@ -6,11 +6,15 @@
 	import { Camera, AlertTriangle } from 'lucide-svelte';
 	import { listRolls } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
-	import type { RollWithDetails, Camera as CameraType, RollStatus } from '$lib/types';
+	import { listLenses } from '$lib/api/lenses';
+	import { listFilmStocks } from '$lib/api/film-stocks';
+	import type { RollWithDetails, Camera as CameraType, Lens, FilmStock, RollStatus } from '$lib/types';
 	import { allStatusOrder, statusConfig } from '$lib/utils/status';
 
 	let rolls: RollWithDetails[] = $state([]);
 	let cameras: CameraType[] = $state([]);
+	let lenses: Lens[] = $state([]);
+	let filmStocks: FilmStock[] = $state([]);
 	let loading = $state(true);
 	let error = $state('');
 
@@ -60,7 +64,12 @@
 
 	async function load() {
 		try {
-			[rolls, cameras] = await Promise.all([listRolls(), listCameras()]);
+			[rolls, cameras, lenses, filmStocks] = await Promise.all([
+			listRolls(),
+			listCameras(),
+			listLenses(),
+			listFilmStocks()
+		]);
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -85,20 +94,44 @@
 	{#if loading}
 		<p class="text-sm text-text-muted">Loading...</p>
 	{:else if rolls.length === 0}
-		<!-- Empty state for new users -->
-		<div class="flex flex-col items-center gap-6 py-20 text-center">
-			<div class="rounded-full bg-accent/10 p-4">
-				<Camera size={32} class="text-accent" />
+		<!-- Catalog stats -->
+		<FadeIn>
+			<div class="mb-8 grid grid-cols-4 gap-4">
+				<div class="rounded-lg border border-border bg-surface-raised p-4">
+					<p class="font-mono text-2xl font-semibold">0</p>
+					<p class="text-xs text-text-faint">Total Rolls</p>
+				</div>
+				<div class="rounded-lg border border-border bg-surface-raised p-4">
+					<p class="font-mono text-2xl font-semibold">{cameras.length}</p>
+					<p class="text-xs text-text-faint">Cameras</p>
+				</div>
+				<div class="rounded-lg border border-border bg-surface-raised p-4">
+					<p class="font-mono text-2xl font-semibold">{lenses.length}</p>
+					<p class="text-xs text-text-faint">Lenses</p>
+				</div>
+				<div class="rounded-lg border border-border bg-surface-raised p-4">
+					<p class="font-mono text-2xl font-semibold">{filmStocks.length}</p>
+					<p class="text-xs text-text-faint">Film Stocks</p>
+				</div>
 			</div>
-			<div>
-				<h2 class="font-display text-2xl text-text">Start your log</h2>
-				<p class="mt-2 max-w-sm text-sm text-text-muted">Add your cameras, pick your film stocks, and create your first roll to begin tracking your film photography.</p>
+		</FadeIn>
+
+		<!-- Empty state CTA -->
+		<FadeIn delay={50}>
+			<div class="flex flex-col items-center gap-6 py-16 text-center">
+				<div class="rounded-full bg-accent/10 p-4">
+					<Camera size={32} class="text-accent" />
+				</div>
+				<div>
+					<h2 class="font-display text-2xl text-text">Start your log</h2>
+					<p class="mt-2 max-w-sm text-sm text-text-muted">Add your cameras, pick your film stocks, and create your first roll to begin tracking your film photography.</p>
+				</div>
+				<div class="flex gap-3">
+					<Button href="/cameras">Add Cameras</Button>
+					<Button variant="primary" href="/rolls/new">Create Roll</Button>
+				</div>
 			</div>
-			<div class="flex gap-3">
-				<Button href="/cameras">Add Cameras</Button>
-				<Button variant="primary" href="/rolls/new">Create Roll</Button>
-			</div>
-		</div>
+		</FadeIn>
 	{:else}
 		{#snippet rollCard(roll: RollWithDetails)}
 			<a
