@@ -31,3 +31,8 @@ bun.lock
 
 # Claude
 .claude/settings.local.json
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

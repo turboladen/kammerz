@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "kammerz",
+  "project_id": "8fb34247-2311-4353-a37f-5936ff2bc42b"
+}
