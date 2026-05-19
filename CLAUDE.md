@@ -142,7 +142,6 @@ Film photography catalog desktop app built with Tauri 2 + SvelteKit + SQLite.
 
 - Another Tauri 2 + SQLite project by the same author: `~/Development/projects/financier` (same SeaORM patterns)
 - `UI_DESIGN.md` documents the visual design system (colors, typography, components, layout)
-- `IMPLEMENTATION_PLAN.md` tracks phase-by-phase development progress
 
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
