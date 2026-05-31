@@ -20,4 +20,11 @@ impl AppConfig {
                 .unwrap_or(false),
         }
     }
+
+    /// Whether auth is enforced. `true` when a password hash is configured;
+    /// `false` is OPEN LAN-trust mode. Single source of truth for the open-mode
+    /// predicate so the `RequireAuth` extractor and the auth handlers can't drift.
+    pub fn auth_enabled(&self) -> bool {
+        self.password_hash.is_some()
+    }
 }

@@ -1,6 +1,9 @@
 [Unit]
 Description=Kammerz film catalog
 After=network.target
+# Restart rate-limit lives in [Unit] (systemd v229+); ignored if placed in [Service].
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -9,8 +12,6 @@ WorkingDirectory=/opt/kammerz
 EnvironmentFile=/opt/kammerz/.env
 ExecStart=/opt/kammerz/kammerz
 Restart=on-failure
-StartLimitIntervalSec=300
-StartLimitBurst=5
 ProtectSystem=strict
 ReadWritePaths=/opt/kammerz/data
 ProtectHome=true

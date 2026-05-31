@@ -10,6 +10,7 @@ use tower_sessions::{cookie::SameSite, Expiry, SessionManagerLayer};
 use tower_sessions_sqlx_store::SqliteStore;
 
 use kammerz::config::AppConfig;
+use kammerz::error::AppError;
 use kammerz::{db, routes, AppState};
 
 #[derive(Embed)]
@@ -57,19 +58,15 @@ async fn main() {
         );
     }
 
-    // Session store: a separate sqlx pool against the same SQLite file. The
-    // store reads its own connection options (no migration FK toggling here).
-    let session_base = db_url
-        .strip_prefix("sqlite:")
-        .unwrap_or(&db_url)
-        .split('?')
-        .next()
-        .unwrap()
-        .to_string();
+    // Session store: a separate sqlx pool against the same SQLite file (path
+    // resolved by the same helper as db::init so the two pools never diverge).
+    // busy_timeout matches the data pool so a session write that collides with a
+    // catalog write waits instead of failing fast with SQLITE_BUSY.
     let session_pool = sqlx::SqlitePool::connect_with(
-        SqliteConnectOptions::from_str(&session_base)
-            .unwrap()
+        SqliteConnectOptions::from_str(db::sqlite_path(&db_url))
+            .expect("invalid DATABASE_URL for session store")
             .create_if_missing(true)
+            .busy_timeout(db::busy_timeout())
             .foreign_keys(true),
     )
     .await
@@ -83,7 +80,7 @@ async fn main() {
         .with_http_only(true)
         .with_expiry(Expiry::OnInactivity(TimeDuration::days(30)));
 
-    let state = AppState { db, config: config.clone() };
+    let state = AppState { db, config };
 
     let app = routes::create_router(state)
         .fallback(serve_spa)
@@ -109,10 +106,9 @@ fn is_route_like(path: &str) -> bool {
 async fn serve_spa(uri: Uri) -> impl IntoResponse {
     let path = uri.path().trim_start_matches('/');
     if path.starts_with("api/") {
-        return (StatusCode::NOT_FOUND,
-            [(header::CONTENT_TYPE, "application/json")],
-            "{\"error\":{\"code\":\"NOT_FOUND\",\"message\":\"not found\"}}")
-            .into_response();
+        // Reuse the shared error envelope so unmatched /api/* 404s are byte-identical
+        // to every handler error (frontend reads `error.code` / `error.message`).
+        return AppError::NotFound("not found".to_string()).into_response();
     }
     let (asset, mime_path) = if path.is_empty() {
         (Assets::get("index.html"), "index.html")

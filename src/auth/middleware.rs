@@ -43,7 +43,7 @@ where
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let config = AppConfig::from_ref(state);
-        if config.password_hash.is_none() {
+        if !config.auth_enabled() {
             return Ok(RequireAuth); // open mode
         }
         let session = parts

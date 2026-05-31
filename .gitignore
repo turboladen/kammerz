@@ -40,4 +40,8 @@ bun.lock
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db
+# SQLite WAL sidecars (dev DB at ./kammerz.db)
+*.db-shm
+*.db-wal
+*.db-journal
 .beads-credential-key

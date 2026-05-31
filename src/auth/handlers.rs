@@ -46,6 +46,6 @@ pub async fn logout(session: Session) -> AppResult<Json<Value>> {
 }
 
 pub async fn me(State(config): State<AppConfig>, session: Session) -> Json<Value> {
-    let authed = config.password_hash.is_none() || is_authed(&session).await;
-    Json(json!({ "authenticated": authed, "auth_required": config.password_hash.is_some() }))
+    let authed = !config.auth_enabled() || is_authed(&session).await;
+    Json(json!({ "authenticated": authed, "auth_required": config.auth_enabled() }))
 }

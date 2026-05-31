@@ -17,7 +17,7 @@ use migration::{Migrator, MigratorTrait};
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
-fn busy_timeout() -> Duration {
+pub fn busy_timeout() -> Duration {
     let ms = std::env::var("SQLITE_BUSY_TIMEOUT_MS")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
@@ -25,11 +25,18 @@ fn busy_timeout() -> Duration {
     Duration::from_millis(ms)
 }
 
+/// Extract the bare SQLite file path from a `DATABASE_URL` — strips the
+/// `sqlite:` scheme and any `?query`. Shared by `init()` and the session-store
+/// setup in `main.rs` so the two pools always resolve the same file.
+pub fn sqlite_path(db_url: &str) -> &str {
+    let base = db_url.strip_prefix("sqlite:").unwrap_or(db_url);
+    base.split('?').next().unwrap_or(base)
+}
+
 /// Connect (single persistent connection), migrate with FK OFF, enable FK ON.
 pub async fn init(db_url: &str) -> Result<DatabaseConnection, DbErr> {
     // SqliteConnectOptions wants the path without the `sqlite:` scheme or `?query`.
-    let base = db_url.strip_prefix("sqlite:").unwrap_or(db_url);
-    let base = base.split('?').next().unwrap_or(base);
+    let base = sqlite_path(db_url);
     let opts = SqliteConnectOptions::from_str(base)
         .map_err(|e| DbErr::Custom(format!("bad sqlite url: {e}")))?
         .create_if_missing(true)

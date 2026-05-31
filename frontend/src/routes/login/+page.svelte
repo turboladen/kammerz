@@ -13,7 +13,9 @@
 
 	function safeNext(): string {
 		const raw = page.url.searchParams.get('next');
-		if (!raw || !raw.startsWith('/')) return '/';
+		// Only allow same-origin absolute paths. Reject protocol-relative ('//host')
+		// and backslash ('/\\host') forms that browsers resolve cross-origin.
+		if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) return '/';
 		return raw;
 	}
 
@@ -23,7 +25,7 @@
 		submitting = true;
 		try {
 			const ok = await auth.login(password);
-			if (ok) goto(safeNext());
+			if (ok) await goto(safeNext());
 			else error = 'Incorrect password';
 		} catch (e) {
 			error =
