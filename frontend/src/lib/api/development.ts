@@ -27,12 +27,17 @@ export const deleteLabDev = (id: number) => request<void>('DELETE', `/api/develo
 export const getSelfDevForRoll = (rollId: number) =>
 	request<DevelopmentSelf | null>('GET', `/api/development/self/for-roll/${rollId}`);
 
-export const createSelfDev = (data: DevelopmentSelfInsert & { stages?: DevStageInsert[] }) =>
+// Stages nested in a self-dev create/update payload: the parent FK
+// (development_self_id) is assigned server-side, so it's omitted here.
+// Mirrors the backend's StageDto (routes/development.rs).
+type NestedStageInsert = Omit<DevStageInsert, 'development_self_id'>;
+
+export const createSelfDev = (data: DevelopmentSelfInsert & { stages?: NestedStageInsert[] }) =>
 	request<number>('POST', '/api/development/self', data);
 
 export const updateSelfDev = (
 	id: number,
-	data: Partial<DevelopmentSelfInsert> & { stages?: DevStageInsert[] }
+	data: Partial<DevelopmentSelfInsert> & { stages?: NestedStageInsert[] }
 ) => request<void>('PUT', `/api/development/self/${id}`, data);
 
 export const deleteSelfDev = (id: number) => request<void>('DELETE', `/api/development/self/${id}`);

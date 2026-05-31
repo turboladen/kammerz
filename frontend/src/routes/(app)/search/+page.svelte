@@ -7,7 +7,7 @@
 	import { Camera, Aperture, Package, Film, Focus, FlaskConical, Search } from 'lucide-svelte';
 
 	let query = $state('');
-	let results: SearchResults | null = $state(null);
+	let results = $state<SearchResults | null>(null);
 	let loading = $state(false);
 	let error = $state('');
 

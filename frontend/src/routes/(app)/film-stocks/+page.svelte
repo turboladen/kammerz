@@ -14,7 +14,7 @@
 	import { Film } from 'lucide-svelte';
 	import { listFilmStocks, createFilmStock, deleteFilmStock, listDistinctFilmBrands } from '$lib/api/film-stocks';
 	import { filterBySearch, groupItems, sortByString, sortByNumber, sortByDate } from '$lib/utils/list';
-	import type { FilmStock, FilmStockInsert } from '$lib/types';
+	import type { FilmStock, FilmFormat, FilmStockType, FilmStockInsert } from '$lib/types';
 
 	let stocks: FilmStock[] = $state([]);
 	let loading = $state(true);
@@ -148,9 +148,9 @@
 			const stock: FilmStockInsert = {
 				brand,
 				name,
-				format,
+				format: format as FilmFormat,
 				exposure_count: exposureCount ? parseInt(exposureCount) : null,
-				stock_type: stockType,
+				stock_type: stockType as FilmStockType,
 				iso: iso ? parseInt(iso) : null,
 				notes: notes || null
 			};
