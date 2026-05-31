@@ -13,6 +13,14 @@ struct Assets;
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
+
+    let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(|s| s.as_str()) == Some("hash-password") {
+        let pw = args.get(2).expect("usage: kammerz hash-password <password>");
+        println!("{}", kammerz::auth::password::hash_password(pw).unwrap());
+        return;
+    }
+
     tracing_subscriber::fmt::init();
 
     let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| db::default_db_url());
