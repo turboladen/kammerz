@@ -202,6 +202,10 @@
 	const shotLensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens', lensMounts));
 
 	async function load() {
+		// Clear any stale error: this component instance is reused across [id]
+		// changes (the $effect re-runs load()), so a prior failure must not leak
+		// into the next roll's view.
+		error = '';
 		try {
 			// The composite /detail endpoint collapses the six roll-scoped
 			// round-trips (roll, shots, shot-lens pairs, lab/self dev, dev stages)
@@ -214,7 +218,7 @@
 				listLabs(),
 				listLensMounts()
 			]);
-			roll = detail.roll ?? undefined;
+			roll = detail.roll;
 			rollFullDismissed = false;
 			cameras = cams;
 			filmStocks = stocks;
