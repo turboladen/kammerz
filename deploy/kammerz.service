@@ -12,8 +12,9 @@ WorkingDirectory=/opt/kammerz
 EnvironmentFile=/opt/kammerz/.env
 ExecStart=/opt/kammerz/kammerz
 Restart=on-failure
-# Spread the 5 restarts across the StartLimitIntervalSec window instead of
-# burning them in milliseconds on a fast crash-loop.
+# Pace restarts 2s apart so a fast crash-loop doesn't burn the StartLimitBurst
+# (5) budget in milliseconds. After 5 failures within StartLimitIntervalSec
+# (300s) systemd stops retrying until the window elapses.
 RestartSec=2
 ProtectSystem=strict
 ReadWritePaths=/opt/kammerz/data

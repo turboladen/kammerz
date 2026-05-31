@@ -21,6 +21,8 @@
 		try {
 			const url = new URL(raw, page.url.origin);
 			if (url.origin !== page.url.origin) return '/';
+			// Never bounce back to the login form (e.g. a stray ?next=/login).
+			if (url.pathname === '/login') return '/';
 			return url.pathname + url.search + url.hash;
 		} catch {
 			return '/';
