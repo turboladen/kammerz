@@ -6,12 +6,15 @@ use crate::auth::handlers;
 use crate::AppState;
 
 pub mod cameras;
+pub mod development;
 pub mod film_stocks;
 pub mod labs;
 pub mod lens_mounts;
 pub mod lenses;
+pub mod rolls;
 pub mod search;
 pub mod settings;
+pub mod shots;
 pub mod stats;
 
 pub fn create_router(state: AppState) -> Router {
@@ -26,6 +29,9 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/api/lens-mounts", lens_mounts::router())
         .nest("/api/film-stocks", film_stocks::router())
         .nest("/api/labs", labs::router())
+        .nest("/api/rolls", rolls::router())
+        .nest("/api/shots", shots::router())
+        .nest("/api/development", development::router())
         .nest("/api/search", search::router())
         .nest("/api/stats", stats::router())
         .nest("/api/settings", settings::router())
