@@ -17,7 +17,7 @@
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { buildMountOptions } from '$lib/utils/lens';
 	import { filterBySearch, groupItems, sortByString, sortByDate } from '$lib/utils/list';
-	import type { Camera, CameraInsert, LensMount } from '$lib/types';
+	import type { Camera, CameraFormat, CameraType, CameraInsert, LensMount } from '$lib/types';
 
 	let cameras: Camera[] = $state([]);
 	let lensMounts: LensMount[] = $state([]);
@@ -192,10 +192,10 @@
 				brand,
 				model,
 				prefix: prefix || null,
-				format,
+				format: format as CameraFormat,
 				lens_mount_id: Number(lensMountId),
 				default_lens_id: null,
-				camera_type: cameraType || null,
+				camera_type: (cameraType || null) as CameraType | null,
 				serial_number: serialNumber || null,
 				date_purchased: datePurchased || null,
 				purchased_from: purchasedFrom || null,

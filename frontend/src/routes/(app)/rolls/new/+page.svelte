@@ -14,7 +14,7 @@
 	import { listLenses } from '$lib/api/lenses';
 	import { buildLensOptions, lensDisplayName } from '$lib/utils/lens';
 	import { listLensMounts } from '$lib/api/lens-mounts';
-	import type { Camera, FilmStock, Lens, LensMount, RollInsert } from '$lib/types';
+	import type { Camera, FilmStock, Lens, LensMount, PushPull, RollInsert } from '$lib/types';
 
 	let cameras: Camera[] = $state([]);
 	let filmStocks: FilmStock[] = $state([]);
@@ -171,7 +171,7 @@
 				date_loaded: dateLoaded || null,
 				date_finished: null,
 				date_fuzzy: dateFuzzy || null,
-				push_pull: pushPull || null,
+				push_pull: (pushPull || null) as PushPull | null,
 				notes: notes || null
 			};
 			const id = await createRoll(roll);

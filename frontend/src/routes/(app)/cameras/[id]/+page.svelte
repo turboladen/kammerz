@@ -17,7 +17,7 @@
 	import { listRollsForCamera } from '$lib/api/rolls';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import { lensDisplayName, buildMountOptions } from '$lib/utils/lens';
-	import type { Camera, CameraMaintenance, CameraMaintenanceInsert, Lens, LensMount, RollWithDetails } from '$lib/types';
+	import type { Camera, CameraFormat, CameraType, MaintenanceType, CameraMaintenance, CameraMaintenanceInsert, Lens, LensMount, RollWithDetails } from '$lib/types';
 
 	const id = $derived(Number(page.params.id));
 
@@ -105,8 +105,9 @@
 
 	// Default lens display name for view mode
 	const defaultLensDisplay = $derived.by(() => {
-		if (!camera?.default_lens_id) return null;
-		const lens = linkedLenses.find((l) => l.id === camera.default_lens_id);
+		const defLensId = camera?.default_lens_id;
+		if (!defLensId) return null;
+		const lens = linkedLenses.find((l) => l.id === defLensId);
 		return lens ? lensDisplayName(lens) : null;
 	});
 
@@ -158,7 +159,7 @@
 				listDistinctMaintProviders(),
 				listLensMounts()
 			]);
-			camera = cam;
+			camera = cam ?? undefined;
 			maintenance = maint;
 			rolls = r;
 			allLenses = lenses;
@@ -198,9 +199,9 @@
 				brand: editBrand,
 				model: editModel,
 				prefix: editPrefix || null,
-				format: editFormat,
+				format: editFormat as CameraFormat,
 				lens_mount_id: Number(editLensMountId),
-				camera_type: editCameraType || null,
+				camera_type: (editCameraType || null) as CameraType | null,
 				serial_number: editSerialNumber || null,
 				date_purchased: editDatePurchased || null,
 				purchased_from: editPurchasedFrom || null,
@@ -233,7 +234,7 @@
 		try {
 			const record: CameraMaintenanceInsert = {
 				camera_id: id,
-				maintenance_type: maintType,
+				maintenance_type: maintType as MaintenanceType,
 				done_by: maintDoneBy || null,
 				date_done: maintDateDone || null,
 				cost: maintCost ? parseFloat(maintCost) : null,

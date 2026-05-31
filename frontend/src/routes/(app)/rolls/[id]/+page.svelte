@@ -23,7 +23,7 @@
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder } from '$lib/utils/status';
-	import type { RollWithDetails, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, LensMount } from '$lib/types';
+	import type { RollWithDetails, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
 
 	const id = $derived(Number(page.params.id));
 
@@ -93,6 +93,12 @@
 	let pendingStatus: RollStatus | null = $state(null);
 	const currentStatusIdx = $derived(roll ? statusFlow.indexOf(roll.status as RollStatus) : -1);
 
+	// Frame progress
+	const frameProgress = $derived.by(() => {
+		if (!roll?.frame_count) return null;
+		return { current: shots.length, total: roll.frame_count };
+	});
+
 	// Roll-full nudge state
 	let rollFullDismissed = $state(false);
 	const showRollFullNudge = $derived(
@@ -113,7 +119,7 @@
 	]);
 
 	const selectedCamera = $derived(
-		roll?.camera_id ? cameras.find((c) => c.id === roll.camera_id) ?? null : null
+		roll?.camera_id ? cameras.find((c) => c.id === roll?.camera_id) ?? null : null
 	);
 
 	// Fixed-lens camera detection (based on saved roll camera)
@@ -196,12 +202,6 @@
 	// Shot-level lens dropdown options (uses the saved camera, not the edit form camera)
 	const shotLensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens', lensMounts));
 
-	// Frame progress
-	const frameProgress = $derived.by(() => {
-		if (!roll?.frame_count) return null;
-		return { current: shots.length, total: roll.frame_count };
-	});
-
 	async function load() {
 		try {
 			const [r, cams, stocks, s, lenses, labsList, ld, sd, mounts] = await Promise.all([
@@ -215,7 +215,7 @@
 				getSelfDevForRoll(id),
 				listLensMounts()
 			]);
-			roll = r;
+			roll = r ?? undefined;
 			rollFullDismissed = false;
 			cameras = cams;
 			filmStocks = stocks;
@@ -416,7 +416,7 @@
 		}
 		// Fall back to roll default
 		if (roll?.lens_id) {
-			const defaultLens = allLenses.find((l) => l.id === roll.lens_id);
+			const defaultLens = allLenses.find((l) => l.id === roll?.lens_id);
 			if (defaultLens) {
 				return { name: lensDisplayName(defaultLens), isDefault: true };
 			}
@@ -487,7 +487,7 @@
 				date_loaded: editDateLoaded || null,
 				date_finished: editDateFinished || null,
 				date_fuzzy: editDateFuzzy || null,
-				push_pull: editPushPull || null,
+				push_pull: (editPushPull || null) as PushPull | null,
 				notes: editNotes || null
 			});
 			editingRoll = false;

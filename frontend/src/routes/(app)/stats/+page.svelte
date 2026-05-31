@@ -5,7 +5,7 @@
 	import type { CatalogStats } from '$lib/types';
 	import { getStatusColorSafe, getStatusLabel, isRollStatus } from '$lib/utils/status';
 
-	let stats: CatalogStats | null = $state(null);
+	let stats = $state<CatalogStats | null>(null);
 	let loading = $state(true);
 	let error = $state('');
 
