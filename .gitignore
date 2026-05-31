@@ -1,12 +1,12 @@
-node_modules
+/frontend/node_modules
 
 # Output
 .output
 .vercel
 .netlify
 .wrangler
-/.svelte-kit
-/build
+/frontend/.svelte-kit
+/frontend/build/
 
 # OS
 .DS_Store
@@ -22,9 +22,14 @@ Thumbs.db
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Tauri
-/src-tauri/**/target
-/src-tauri/gen
+# Playwright (browsers cached in ~/Library/Caches/ms-playwright, not the repo)
+/frontend/test-results/
+/frontend/playwright-report/
+/frontend/blob-report/
+/frontend/.playwright/
+
+# Rust
+/target
 
 # Bun
 bun.lock
@@ -35,4 +40,8 @@ bun.lock
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db
+# SQLite WAL sidecars (dev DB at ./kammerz.db)
+*.db-shm
+*.db-wal
+*.db-journal
 .beads-credential-key

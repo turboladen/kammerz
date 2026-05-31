@@ -1,0 +1,26 @@
+[Unit]
+Description=Kammerz film catalog
+After=network.target
+# Restart rate-limit lives in [Unit] (systemd v229+); ignored if placed in [Service].
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=kammerz
+WorkingDirectory=/opt/kammerz
+EnvironmentFile=/opt/kammerz/.env
+ExecStart=/opt/kammerz/kammerz
+Restart=on-failure
+# Pace restarts 2s apart so a fast crash-loop doesn't burn the StartLimitBurst
+# (5) budget in milliseconds. After 5 failures within StartLimitIntervalSec
+# (300s) systemd stops retrying until the window elapses.
+RestartSec=2
+ProtectSystem=strict
+ReadWritePaths=/opt/kammerz/data
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
