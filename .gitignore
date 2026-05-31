@@ -22,6 +22,12 @@ Thumbs.db
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
+# Playwright (browsers cached in ~/Library/Caches/ms-playwright, not the repo)
+/frontend/test-results/
+/frontend/playwright-report/
+/frontend/blob-report/
+/frontend/.playwright/
+
 # Rust
 /target
 
