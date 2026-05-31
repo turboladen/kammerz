@@ -1,4 +1,8 @@
 //! Shared test helpers for integration tests.
+//!
+//! `mod common;` is compiled independently into each test binary, so any helper
+//! a given test file doesn't use shows as dead code there. Allow it module-wide.
+#![allow(dead_code)]
 
 use axum::body::Body;
 use axum::http::Request;

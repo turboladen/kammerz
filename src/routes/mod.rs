@@ -6,6 +6,13 @@ use crate::auth::handlers;
 use crate::AppState;
 
 pub mod cameras;
+pub mod film_stocks;
+pub mod labs;
+pub mod lens_mounts;
+pub mod lenses;
+pub mod search;
+pub mod settings;
+pub mod stats;
 
 pub fn create_router(state: AppState) -> Router {
     Router::<AppState>::new()
@@ -15,6 +22,13 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/auth/me", get(handlers::me))
         .nest("/api/cameras", cameras::router())
         .nest("/api/maintenance", cameras::maintenance_router())
+        .nest("/api/lenses", lenses::router())
+        .nest("/api/lens-mounts", lens_mounts::router())
+        .nest("/api/film-stocks", film_stocks::router())
+        .nest("/api/labs", labs::router())
+        .nest("/api/search", search::router())
+        .nest("/api/stats", stats::router())
+        .nest("/api/settings", settings::router())
         .with_state(state)
 }
 
