@@ -1,7 +1,13 @@
+use std::str::FromStr;
+
 use axum::http::{header, StatusCode, Uri};
 use axum::response::IntoResponse;
 use rust_embed::Embed;
+use sqlx::sqlite::SqliteConnectOptions;
+use time::Duration as TimeDuration;
 use tower_http::trace::TraceLayer;
+use tower_sessions::{cookie::SameSite, Expiry, SessionManagerLayer};
+use tower_sessions_sqlx_store::SqliteStore;
 
 use kammerz::config::AppConfig;
 use kammerz::{db, routes, AppState};
@@ -34,10 +40,37 @@ async fn main() {
         );
     }
 
+    // Session store: a separate sqlx pool against the same SQLite file. The
+    // store reads its own connection options (no migration FK toggling here).
+    let session_base = db_url
+        .strip_prefix("sqlite:")
+        .unwrap_or(&db_url)
+        .split('?')
+        .next()
+        .unwrap()
+        .to_string();
+    let session_pool = sqlx::SqlitePool::connect_with(
+        SqliteConnectOptions::from_str(&session_base)
+            .unwrap()
+            .create_if_missing(true)
+            .foreign_keys(true),
+    )
+    .await
+    .expect("session store pool");
+    let session_store = SqliteStore::new(session_pool);
+    session_store.migrate().await.expect("session store migrate");
+
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_secure(config.secure_cookies)
+        .with_same_site(SameSite::Lax)
+        .with_http_only(true)
+        .with_expiry(Expiry::OnInactivity(TimeDuration::days(30)));
+
     let state = AppState { db, config: config.clone() };
 
     let app = routes::create_router(state)
         .fallback(serve_spa)
+        .layer(session_layer)
         .layer(TraceLayer::new_for_http());
 
     let port: u16 = std::env::var("PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(3001);
