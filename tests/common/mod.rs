@@ -26,6 +26,28 @@ pub async fn open_app() -> axum::Router {
     kammerz::routes::create_router(AppState { db, config })
 }
 
+/// Build an app with a single password configured, backed by a fresh in-memory
+/// DB and a `tower-sessions` session layer (required because `RequireAuth`
+/// consults the session when a password hash is set). `min_connections(1)` keeps
+/// the in-memory session DB alive for the life of the pool.
+pub async fn app_with_password(pw: &str) -> axum::Router {
+    let db = kammerz::db::init("sqlite::memory:").await.unwrap();
+    let config = AppConfig {
+        password_hash: Some(kammerz::auth::password::hash_password(pw).unwrap()),
+        anthropic_api_key: None,
+        secure_cookies: false,
+    };
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .min_connections(1)
+        .connect("sqlite::memory:")
+        .await
+        .unwrap();
+    let store = tower_sessions_sqlx_store::SqliteStore::new(pool);
+    store.migrate().await.unwrap();
+    let layer = tower_sessions::SessionManagerLayer::new(store);
+    kammerz::routes::create_router(AppState { db, config }).layer(layer)
+}
+
 /// Build a GET request with an empty body.
 pub fn get(path: &str) -> Request<Body> {
     Request::builder()
