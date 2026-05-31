@@ -13,10 +13,18 @@
 
 	function safeNext(): string {
 		const raw = page.url.searchParams.get('next');
-		// Only allow same-origin absolute paths. Reject protocol-relative ('//host')
-		// and backslash ('/\\host') forms that browsers resolve cross-origin.
-		if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) return '/';
-		return raw;
+		if (!raw) return '/';
+		// Resolve against the current origin and accept ONLY same-origin results.
+		// This rejects protocol-relative ('//host'), backslash ('/\\host'), and
+		// control-char ('/\t/host') forms that the URL parser would resolve
+		// cross-origin — a plain prefix check misses those.
+		try {
+			const url = new URL(raw, page.url.origin);
+			if (url.origin !== page.url.origin) return '/';
+			return url.pathname + url.search + url.hash;
+		} catch {
+			return '/';
+		}
 	}
 
 	async function submit() {

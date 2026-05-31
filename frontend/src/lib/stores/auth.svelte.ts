@@ -8,13 +8,19 @@ let initialized = $state(false);
 
 // A 401 from any data call means the session expired mid-session. Flip state and
 // bounce to /login with a `next` so the user lands back where they were. Guard
-// against a loop when the 401 is the login attempt itself (already on /login).
+// against a loop when the 401 is the login attempt itself (already on /login),
+// and against a burst of parallel 401s (a page's concurrent fetches) all firing
+// the redirect — only the first navigates.
+let redirecting = false;
 setUnauthorizedHandler(() => {
 	authenticated = false;
-	if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-		const next = window.location.pathname + window.location.search;
-		void goto(`/login?next=${encodeURIComponent(next)}`, { invalidateAll: true });
-	}
+	if (typeof window === 'undefined' || redirecting) return;
+	if (window.location.pathname.startsWith('/login')) return;
+	redirecting = true;
+	const next = window.location.pathname + window.location.search;
+	void goto(`/login?next=${encodeURIComponent(next)}`).finally(() => {
+		redirecting = false;
+	});
 });
 
 export const auth = {

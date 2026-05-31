@@ -12,6 +12,9 @@ WorkingDirectory=/opt/kammerz
 EnvironmentFile=/opt/kammerz/.env
 ExecStart=/opt/kammerz/kammerz
 Restart=on-failure
+# Spread the 5 restarts across the StartLimitIntervalSec window instead of
+# burning them in milliseconds on a fast crash-loop.
+RestartSec=2
 ProtectSystem=strict
 ReadWritePaths=/opt/kammerz/data
 ProtectHome=true
