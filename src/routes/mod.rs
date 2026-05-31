@@ -8,6 +8,7 @@ use crate::AppState;
 pub mod cameras;
 pub mod development;
 pub mod film_stocks;
+pub mod import;
 pub mod labs;
 pub mod lens_mounts;
 pub mod lenses;
@@ -35,6 +36,7 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/api/search", search::router())
         .nest("/api/stats", stats::router())
         .nest("/api/settings", settings::router())
+        .nest("/api/import", import::router())
         .with_state(state)
 }
 
