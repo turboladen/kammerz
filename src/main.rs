@@ -20,10 +20,27 @@ struct Assets;
 async fn main() {
     dotenvy::dotenv().ok();
 
+    // Generate the argon2 hash for KAMMERZ_PASSWORD_HASH. Reads the password from
+    // stdin (never argv) to keep it out of shell history and `ps` output:
+    //   interactive: `kammerz hash-password`            (prompts, echo off)
+    //   piped:       `echo -n <pw> | kammerz hash-password`  or  `kammerz hash-password < secret.txt`
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(|s| s.as_str()) == Some("hash-password") {
-        let pw = args.get(2).expect("usage: kammerz hash-password <password>");
-        println!("{}", kammerz::auth::password::hash_password(pw).unwrap());
+        if args.get(2).is_some_and(|a| a != "-") {
+            eprintln!("error: do not pass the password as an argument (it leaks into shell history / ps).");
+            eprintln!("usage: kammerz hash-password            # prompts on a TTY");
+            eprintln!("       echo -n <pw> | kammerz hash-password");
+            std::process::exit(2);
+        }
+        use std::io::{IsTerminal, Read};
+        let pw = if std::io::stdin().is_terminal() {
+            rpassword::prompt_password("Password: ").expect("failed to read password")
+        } else {
+            let mut s = String::new();
+            std::io::stdin().read_to_string(&mut s).expect("failed to read stdin");
+            s.trim_end_matches(['\n', '\r']).to_string()
+        };
+        println!("{}", kammerz::auth::password::hash_password(&pw).unwrap());
         return;
     }
 
