@@ -1,7 +1,13 @@
+use std::str::FromStr;
+
 use axum::http::{header, StatusCode, Uri};
 use axum::response::IntoResponse;
 use rust_embed::Embed;
+use sqlx::sqlite::SqliteConnectOptions;
+use time::Duration as TimeDuration;
 use tower_http::trace::TraceLayer;
+use tower_sessions::{cookie::SameSite, Expiry, SessionManagerLayer};
+use tower_sessions_sqlx_store::SqliteStore;
 
 use kammerz::config::AppConfig;
 use kammerz::{db, routes, AppState};
@@ -13,6 +19,31 @@ struct Assets;
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
+
+    // Generate the argon2 hash for KAMMERZ_PASSWORD_HASH. Reads the password from
+    // stdin (never argv) to keep it out of shell history and `ps` output:
+    //   interactive: `kammerz hash-password`            (prompts, echo off)
+    //   piped:       `echo -n <pw> | kammerz hash-password`  or  `kammerz hash-password < secret.txt`
+    let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(|s| s.as_str()) == Some("hash-password") {
+        if args.get(2).is_some_and(|a| a != "-") {
+            eprintln!("error: do not pass the password as an argument (it leaks into shell history / ps).");
+            eprintln!("usage: kammerz hash-password            # prompts on a TTY");
+            eprintln!("       echo -n <pw> | kammerz hash-password");
+            std::process::exit(2);
+        }
+        use std::io::{IsTerminal, Read};
+        let pw = if std::io::stdin().is_terminal() {
+            rpassword::prompt_password("Password: ").expect("failed to read password")
+        } else {
+            let mut s = String::new();
+            std::io::stdin().read_to_string(&mut s).expect("failed to read stdin");
+            s.trim_end_matches(['\n', '\r']).to_string()
+        };
+        println!("{}", kammerz::auth::password::hash_password(&pw).unwrap());
+        return;
+    }
+
     tracing_subscriber::fmt::init();
 
     let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| db::default_db_url());
@@ -26,10 +57,37 @@ async fn main() {
         );
     }
 
+    // Session store: a separate sqlx pool against the same SQLite file. The
+    // store reads its own connection options (no migration FK toggling here).
+    let session_base = db_url
+        .strip_prefix("sqlite:")
+        .unwrap_or(&db_url)
+        .split('?')
+        .next()
+        .unwrap()
+        .to_string();
+    let session_pool = sqlx::SqlitePool::connect_with(
+        SqliteConnectOptions::from_str(&session_base)
+            .unwrap()
+            .create_if_missing(true)
+            .foreign_keys(true),
+    )
+    .await
+    .expect("session store pool");
+    let session_store = SqliteStore::new(session_pool);
+    session_store.migrate().await.expect("session store migrate");
+
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_secure(config.secure_cookies)
+        .with_same_site(SameSite::Lax)
+        .with_http_only(true)
+        .with_expiry(Expiry::OnInactivity(TimeDuration::days(30)));
+
     let state = AppState { db, config: config.clone() };
 
     let app = routes::create_router(state)
         .fallback(serve_spa)
+        .layer(session_layer)
         .layer(TraceLayer::new_for_http());
 
     let port: u16 = std::env::var("PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(3001);

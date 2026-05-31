@@ -637,22 +637,39 @@ mod tests {
 Run: `cargo test -p kammerz password::tests`
 Expected: PASS (this module is self-contained; the "failing" stage was the empty file not compiling).
 
-- [ ] **Step 3: Add a `hash-password` CLI path to `main.rs`**
+- [ ] **Step 3: Add a `hash-password` CLI path to `main.rs` (reads stdin, never argv)**
 
-At the top of `main()`, before binding the server, handle a one-shot arg so the operator can generate the hash for `.env`:
+Add `rpassword = "7"` to `[dependencies]` in the root `Cargo.toml`. At the top of `main()`, before binding the server, handle a one-shot arg so the operator can generate the hash for `.env`. **The password is read from stdin, never from argv** (argv leaks into shell history and `ps`):
 ```rust
+// interactive: `kammerz hash-password`  (prompts, echo off)
+// piped:       `echo -n <pw> | kammerz hash-password`  or  `kammerz hash-password < secret.txt`
 let args: Vec<String> = std::env::args().collect();
 if args.get(1).map(|s| s.as_str()) == Some("hash-password") {
-    let pw = args.get(2).expect("usage: kammerz hash-password <password>");
-    println!("{}", kammerz::auth::password::hash_password(pw).unwrap());
+    if args.get(2).is_some_and(|a| a != "-") {
+        eprintln!("error: do not pass the password as an argument (it leaks into shell history / ps).");
+        eprintln!("usage: kammerz hash-password            # prompts on a TTY");
+        eprintln!("       echo -n <pw> | kammerz hash-password");
+        std::process::exit(2);
+    }
+    use std::io::{IsTerminal, Read};
+    let pw = if std::io::stdin().is_terminal() {
+        rpassword::prompt_password("Password: ").expect("failed to read password")
+    } else {
+        let mut s = String::new();
+        std::io::stdin().read_to_string(&mut s).expect("failed to read stdin");
+        s.trim_end_matches(['\n', '\r']).to_string()
+    };
+    println!("{}", kammerz::auth::password::hash_password(&pw).unwrap());
     return;
 }
 ```
 
-- [ ] **Step 4: Verify it prints a hash**
+- [ ] **Step 4: Verify it prints a hash (and rejects argv passwords)**
 
-Run: `cargo run -- hash-password test123`
+Run: `echo -n test123 | cargo run -- hash-password`
 Expected: a string starting with `$argon2id$v=19$...`.
+Run: `cargo run -- hash-password test123`
+Expected: non-zero exit with the "do not pass the password as an argument" error (NOT a hash).
 
 - [ ] **Step 5: Commit**
 
@@ -862,7 +879,7 @@ Expected: PASS. (If `SessionStore::migrate` trait path differs in tower-sessions
 
 Run:
 ```bash
-HASH=$(cargo run -q -- hash-password secret)
+HASH=$(echo -n secret | cargo run -q -- hash-password)
 KAMMERZ_PASSWORD_HASH="$HASH" DATABASE_URL="sqlite:/tmp/kz-test.db?mode=rwc" cargo run &
 sleep 3
 curl -s -c /tmp/jar localhost:3001/api/auth/me
@@ -1649,9 +1666,10 @@ check:
 migrate:
     cargo run -- # migrations run on startup; this just boots once
     
-# Generate the argon2 hash for KAMMERZ_PASSWORD_HASH.
-hash-password password:
-    cargo run -q -- hash-password {{password}}
+# Generate the argon2 hash for KAMMERZ_PASSWORD_HASH (reads the password from
+# stdin — prompts on a TTY, or pipe it: `echo -n <pw> | just hash-password`).
+hash-password:
+    cargo run -q -- hash-password
 ```
 
 - [ ] **Step 2: Full release build (proves rust-embed picks up the real frontend)**
@@ -1663,7 +1681,7 @@ Expected: `frontend/build/` regenerated, then `cargo build --release` embeds it.
 
 Run:
 ```bash
-HASH=$(target/release/kammerz hash-password secret)
+HASH=$(echo -n secret | target/release/kammerz hash-password)
 KAMMERZ_PASSWORD_HASH="$HASH" DATABASE_URL="sqlite:/tmp/kz.db?mode=rwc" PORT=3001 target/release/kammerz &
 sleep 3
 curl -s localhost:3001/api/auth/me
@@ -1692,7 +1710,8 @@ git commit -m "chore: justfile dev/build recipes + verify embedded release build
 ```bash
 # Where the SQLite catalog lives on the NAS.
 DATABASE_URL=sqlite:/opt/kammerz/data/kammerz.db?mode=rwc
-# Argon2 hash of the single shared password (generate: kammerz hash-password <pw>).
+# Argon2 hash of the single shared password.
+# Generate (password read from stdin, never argv): echo -n <pw> | kammerz hash-password
 KAMMERZ_PASSWORD_HASH=
 # Set true only when served over HTTPS (behind a TLS reverse proxy).
 SECURE_COOKIES=false
@@ -1822,7 +1841,7 @@ test('login gate redirects then admits with correct password', async ({ page }) 
 - [ ] **Step 3: Run against the release binary**
 
 ```bash
-HASH=$(target/release/kammerz hash-password secret)
+HASH=$(echo -n secret | target/release/kammerz hash-password)
 KAMMERZ_PASSWORD_HASH="$HASH" DATABASE_URL="sqlite:/tmp/kz-e2e.db?mode=rwc" target/release/kammerz &
 sleep 3
 cd frontend && E2E_PASSWORD=secret bunx playwright test; cd ..
