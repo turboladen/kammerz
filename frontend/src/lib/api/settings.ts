@@ -1,6 +1,7 @@
-import { invoke } from '@tauri-apps/api/core';
+import { request } from './client';
 
-export const getSetting = (key: string) => invoke<string | null>('get_setting', { key });
+export const getSetting = (key: string) =>
+	request<string | null>('GET', `/api/settings/${encodeURIComponent(key)}`);
 
 export const setSetting = (key: string, value: string) =>
-	invoke<void>('set_setting', { key, value });
+	request<void>('PUT', `/api/settings/${encodeURIComponent(key)}`, { value });

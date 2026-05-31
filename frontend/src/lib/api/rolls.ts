@@ -1,20 +1,15 @@
-import { invoke } from '@tauri-apps/api/core';
 import type { RollDetail, RollInsert, RollWithDetails } from '$lib/types';
+import { request } from './client';
 
-export const listRolls = () => invoke<RollWithDetails[]>('list_rolls');
-
-export const getRoll = (id: number) => invoke<RollWithDetails | null>('get_roll', { id });
-
-export const getRollDetail = (id: number) => invoke<RollDetail>('get_roll_detail', { id });
-
-export const createRoll = (data: RollInsert) => invoke<number>('create_roll', { data });
-
+export const listRolls = () => request<RollWithDetails[]>('GET', '/api/rolls');
+export const getRoll = (id: number) => request<RollWithDetails | null>('GET', `/api/rolls/${id}`);
+export const getRollDetail = (id: number) => request<RollDetail>('GET', `/api/rolls/${id}/detail`);
+export const createRoll = (data: RollInsert) => request<number>('POST', '/api/rolls', data);
 export const updateRoll = (id: number, data: Partial<RollInsert>) =>
-	invoke<void>('update_roll', { id, data });
-
-export const deleteRoll = (id: number) => invoke<void>('delete_roll', { id });
+	request<void>('PUT', `/api/rolls/${id}`, data);
+export const deleteRoll = (id: number) => request<void>('DELETE', `/api/rolls/${id}`);
 
 export const listRollsForCamera = (cameraId: number) =>
-	invoke<RollWithDetails[]>('list_rolls_for_camera', { cameraId });
+	request<RollWithDetails[]>('GET', `/api/rolls/for-camera/${cameraId}`);
 
-export const suggestRollId = () => invoke<string>('suggest_roll_id');
+export const suggestRollId = () => request<string>('GET', '/api/rolls/suggest-id');

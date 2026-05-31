@@ -1,29 +1,22 @@
-import { invoke } from '@tauri-apps/api/core';
 import type { Camera, CameraInsert, CameraMaintenance, CameraMaintenanceInsert } from '$lib/types';
+import { request } from './client';
 
-export const listCameras = () => invoke<Camera[]>('list_cameras');
-
-export const getCamera = (id: number) => invoke<Camera | null>('get_camera', { id });
-
-export const createCamera = (data: CameraInsert) => invoke<number>('create_camera', { data });
-
+export const listCameras = () => request<Camera[]>('GET', '/api/cameras');
+export const getCamera = (id: number) => request<Camera | null>('GET', `/api/cameras/${id}`);
+export const createCamera = (data: CameraInsert) => request<number>('POST', '/api/cameras', data);
 export const updateCamera = (id: number, data: Partial<CameraInsert>) =>
-	invoke<void>('update_camera', { id, data });
-
-export const deleteCamera = (id: number) => invoke<void>('delete_camera', { id });
+	request<void>('PUT', `/api/cameras/${id}`, data);
+export const deleteCamera = (id: number) => request<void>('DELETE', `/api/cameras/${id}`);
 
 // --- Maintenance Records ---
 
 export const listMaintenanceForCamera = (cameraId: number) =>
-	invoke<CameraMaintenance[]>('list_maintenance', { cameraId });
-
+	request<CameraMaintenance[]>('GET', `/api/cameras/${cameraId}/maintenance`);
 export const createMaintenance = (data: CameraMaintenanceInsert) =>
-	invoke<number>('create_maintenance', { data });
-
+	request<number>('POST', '/api/maintenance', data);
 export const updateMaintenance = (id: number, data: Partial<CameraMaintenanceInsert>) =>
-	invoke<void>('update_maintenance', { id, data });
-
-export const deleteMaintenance = (id: number) => invoke<void>('delete_maintenance', { id });
+	request<void>('PUT', `/api/maintenance/${id}`, data);
+export const deleteMaintenance = (id: number) => request<void>('DELETE', `/api/maintenance/${id}`);
 
 // --- Create camera with fixed lens (transactional) ---
 
@@ -33,25 +26,21 @@ export interface CreateCameraWithLensData {
 	lens_focal_length: string | null;
 	lens_max_aperture: string | null;
 }
-
 export const createCameraWithLens = (data: CreateCameraWithLensData) =>
-	invoke<number>('create_camera_with_lens', { data });
+	request<number>('POST', '/api/cameras/with-lens', data);
 
 // --- Camera-Lens Associations ---
 
 export const getLensesForCamera = (cameraId: number) =>
-	invoke<number[]>('get_lenses_for_camera', { cameraId });
-
+	request<number[]>('GET', `/api/cameras/${cameraId}/lenses`);
 export const linkLensToCamera = (cameraId: number, lensId: number) =>
-	invoke<void>('link_lens_to_camera', { cameraId, lensId });
-
+	request<void>('POST', `/api/cameras/${cameraId}/lenses/${lensId}`);
 export const unlinkLensFromCamera = (cameraId: number, lensId: number) =>
-	invoke<void>('unlink_lens_from_camera', { cameraId, lensId });
+	request<void>('DELETE', `/api/cameras/${cameraId}/lenses/${lensId}`);
 
 // --- Distinct value helpers ---
 
-export const listDistinctCameraBrands = () => invoke<string[]>('list_distinct_camera_brands');
-
-export const listDistinctVendors = () => invoke<string[]>('list_distinct_vendors');
-
-export const listDistinctMaintProviders = () => invoke<string[]>('list_distinct_maint_providers');
+export const listDistinctCameraBrands = () => request<string[]>('GET', '/api/cameras/distinct/brands');
+export const listDistinctVendors = () => request<string[]>('GET', '/api/cameras/distinct/vendors');
+export const listDistinctMaintProviders = () =>
+	request<string[]>('GET', '/api/cameras/distinct/maint-providers');

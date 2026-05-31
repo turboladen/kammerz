@@ -1,10 +1,10 @@
-import { invoke } from '@tauri-apps/api/core';
 import type { ParsedRoll, ImportRollDto, ModelInfo } from '$lib/types';
+import { request } from './client';
 
-export const listModels = () => invoke<ModelInfo[]>('list_models');
+export const listModels = () => request<ModelInfo[]>('GET', '/api/import/models');
 
 export const parseNote = (noteText: string, model?: string) =>
-	invoke<ParsedRoll>('parse_note', { noteText, model });
+	request<ParsedRoll>('POST', '/api/import/parse', { note_text: noteText, model });
 
 export const importParsedRoll = (data: ImportRollDto) =>
-	invoke<number>('import_parsed_roll', { data });
+	request<number>('POST', '/api/import/roll', data);

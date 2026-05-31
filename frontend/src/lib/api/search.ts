@@ -1,5 +1,5 @@
-import { invoke } from '@tauri-apps/api/core';
 import type { SearchResults } from '$lib/types';
+import { qs, request } from './client';
 
 export const searchCatalog = (query: string) =>
-	invoke<SearchResults>('search_catalog', { query });
+	request<SearchResults>('GET', `/api/search${qs({ q: query })}`);

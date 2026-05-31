@@ -1,27 +1,27 @@
-import { invoke } from '@tauri-apps/api/core';
 import type { Shot, ShotInsert } from '$lib/types';
+import { request } from './client';
 
 export const listShotsForRoll = (rollId: number) =>
-	invoke<Shot[]>('list_shots_for_roll', { rollId });
+	request<Shot[]>('GET', `/api/shots/for-roll/${rollId}`);
 
-export const getShot = (id: number) => invoke<Shot | null>('get_shot', { id });
+export const getShot = (id: number) => request<Shot | null>('GET', `/api/shots/${id}`);
 
 export const createShot = (data: ShotInsert & { lens_ids?: number[] }) =>
-	invoke<number>('create_shot', { data });
+	request<number>('POST', '/api/shots', data);
 
 export const updateShot = (id: number, data: Partial<ShotInsert> & { lens_ids?: number[] }) =>
-	invoke<void>('update_shot', { id, data });
+	request<void>('PUT', `/api/shots/${id}`, data);
 
-export const deleteShot = (id: number) => invoke<void>('delete_shot', { id });
+export const deleteShot = (id: number) => request<void>('DELETE', `/api/shots/${id}`);
 
 export const getLensesForShot = (shotId: number) =>
-	invoke<number[]>('get_lenses_for_shot', { shotId });
+	request<number[]>('GET', `/api/shots/${shotId}/lenses`);
 
 export const getLensesForRollShots = (rollId: number) =>
-	invoke<[number, number][]>('get_lenses_for_roll_shots', { rollId });
+	request<[number, number][]>('GET', `/api/shots/for-roll/${rollId}/lenses`);
 
 export const suggestNextFrame = (rollId: number) =>
-	invoke<string>('suggest_next_frame', { rollId });
+	request<string>('GET', `/api/shots/for-roll/${rollId}/next-frame`);
 
 export const countShotsForRoll = (rollId: number) =>
-	invoke<number>('count_shots_for_roll', { rollId });
+	request<number>('GET', `/api/shots/for-roll/${rollId}/count`);

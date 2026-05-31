@@ -1,6 +1,7 @@
-import { invoke } from '@tauri-apps/api/core';
 import type { LensMount } from '$lib/types';
+import { request } from './client';
 
-export const listLensMounts = () => invoke<LensMount[]>('list_lens_mounts');
+export const listLensMounts = () => request<LensMount[]>('GET', '/api/lens-mounts');
 
-export const createLensMount = (name: string) => invoke<number>('create_lens_mount', { name });
+export const createLensMount = (name: string) =>
+	request<number>('POST', '/api/lens-mounts', { name });

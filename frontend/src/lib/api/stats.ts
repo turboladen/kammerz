@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
 import type { CatalogStats } from '$lib/types';
+import { request } from './client';
 
-export const getCatalogStats = () => invoke<CatalogStats>('get_catalog_stats');
+export const getCatalogStats = () => request<CatalogStats>('GET', '/api/stats');
