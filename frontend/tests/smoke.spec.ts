@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:3001';
+const BASE = process.env.E2E_BASE ?? 'http://localhost:3002';
 const PASSWORD = process.env.E2E_PASSWORD ?? 'secret';
 
 /**

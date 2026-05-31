@@ -16,7 +16,7 @@ Prerequisites: Rust (stable), [Bun](https://bun.sh), and [`just`](https://github
 just dev
 ```
 
-This runs the axum backend on `:3001` and the Vite dev server on `:5173` (which proxies `/api` → `:3001`). Open <http://localhost:5173>. The dev database is `./kammerz.db` (created on first run; override with `DATABASE_URL`).
+This runs the axum backend on `:3002` and the Vite dev server on `:5173` (which proxies `/api` → `:3002`). Open <http://localhost:5173>. The dev database is `./kammerz.db` (created on first run; override with `DATABASE_URL`).
 
 Run the halves separately with `just dev-backend` / `just dev-frontend`.
 
@@ -60,7 +60,7 @@ Copy `.env.example` to `.env` and fill it in:
 DATABASE_URL=sqlite:/opt/kammerz/data/kammerz.db?mode=rwc
 KAMMERZ_PASSWORD_HASH=$argon2id$v=19$...    # from `kammerz hash-password`
 SECURE_COOKIES=false   # set true only when served over HTTPS (behind a TLS reverse proxy)
-PORT=3001
+PORT=3002
 ANTHROPIC_API_KEY=     # optional; overrides the claude_api_key settings row for AI import
 ```
 

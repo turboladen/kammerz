@@ -2,7 +2,7 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
-const backendPort = Number(process.env.PORT) || 3001;
+const backendPort = Number(process.env.PORT) || 3002;
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
