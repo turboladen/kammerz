@@ -7,6 +7,15 @@ use ::entity::development_self::{self, Entity as DevelopmentSelf};
 use ::entity::film_stock::FilmStockType;
 use ::entity::roll::RollStatus;
 
+/// A self-development list item with its ordered stages merged in.
+/// Returned by the `list_all_self_developments` endpoint.
+#[derive(Debug, Serialize)]
+pub struct SelfDevWithStages {
+    #[serde(flatten)]
+    pub item: SelfDevListItem,
+    pub stages: Vec<dev_stage::Model>,
+}
+
 /// Flat struct for self-developments joined with roll, film stock, and camera data.
 #[derive(Debug, Serialize, FromQueryResult)]
 pub struct SelfDevListItem {
