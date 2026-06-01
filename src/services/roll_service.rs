@@ -147,9 +147,7 @@ impl RollService {
                     let roll_result = roll_model.insert(txn).await?;
                     let new_roll_id = roll_result.id;
 
-                    let now = chrono::Utc::now()
-                        .format("%Y-%m-%d %H:%M:%S")
-                        .to_string();
+                    let now = now_string();
 
                     for entry in shot_entries {
                         let shot_model = shot::ActiveModel {
