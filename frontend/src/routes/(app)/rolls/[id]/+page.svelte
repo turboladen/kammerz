@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
@@ -202,10 +201,12 @@
 	// Shot-level lens dropdown options (uses the saved camera, not the edit form camera)
 	const shotLensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens', lensMounts));
 
-	// Reference catalogs (cameras, film stocks, lenses, labs, lens mounts) rarely
-	// change and — critically — no mutation on this page touches them (the lens
-	// and lab dropdowns are read-only Selects, not inline-create inputs). So they
-	// are fetched once on mount, not on every loadRollData() refresh.
+	// Reference catalogs (cameras, film stocks, lenses, labs, lens mounts) are
+	// loaded by the page-load $effect — on mount and on roll-id navigation — but
+	// NOT by the mutation refresh path (loadRollData), since no mutation on this
+	// page can change them. That split is the whole point of this page's load:
+	// shot/roll/dev mutations re-pull only the roll's own /detail, not the
+	// rarely-changing reference lists.
 	async function loadRefData() {
 		try {
 			const [cams, stocks, lenses, labsList, mounts] = await Promise.all([
@@ -221,8 +222,6 @@
 			labs = labsList;
 			lensMounts = mounts;
 		} catch (err) {
-			// Only set (never clear) the shared error so we don't race with the
-			// concurrent loadRollData() that clears it at mount.
 			error = err instanceof Error ? err.message : String(err);
 		}
 	}
@@ -252,8 +251,6 @@
 			shotLensMap = map;
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
-		} finally {
-			loading = false;
 		}
 	}
 
@@ -521,12 +518,17 @@
 		}
 	}
 
-	onMount(() => {
-		loadRefData();
-	});
-
+	// Page load: on mount and whenever the roll id changes (navigation), fetch
+	// reference catalogs and roll detail together, gating `loading` until BOTH
+	// resolve. This keeps reference data fresh on every page entry while never
+	// rendering the roll with empty dropdowns / lens lookups. The $effect tracks
+	// `id` via loadRollData's synchronous read of it. Mutations bypass this and
+	// call loadRollData() directly, so they refresh only the roll's /detail.
 	$effect(() => {
-		loadRollData();
+		loading = true;
+		Promise.all([loadRefData(), loadRollData()]).finally(() => {
+			loading = false;
+		});
 	});
 </script>
 
