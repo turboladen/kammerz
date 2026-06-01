@@ -12,12 +12,11 @@
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import DevelopmentSection from '$lib/components/rolls/DevelopmentSection.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
-	import { getRoll, updateRoll, deleteRoll } from '$lib/api/rolls';
+	import { getRollDetail, updateRoll, deleteRoll } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
 	import { listLenses } from '$lib/api/lenses';
-	import { listShotsForRoll, createShot, updateShot, deleteShot, getLensesForRollShots, suggestNextFrame } from '$lib/api/shots';
-	import { getLabDevForRoll, getSelfDevForRoll, listDevStages } from '$lib/api/development';
+	import { createShot, updateShot, deleteShot, suggestNextFrame } from '$lib/api/shots';
 	import { listLabs } from '$lib/api/labs';
 	import { lensDisplayName, buildLensOptions } from '$lib/utils/lens';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
@@ -203,40 +202,37 @@
 	const shotLensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens', lensMounts));
 
 	async function load() {
+		// Clear any stale error: this component instance is reused across [id]
+		// changes (the $effect re-runs load()), so a prior failure must not leak
+		// into the next roll's view.
+		error = '';
 		try {
-			const [r, cams, stocks, s, lenses, labsList, ld, sd, mounts] = await Promise.all([
-				getRoll(id),
+			// The composite /detail endpoint collapses the six roll-scoped
+			// round-trips (roll, shots, shot-lens pairs, lab/self dev, dev stages)
+			// into one. The remaining calls are reference lookups, not roll-specific.
+			const [detail, cams, stocks, lenses, labsList, mounts] = await Promise.all([
+				getRollDetail(id),
 				listCameras(),
 				listFilmStocks(),
-				listShotsForRoll(id),
 				listLenses(),
 				listLabs(),
-				getLabDevForRoll(id),
-				getSelfDevForRoll(id),
 				listLensMounts()
 			]);
-			roll = r ?? undefined;
+			roll = detail.roll;
 			rollFullDismissed = false;
 			cameras = cams;
 			filmStocks = stocks;
-			shots = s;
+			shots = detail.shots;
 			allLenses = lenses;
 			labs = labsList;
 			lensMounts = mounts;
-			labDev = ld;
-			selfDev = sd;
+			labDev = detail.lab_dev;
+			selfDev = detail.self_dev;
+			devStages = detail.dev_stages;
 
-			// Load dev stages if self-development exists
-			if (sd) {
-				devStages = await listDevStages(sd.id);
-			} else {
-				devStages = [];
-			}
-
-			// Batch-load all shot-lens associations in a single query
-			const pairs = await getLensesForRollShots(id);
+			// Map the batched shot-lens associations by shot id
 			const map: Record<number, number[]> = {};
-			for (const [shotId, lensId] of pairs) {
+			for (const [shotId, lensId] of detail.shot_lens_pairs) {
 				(map[shotId] ??= []).push(lensId);
 			}
 			shotLensMap = map;
