@@ -108,8 +108,8 @@
 	);
 
 	// Status auto-sync (advance on create, revert on delete) is handled by the
-	// backend commands transactionally. The frontend just calls load() after
-	// mutations (via DevelopmentSection's onchange={load}) to pick up new status.
+	// backend commands transactionally. The frontend just calls loadRollData()
+	// after mutations (via DevelopmentSection's onchange) to pick up new status.
 
 	const cameraLabels = $derived(buildCameraLabels(cameras));
 	const cameraOptions = $derived([
@@ -201,31 +201,44 @@
 	// Shot-level lens dropdown options (uses the saved camera, not the edit form camera)
 	const shotLensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens', lensMounts));
 
-	async function load() {
-		// Clear any stale error: this component instance is reused across [id]
-		// changes (the $effect re-runs load()), so a prior failure must not leak
-		// into the next roll's view.
-		error = '';
+	// Reference catalogs (cameras, film stocks, lenses, labs, lens mounts) are
+	// loaded by the page-load $effect — on mount and on roll-id navigation — but
+	// NOT by the mutation refresh path (loadRollData), since no mutation on this
+	// page can change them. That split is the whole point of this page's load:
+	// shot/roll/dev mutations re-pull only the roll's own /detail, not the
+	// rarely-changing reference lists.
+	async function loadRefData() {
 		try {
-			// The composite /detail endpoint collapses the six roll-scoped
-			// round-trips (roll, shots, shot-lens pairs, lab/self dev, dev stages)
-			// into one. The remaining calls are reference lookups, not roll-specific.
-			const [detail, cams, stocks, lenses, labsList, mounts] = await Promise.all([
-				getRollDetail(id),
+			const [cams, stocks, lenses, labsList, mounts] = await Promise.all([
 				listCameras(),
 				listFilmStocks(),
 				listLenses(),
 				listLabs(),
 				listLensMounts()
 			]);
-			roll = detail.roll;
-			rollFullDismissed = false;
 			cameras = cams;
 			filmStocks = stocks;
-			shots = detail.shots;
 			allLenses = lenses;
 			labs = labsList;
 			lensMounts = mounts;
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	async function loadRollData() {
+		// Clear any stale error: this component instance is reused across [id]
+		// changes (the $effect re-runs loadRollData()), so a prior failure must
+		// not leak into the next roll's view.
+		error = '';
+		try {
+			// The composite /detail endpoint collapses the six roll-scoped
+			// round-trips (roll, shots, shot-lens pairs, lab/self dev, dev stages)
+			// into one. Reference catalogs are loaded separately in loadRefData().
+			const detail = await getRollDetail(id);
+			roll = detail.roll;
+			rollFullDismissed = false;
+			shots = detail.shots;
 			labDev = detail.lab_dev;
 			selfDev = detail.self_dev;
 			devStages = detail.dev_stages;
@@ -238,8 +251,6 @@
 			shotLensMap = map;
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
-		} finally {
-			loading = false;
 		}
 	}
 
@@ -342,7 +353,7 @@
 			}
 			showShotDialog = false;
 			resetShotForm();
-			await load();
+			await loadRollData();
 		} catch (err) {
 			shotError = err instanceof Error ? err.message : String(err);
 		}
@@ -370,7 +381,7 @@
 				notes: shotNotes || null,
 				lens_ids: lensIds
 			});
-			await load();
+			await loadRollData();
 			// Reset per-shot fields but keep session defaults (date, location, lens)
 			try {
 				shotFrameNumber = await suggestNextFrame(id);
@@ -393,7 +404,7 @@
 		try {
 			await deleteShot(deletingShotId);
 			deletingShotId = null;
-			await load();
+			await loadRollData();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -424,7 +435,7 @@
 		error = '';
 		try {
 			await updateRoll(id, { status });
-			await load();
+			await loadRollData();
 			// Auto-prompt development dialogs
 			if (status === 'at-lab' && !labDev && !selfDev) {
 				devAutoPrompt = 'lab';
@@ -487,7 +498,7 @@
 				notes: editNotes || null
 			});
 			editingRoll = false;
-			await load();
+			await loadRollData();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -507,8 +518,17 @@
 		}
 	}
 
+	// Page load: on mount and whenever the roll id changes (navigation), fetch
+	// reference catalogs and roll detail together, gating `loading` until BOTH
+	// resolve. This keeps reference data fresh on every page entry while never
+	// rendering the roll with empty dropdowns / lens lookups. The $effect tracks
+	// `id` via loadRollData's synchronous read of it. Mutations bypass this and
+	// call loadRollData() directly, so they refresh only the roll's /detail.
 	$effect(() => {
-		load();
+		loading = true;
+		Promise.all([loadRefData(), loadRollData()]).finally(() => {
+			loading = false;
+		});
 	});
 </script>
 
@@ -671,7 +691,7 @@
 			bind:devStages
 			bind:autoPrompt={devAutoPrompt}
 			defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
-			onchange={load}
+			onchange={loadRollData}
 		/>
 
 		</FadeIn>
