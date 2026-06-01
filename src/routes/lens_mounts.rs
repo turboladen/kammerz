@@ -7,6 +7,7 @@ use serde::Deserialize;
 
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult};
+use crate::patch::now_string;
 use crate::routes::friendly_err;
 use crate::services::lens_mount_service::LensMountService;
 use crate::AppState;
@@ -25,10 +26,7 @@ async fn list(
     _: RequireAuth,
     State(db): State<sea_orm::DatabaseConnection>,
 ) -> AppResult<Json<Vec<lens_mount::Model>>> {
-    LensMountService::list_all(&db)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(LensMountService::list_all(&db).await?))
 }
 
 async fn create(
@@ -36,7 +34,7 @@ async fn create(
     State(db): State<sea_orm::DatabaseConnection>,
     Json(data): Json<CreateLensMountDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
     let model = lens_mount::ActiveModel {
         name: Set(data.name),
         created_at: Set(now.clone()),

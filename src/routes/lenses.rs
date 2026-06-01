@@ -6,8 +6,8 @@ use sea_orm::Set;
 use serde::Deserialize;
 
 use crate::auth::middleware::RequireAuth;
-use crate::error::{AppError, AppResult};
-use crate::patch::{double_option, trim, trim_opt};
+use crate::error::{AppError, AppResult, OptionExt};
+use crate::patch::{double_option, now_string, trim, trim_opt};
 use crate::routes::friendly_err;
 use crate::services::lens_service::LensService;
 use crate::AppState;
@@ -81,10 +81,7 @@ async fn list(
     _: RequireAuth,
     State(db): State<sea_orm::DatabaseConnection>,
 ) -> AppResult<Json<Vec<lens::Model>>> {
-    LensService::list_all(&db)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(LensService::list_all(&db).await?))
 }
 
 async fn get_one(
@@ -92,10 +89,7 @@ async fn get_one(
     State(db): State<sea_orm::DatabaseConnection>,
     Path(id): Path<i32>,
 ) -> AppResult<Json<Option<lens::Model>>> {
-    LensService::get_by_id(&db, id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(LensService::get_by_id(&db, id).await?))
 }
 
 async fn create(
@@ -103,7 +97,7 @@ async fn create(
     State(db): State<sea_orm::DatabaseConnection>,
     Json(data): Json<CreateLensDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
     let model = lens::ActiveModel {
         brand: trim(data.brand),
         lens_mount_id: Set(data.lens_mount_id),
@@ -135,11 +129,8 @@ async fn update(
     Path(id): Path<i32>,
     Json(data): Json<UpdateLensDto>,
 ) -> AppResult<StatusCode> {
-    let existing = LensService::get_by_id(&db, id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound(format!("Lens {id} not found")))?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let existing = LensService::get_by_id(&db, id).await?.or_404("Lens", id)?;
+    let now = now_string();
     let mut model: lens::ActiveModel = existing.into();
     if let Some(v) = data.brand {
         model.brand = trim(v);
@@ -205,20 +196,14 @@ async fn distinct_brands(
     _: RequireAuth,
     State(db): State<sea_orm::DatabaseConnection>,
 ) -> AppResult<Json<Vec<String>>> {
-    LensService::distinct_brands(&db)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(LensService::distinct_brands(&db).await?))
 }
 
 async fn distinct_systems(
     _: RequireAuth,
     State(db): State<sea_orm::DatabaseConnection>,
 ) -> AppResult<Json<Vec<String>>> {
-    LensService::distinct_lens_systems(&db)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(LensService::distinct_lens_systems(&db).await?))
 }
 
 async fn cameras_for_lens(
@@ -226,8 +211,5 @@ async fn cameras_for_lens(
     State(db): State<sea_orm::DatabaseConnection>,
     Path(id): Path<i32>,
 ) -> AppResult<Json<Vec<i32>>> {
-    LensService::get_cameras_for_lens(&db, id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(LensService::get_cameras_for_lens(&db, id).await?))
 }

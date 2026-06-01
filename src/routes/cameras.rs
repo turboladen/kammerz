@@ -6,8 +6,8 @@ use sea_orm::{DatabaseConnection, DbErr, EntityTrait, Set, TransactionTrait};
 use serde::Deserialize;
 
 use crate::auth::middleware::RequireAuth;
-use crate::error::{AppError, AppResult};
-use crate::patch::{double_option, trim, trim_opt};
+use crate::error::{AppError, AppResult, OptionExt};
+use crate::patch::{double_option, now_string, trim, trim_opt};
 use crate::routes::friendly_err;
 use crate::services::camera_service::CameraService;
 use crate::services::lens_service::LensService;
@@ -119,10 +119,7 @@ async fn list(
     _: RequireAuth,
     State(db): State<DatabaseConnection>,
 ) -> AppResult<Json<Vec<camera::Model>>> {
-    CameraService::list_all(&db)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(CameraService::list_all(&db).await?))
 }
 
 async fn get_one(
@@ -130,10 +127,7 @@ async fn get_one(
     State(db): State<DatabaseConnection>,
     Path(id): Path<i32>,
 ) -> AppResult<Json<Option<camera::Model>>> {
-    CameraService::get_by_id(&db, id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(CameraService::get_by_id(&db, id).await?))
 }
 
 async fn create(
@@ -141,7 +135,7 @@ async fn create(
     State(db): State<DatabaseConnection>,
     Json(data): Json<CreateCameraDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
     let model = camera::ActiveModel {
         brand: trim(data.brand),
         model: trim(data.model),
@@ -171,11 +165,8 @@ async fn update(
     Path(id): Path<i32>,
     Json(data): Json<UpdateCameraDto>,
 ) -> AppResult<StatusCode> {
-    let existing = CameraService::get_by_id(&db, id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound(format!("Camera {id} not found")))?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let existing = CameraService::get_by_id(&db, id).await?.or_404("Camera", id)?;
+    let now = now_string();
     let mut model: camera::ActiveModel = existing.into();
     if let Some(v) = data.brand {
         model.brand = trim(v);
@@ -238,7 +229,7 @@ async fn create_with_lens(
     State(db): State<DatabaseConnection>,
     Json(data): Json<CreateCameraWithLensDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
 
     let camera_id = db
         .transaction::<_, i32, DbErr>(|txn| {
@@ -317,30 +308,21 @@ async fn distinct_brands(
     _: RequireAuth,
     State(db): State<DatabaseConnection>,
 ) -> AppResult<Json<Vec<String>>> {
-    CameraService::distinct_brands(&db)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(CameraService::distinct_brands(&db).await?))
 }
 
 async fn distinct_vendors(
     _: RequireAuth,
     State(db): State<DatabaseConnection>,
 ) -> AppResult<Json<Vec<String>>> {
-    CameraService::distinct_vendors(&db)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(CameraService::distinct_vendors(&db).await?))
 }
 
 async fn distinct_maint_providers(
     _: RequireAuth,
     State(db): State<DatabaseConnection>,
 ) -> AppResult<Json<Vec<String>>> {
-    CameraService::distinct_maint_providers(&db)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(CameraService::distinct_maint_providers(&db).await?))
 }
 
 // --- Camera-Lens association handlers ---
@@ -350,10 +332,7 @@ async fn lenses_for_camera(
     State(db): State<DatabaseConnection>,
     Path(id): Path<i32>,
 ) -> AppResult<Json<Vec<i32>>> {
-    CameraService::get_lenses_for_camera(&db, id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(CameraService::get_lenses_for_camera(&db, id).await?))
 }
 
 async fn link_lens(
@@ -385,10 +364,7 @@ async fn list_maintenance(
     State(db): State<DatabaseConnection>,
     Path(id): Path<i32>,
 ) -> AppResult<Json<Vec<camera_maintenance::Model>>> {
-    CameraService::list_maintenance(&db, id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(CameraService::list_maintenance(&db, id).await?))
 }
 
 async fn create_maintenance(
@@ -396,7 +372,7 @@ async fn create_maintenance(
     State(db): State<DatabaseConnection>,
     Json(data): Json<CreateMaintenanceDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
     let model = camera_maintenance::ActiveModel {
         camera_id: Set(data.camera_id),
         maintenance_type: Set(data.maintenance_type),
@@ -422,10 +398,9 @@ async fn update_maintenance(
 ) -> AppResult<StatusCode> {
     let existing = camera_maintenance::Entity::find_by_id(id)
         .one(&db)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound(format!("Maintenance record {id} not found")))?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        .await?
+        .or_404("Maintenance record", id)?;
+    let now = now_string();
     let mut model: camera_maintenance::ActiveModel = existing.into();
     if let Some(v) = data.camera_id {
         model.camera_id = Set(v);

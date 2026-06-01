@@ -9,8 +9,8 @@ use sea_orm::{
 use serde::Deserialize;
 
 use crate::auth::middleware::RequireAuth;
-use crate::error::{AppError, AppResult};
-use crate::patch::{double_option, trim, trim_opt};
+use crate::error::{AppError, AppResult, OptionExt};
+use crate::patch::{double_option, now_string, trim, trim_opt};
 use crate::routes::friendly_err;
 use crate::services::roll_service::RollService;
 use crate::services::shot_service::ShotService;
@@ -78,10 +78,7 @@ async fn list_for_roll(
     State(db): State<DatabaseConnection>,
     Path(roll_id): Path<i32>,
 ) -> AppResult<Json<Vec<shot::Model>>> {
-    ShotService::list_for_roll(&db, roll_id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(ShotService::list_for_roll(&db, roll_id).await?))
 }
 
 async fn get_one(
@@ -89,10 +86,7 @@ async fn get_one(
     State(db): State<DatabaseConnection>,
     Path(id): Path<i32>,
 ) -> AppResult<Json<Option<shot::Model>>> {
-    ShotService::get_by_id(&db, id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(ShotService::get_by_id(&db, id).await?))
 }
 
 // --- Create shot (transactional: create + set_lenses + auto_sync_status) ---
@@ -102,7 +96,7 @@ async fn create(
     State(db): State<DatabaseConnection>,
     Json(data): Json<CreateShotDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
 
     let result_id = db
         .transaction::<_, i32, DbErr>(|txn| {
@@ -156,12 +150,9 @@ async fn update(
     Path(id): Path<i32>,
     Json(data): Json<UpdateShotDto>,
 ) -> AppResult<StatusCode> {
-    let existing = ShotService::get_by_id(&db, id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound(format!("Shot {id} not found")))?;
+    let existing = ShotService::get_by_id(&db, id).await?.or_404("Shot", id)?;
 
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
 
     db.transaction::<_, (), DbErr>(|txn| {
         Box::pin(async move {
@@ -260,10 +251,7 @@ async fn lenses_for_shot(
     State(db): State<DatabaseConnection>,
     Path(shot_id): Path<i32>,
 ) -> AppResult<Json<Vec<i32>>> {
-    ShotService::get_lenses_for_shot(&db, shot_id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(ShotService::get_lenses_for_shot(&db, shot_id).await?))
 }
 
 async fn lenses_for_roll_shots(
@@ -271,10 +259,7 @@ async fn lenses_for_roll_shots(
     State(db): State<DatabaseConnection>,
     Path(roll_id): Path<i32>,
 ) -> AppResult<Json<Vec<(i32, i32)>>> {
-    ShotService::get_lenses_for_roll_shots(&db, roll_id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(ShotService::get_lenses_for_roll_shots(&db, roll_id).await?))
 }
 
 async fn suggest_next_frame(
@@ -282,10 +267,7 @@ async fn suggest_next_frame(
     State(db): State<DatabaseConnection>,
     Path(roll_id): Path<i32>,
 ) -> AppResult<Json<String>> {
-    ShotService::suggest_next_frame(&db, roll_id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(ShotService::suggest_next_frame(&db, roll_id).await?))
 }
 
 async fn count_for_roll(
@@ -293,8 +275,5 @@ async fn count_for_roll(
     State(db): State<DatabaseConnection>,
     Path(roll_id): Path<i32>,
 ) -> AppResult<Json<u64>> {
-    ShotService::count_for_roll(&db, roll_id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(ShotService::count_for_roll(&db, roll_id).await?))
 }

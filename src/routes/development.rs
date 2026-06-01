@@ -11,8 +11,8 @@ use sea_orm::{
 use serde::Deserialize;
 
 use crate::auth::middleware::RequireAuth;
-use crate::error::{AppError, AppResult};
-use crate::patch::{double_option, trim_opt};
+use crate::error::{AppError, AppResult, OptionExt};
+use crate::patch::{double_option, now_string, trim_opt};
 use crate::routes::friendly_err;
 use crate::services::development_service::{
     DevelopmentService, SelfDevWithStages, StageInput,
@@ -140,10 +140,7 @@ async fn get_lab_dev_for_roll(
     State(db): State<DatabaseConnection>,
     Path(roll_id): Path<i32>,
 ) -> AppResult<Json<Option<development_lab::Model>>> {
-    DevelopmentService::get_lab_dev_for_roll(&db, roll_id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(DevelopmentService::get_lab_dev_for_roll(&db, roll_id).await?))
 }
 
 async fn create_lab_dev(
@@ -151,7 +148,7 @@ async fn create_lab_dev(
     State(db): State<DatabaseConnection>,
     Json(data): Json<CreateLabDevDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
 
     let result_id = db
         .transaction::<_, i32, DbErr>(|txn| {
@@ -194,11 +191,10 @@ async fn update_lab_dev(
     Json(data): Json<UpdateLabDevDto>,
 ) -> AppResult<StatusCode> {
     let existing = DevelopmentService::get_lab_dev_by_id(&db, id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound(format!("Lab development {id} not found")))?;
+        .await?
+        .or_404("Lab development", id)?;
 
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
     let mut model: development_lab::ActiveModel = existing.into();
 
     if let Some(v) = data.lab_id {
@@ -275,10 +271,7 @@ async fn get_self_dev_for_roll(
     State(db): State<DatabaseConnection>,
     Path(roll_id): Path<i32>,
 ) -> AppResult<Json<Option<development_self::Model>>> {
-    DevelopmentService::get_self_dev_for_roll(&db, roll_id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(DevelopmentService::get_self_dev_for_roll(&db, roll_id).await?))
 }
 
 async fn create_self_dev(
@@ -286,7 +279,7 @@ async fn create_self_dev(
     State(db): State<DatabaseConnection>,
     Json(data): Json<CreateSelfDevDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
 
     let result_id = db
         .transaction::<_, i32, DbErr>(|txn| {
@@ -340,11 +333,10 @@ async fn update_self_dev(
     Json(data): Json<UpdateSelfDevDto>,
 ) -> AppResult<StatusCode> {
     let existing = DevelopmentService::get_self_dev_by_id(&db, id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound(format!("Self development {id} not found")))?;
+        .await?
+        .or_404("Self development", id)?;
 
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
 
     db.transaction::<_, (), DbErr>(|txn| {
         Box::pin(async move {
@@ -451,10 +443,7 @@ async fn list_dev_stages(
     State(db): State<DatabaseConnection>,
     Path(development_self_id): Path<i32>,
 ) -> AppResult<Json<Vec<dev_stage::Model>>> {
-    DevelopmentService::list_stages(&db, development_self_id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(DevelopmentService::list_stages(&db, development_self_id).await?))
 }
 
 // --- List all self-developments (composite: parents + batched stages) ---
@@ -463,15 +452,11 @@ async fn list_all_self_developments(
     _: RequireAuth,
     State(db): State<DatabaseConnection>,
 ) -> AppResult<Json<Vec<SelfDevWithStages>>> {
-    let items = DevelopmentService::list_all_self_devs(&db)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let items = DevelopmentService::list_all_self_devs(&db).await?;
 
     let dev_ids: Vec<i32> = items.iter().map(|i| i.dev_id).collect();
 
-    let all_stages = DevelopmentService::list_stages_for_dev_ids(&db, dev_ids)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let all_stages = DevelopmentService::list_stages_for_dev_ids(&db, dev_ids).await?;
 
     let mut stage_map: HashMap<i32, Vec<dev_stage::Model>> = HashMap::new();
     for stage in all_stages {

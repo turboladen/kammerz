@@ -3,6 +3,7 @@ use serde::Serialize;
 
 use ::entity::roll::{self, Entity as Roll, PushPull, RollStatus};
 use ::entity::shot;
+use crate::patch::now_string;
 use crate::services::shot_service::ShotService;
 
 /// Convert `TransactionError<DbErr>` to `DbErr`.
@@ -199,7 +200,7 @@ impl RollService {
             .ok_or_else(|| DbErr::Custom(format!("Roll {roll_id} not found")))?;
 
         if from_statuses.contains(&roll_record.status) {
-            let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+            let now = now_string();
             let mut model: roll::ActiveModel = roll_record.into();
             model.status = Set(to_status);
             model.updated_at = Set(now);

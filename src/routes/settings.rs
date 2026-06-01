@@ -24,10 +24,7 @@ async fn get_setting(
     State(db): State<sea_orm::DatabaseConnection>,
     Path(key): Path<String>,
 ) -> AppResult<Json<Option<String>>> {
-    SettingsService::get_setting(&db, &key)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(SettingsService::get_setting(&db, &key).await?))
 }
 
 async fn set_setting(

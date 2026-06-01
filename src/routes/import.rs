@@ -8,7 +8,7 @@ use serde::Deserialize;
 use crate::auth::middleware::RequireAuth;
 use crate::config::AppConfig;
 use crate::error::{AppError, AppResult};
-use crate::patch::{trim, trim_opt};
+use crate::patch::{now_string, trim, trim_opt};
 use crate::routes::friendly_err;
 use crate::services::import_service::{ImportService, ModelInfo, ParsedRoll};
 use crate::services::roll_service::{ImportShotEntry, RollService};
@@ -72,8 +72,7 @@ async fn resolve_key(db: &DatabaseConnection, config: &AppConfig) -> AppResult<S
         return Ok(k.clone());
     }
     SettingsService::get_setting(db, "claude_api_key")
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?
+        .await?
         .filter(|s| !s.is_empty())
         .ok_or_else(|| {
             AppError::UnprocessableEntity(
@@ -105,8 +104,7 @@ async fn parse_note(
     let model = match data.model {
         Some(m) if !m.is_empty() => m,
         _ => SettingsService::get_setting(&state.db, "claude_model")
-            .await
-            .map_err(|e| AppError::Internal(e.to_string()))?
+            .await?
             .unwrap_or_else(|| DEFAULT_MODEL.to_string()),
     };
     ImportService::parse_note(&key, &model, &data.note_text)
@@ -120,7 +118,7 @@ async fn import_parsed_roll(
     State(state): State<AppState>,
     Json(data): Json<ImportRollDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
 
     let roll_model = roll::ActiveModel {
         roll_id: trim(data.roll_id),

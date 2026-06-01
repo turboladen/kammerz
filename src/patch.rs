@@ -1,6 +1,11 @@
 use sea_orm::ActiveValue;
 use serde::{Deserialize, Deserializer};
 
+/// Current UTC timestamp formatted for SQLite TEXT columns (`created_at` / `updated_at`).
+pub fn now_string() -> String {
+    chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
 /// Deserializes a field as `Option<Option<T>>` to distinguish between:
 /// - Field absent from JSON → `None` (don't update; requires `#[serde(default)]` on struct)
 /// - Field present as `null` → `Some(None)` (set to NULL in DB)

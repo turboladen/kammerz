@@ -4,7 +4,7 @@ use axum::{Json, Router};
 use serde::Deserialize;
 
 use crate::auth::middleware::RequireAuth;
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::services::search_service::{SearchResults, SearchService};
 use crate::AppState;
 
@@ -34,8 +34,5 @@ async fn search(
             labs: vec![],
         }));
     }
-    SearchService::search(&db, query)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(SearchService::search(&db, query).await?))
 }

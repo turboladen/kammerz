@@ -44,3 +44,19 @@ impl From<sea_orm::DbErr> for AppError {
         AppError::Internal(e.to_string())
     }
 }
+
+/// Turn a successful-but-empty lookup (`Option::None`) into a 404.
+///
+/// Pairs with the `From<DbErr>` impl above so an update/delete handler reads:
+/// ```ignore
+/// let existing = CameraService::get_by_id(&db, id).await?.or_404("Camera", id)?;
+/// ```
+pub trait OptionExt<T> {
+    fn or_404(self, label: &str, id: i32) -> AppResult<T>;
+}
+
+impl<T> OptionExt<T> for Option<T> {
+    fn or_404(self, label: &str, id: i32) -> AppResult<T> {
+        self.ok_or_else(|| AppError::NotFound(format!("{label} {id} not found")))
+    }
+}

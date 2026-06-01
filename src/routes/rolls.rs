@@ -6,8 +6,8 @@ use sea_orm::{DatabaseConnection, EntityTrait, Set};
 use serde::{Deserialize, Serialize};
 
 use crate::auth::middleware::RequireAuth;
-use crate::error::{AppError, AppResult};
-use crate::patch::{double_option, trim, trim_opt};
+use crate::error::{AppError, AppResult, OptionExt};
+use crate::patch::{double_option, now_string, trim, trim_opt};
 use crate::routes::friendly_err;
 use crate::services::development_service::DevelopmentService;
 use crate::services::roll_service::{RollService, RollWithDetails};
@@ -87,10 +87,7 @@ async fn list(
     _: RequireAuth,
     State(db): State<DatabaseConnection>,
 ) -> AppResult<Json<Vec<RollWithDetails>>> {
-    RollService::list_all_with_details(&db)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(RollService::list_all_with_details(&db).await?))
 }
 
 async fn get_one(
@@ -98,10 +95,7 @@ async fn get_one(
     State(db): State<DatabaseConnection>,
     Path(id): Path<i32>,
 ) -> AppResult<Json<Option<RollWithDetails>>> {
-    RollService::get_with_details(&db, id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(RollService::get_with_details(&db, id).await?))
 }
 
 async fn create(
@@ -109,7 +103,7 @@ async fn create(
     State(db): State<DatabaseConnection>,
     Json(data): Json<CreateRollDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
     let model = roll::ActiveModel {
         roll_id: trim(data.roll_id),
         camera_id: Set(data.camera_id),
@@ -140,11 +134,10 @@ async fn update(
 ) -> AppResult<StatusCode> {
     let existing = roll::Entity::find_by_id(id)
         .one(&db)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound(format!("Roll {id} not found")))?;
+        .await?
+        .or_404("Roll", id)?;
 
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
     let mut model: roll::ActiveModel = existing.into();
 
     if let Some(v) = data.roll_id {
@@ -204,20 +197,14 @@ async fn list_for_camera(
     State(db): State<DatabaseConnection>,
     Path(camera_id): Path<i32>,
 ) -> AppResult<Json<Vec<RollWithDetails>>> {
-    RollService::list_for_camera(&db, camera_id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(RollService::list_for_camera(&db, camera_id).await?))
 }
 
 async fn suggest_id(
     _: RequireAuth,
     State(db): State<DatabaseConnection>,
 ) -> AppResult<Json<String>> {
-    RollService::suggest_id(&db)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(RollService::suggest_id(&db).await?))
 }
 
 // --- Composite roll detail (ported from commands/rolls.rs::get_roll_detail) ---
@@ -227,31 +214,18 @@ async fn get_detail(
     State(db): State<DatabaseConnection>,
     Path(id): Path<i32>,
 ) -> AppResult<Json<RollDetail>> {
-    let roll = RollService::get_with_details(&db, id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound(format!("Roll {id} not found")))?;
+    let roll = RollService::get_with_details(&db, id).await?.or_404("Roll", id)?;
 
-    let shots = ShotService::list_for_roll(&db, id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let shots = ShotService::list_for_roll(&db, id).await?;
 
-    let shot_lens_pairs = ShotService::get_lenses_for_roll_shots(&db, id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let shot_lens_pairs = ShotService::get_lenses_for_roll_shots(&db, id).await?;
 
-    let lab_dev = DevelopmentService::get_lab_dev_for_roll(&db, id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let lab_dev = DevelopmentService::get_lab_dev_for_roll(&db, id).await?;
 
-    let self_dev = DevelopmentService::get_self_dev_for_roll(&db, id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let self_dev = DevelopmentService::get_self_dev_for_roll(&db, id).await?;
 
     let dev_stages = if let Some(ref sd) = self_dev {
-        DevelopmentService::list_stages(&db, sd.id)
-            .await
-            .map_err(|e| AppError::Internal(e.to_string()))?
+        DevelopmentService::list_stages(&db, sd.id).await?
     } else {
         vec![]
     };

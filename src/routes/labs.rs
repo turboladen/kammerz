@@ -6,8 +6,8 @@ use sea_orm::Set;
 use serde::Deserialize;
 
 use crate::auth::middleware::RequireAuth;
-use crate::error::{AppError, AppResult};
-use crate::patch::{double_option, trim, trim_opt};
+use crate::error::{AppError, AppResult, OptionExt};
+use crate::patch::{double_option, now_string, trim, trim_opt};
 use crate::routes::friendly_err;
 use crate::services::lab_service::LabService;
 use crate::AppState;
@@ -49,10 +49,7 @@ async fn list(
     _: RequireAuth,
     State(db): State<sea_orm::DatabaseConnection>,
 ) -> AppResult<Json<Vec<lab::Model>>> {
-    LabService::list_all(&db)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(LabService::list_all(&db).await?))
 }
 
 async fn get_one(
@@ -60,10 +57,7 @@ async fn get_one(
     State(db): State<sea_orm::DatabaseConnection>,
     Path(id): Path<i32>,
 ) -> AppResult<Json<Option<lab::Model>>> {
-    LabService::get_by_id(&db, id)
-        .await
-        .map(Json)
-        .map_err(|e| AppError::Internal(e.to_string()))
+    Ok(Json(LabService::get_by_id(&db, id).await?))
 }
 
 async fn create(
@@ -71,7 +65,7 @@ async fn create(
     State(db): State<sea_orm::DatabaseConnection>,
     Json(data): Json<CreateLabDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = now_string();
     let model = lab::ActiveModel {
         name: trim(data.name),
         location: trim_opt(data.location),
@@ -93,11 +87,8 @@ async fn update(
     Path(id): Path<i32>,
     Json(data): Json<UpdateLabDto>,
 ) -> AppResult<StatusCode> {
-    let existing = LabService::get_by_id(&db, id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound(format!("Lab {id} not found")))?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let existing = LabService::get_by_id(&db, id).await?.or_404("Lab", id)?;
+    let now = now_string();
     let mut model: lab::ActiveModel = existing.into();
     if let Some(v) = data.name {
         model.name = trim(v);
