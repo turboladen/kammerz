@@ -27,6 +27,8 @@ vite.config.ts.timestamp-*
 /frontend/playwright-report/
 /frontend/blob-report/
 /frontend/.playwright/
+# Playwright MCP snapshot/console artifacts (written to repo root)
+.playwright-mcp/
 
 # Rust
 /target
