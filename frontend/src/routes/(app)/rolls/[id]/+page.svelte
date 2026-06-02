@@ -101,9 +101,12 @@
 
 	// Roll-full nudge state
 	let rollFullDismissed = $state(false);
-	// Finish date captured at the shooting→shot transition (prefilled with today,
-	// editable in the nudge). The shot moment is significant enough to record.
+	// Finish date shown in the roll-complete nudge. Seeded once per roll from the
+	// roll's existing date_finished (or today when unset) — see loadRollData. The
+	// per-roll guard keeps same-roll mutation reloads from clobbering an in-progress
+	// edit while still re-seeding on navigation to a different roll.
 	let finishDate = $state(todayLocal());
+	let finishDateSeededFor: number | null = $state(null);
 	const showRollFullNudge = $derived(
 		roll?.status === 'shooting' &&
 		frameProgress !== null &&
@@ -245,6 +248,14 @@
 			const detail = await getRollDetail(id);
 			roll = detail.roll;
 			rollFullDismissed = false;
+			// Seed the nudge's finish date ONCE per roll: reflect an already-set
+			// date_finished (e.g. entered via the Edit form) instead of misleadingly
+			// showing today, but don't re-seed on same-roll mutation reloads, which
+			// would clobber an in-progress edit.
+			if (roll.id !== finishDateSeededFor) {
+				finishDateSeededFor = roll.id;
+				finishDate = roll.date_finished ?? todayLocal();
+			}
 			shots = detail.shots;
 			labDev = detail.lab_dev;
 			selfDev = detail.self_dev;
@@ -444,17 +455,18 @@
 			const patch: Partial<RollInsert> = { status };
 			// Capture the finish date only when the roll is genuinely *advancing*
 			// into 'shot' from a pre-shot state — the real "finished shooting"
-			// moment. A backward correction into 'shot' (e.g. reverting from at-lab)
-			// must not invent a finish date. Use the nudge's date when it's a
-			// complete YYYY-MM-DD; a partial/invalid entry falls back to today.
-			const advancingToShot =
-				status === 'shot' &&
-				!!roll &&
-				!roll.date_finished &&
-				(roll.status === 'shooting' || roll.status === 'loaded');
-			if (advancingToShot) {
-				const typed = finishDateOverride ?? '';
-				patch.date_finished = isValidIsoDate(typed) ? typed : todayLocal();
+			// moment. A backward correction into 'shot' (e.g. reverting from
+			// at-lab) must not touch the date. A deliberate, valid date from the
+			// nudge wins (even over one set earlier via the Edit form); otherwise
+			// stamp today only when none is recorded yet, never clobbering an
+			// existing value on a no-op or invalid entry.
+			if (status === 'shot' && roll && (roll.status === 'shooting' || roll.status === 'loaded')) {
+				const explicit = finishDateOverride ?? '';
+				if (isValidIsoDate(explicit)) {
+					patch.date_finished = explicit;
+				} else if (!roll.date_finished) {
+					patch.date_finished = todayLocal();
+				}
 			}
 			await updateRoll(id, patch);
 			await loadRollData();
@@ -556,12 +568,6 @@
 	// call loadRollData() directly, so they refresh only the roll's /detail.
 	$effect(() => {
 		loading = true;
-		// Re-seed the nudge's finish-date default on navigation ONLY (this effect
-		// re-runs on roll-id change). Mutations call loadRollData() directly and
-		// must NOT reset it, or a user's edited finish date would be clobbered
-		// mid-edit. This also keeps an unsubmitted edit from leaking across rolls
-		// and refreshes "today" across midnight on the next navigation.
-		finishDate = todayLocal();
 		Promise.all([loadRefData(), loadRollData()]).finally(() => {
 			loading = false;
 		});
