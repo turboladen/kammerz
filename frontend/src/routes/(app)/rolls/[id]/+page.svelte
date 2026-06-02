@@ -22,7 +22,7 @@
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder } from '$lib/utils/status';
-	import { todayLocal } from '$lib/utils/date';
+	import { todayLocal, isValidIsoDate } from '$lib/utils/date';
 	import type { RollWithDetails, RollInsert, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
 
 	const id = $derived(Number(page.params.id));
@@ -245,10 +245,6 @@
 			const detail = await getRollDetail(id);
 			roll = detail.roll;
 			rollFullDismissed = false;
-			// Re-seed the finish-date default per roll (this component instance is
-			// reused across [id] changes) so an edit on one roll can't leak into the
-			// next roll's nudge, and "today" stays fresh across midnight.
-			finishDate = todayLocal();
 			shots = detail.shots;
 			labDev = detail.lab_dev;
 			selfDev = detail.self_dev;
@@ -458,7 +454,7 @@
 				(roll.status === 'shooting' || roll.status === 'loaded');
 			if (advancingToShot) {
 				const typed = finishDateOverride ?? '';
-				patch.date_finished = /^\d{4}-\d{2}-\d{2}$/.test(typed) ? typed : todayLocal();
+				patch.date_finished = isValidIsoDate(typed) ? typed : todayLocal();
 			}
 			await updateRoll(id, patch);
 			await loadRollData();
@@ -560,6 +556,12 @@
 	// call loadRollData() directly, so they refresh only the roll's /detail.
 	$effect(() => {
 		loading = true;
+		// Re-seed the nudge's finish-date default on navigation ONLY (this effect
+		// re-runs on roll-id change). Mutations call loadRollData() directly and
+		// must NOT reset it, or a user's edited finish date would be clobbered
+		// mid-edit. This also keeps an unsubmitted edit from leaking across rolls
+		// and refreshes "today" across midnight on the next navigation.
+		finishDate = todayLocal();
 		Promise.all([loadRefData(), loadRollData()]).finally(() => {
 			loading = false;
 		});
