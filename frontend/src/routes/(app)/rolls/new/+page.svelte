@@ -14,6 +14,7 @@
 	import { listLenses } from '$lib/api/lenses';
 	import { buildLensOptions, lensDisplayName } from '$lib/utils/lens';
 	import { listLensMounts } from '$lib/api/lens-mounts';
+	import { todayLocal } from '$lib/utils/date';
 	import type { Camera, FilmStock, Lens, LensMount, PushPull, RollInsert } from '$lib/types';
 
 	let cameras: Camera[] = $state([]);
@@ -28,7 +29,7 @@
 	let lensId = $state('');
 	let frameCount = $state('');
 	let frameCountAutoFilledFrom = $state<string | null>(null); // tracks which stock auto-filled the frame count
-	let dateLoaded = $state(new Date().toISOString().split('T')[0]);
+	let dateLoaded = $state(todayLocal());
 	let dateFuzzy = $state('');
 	let pushPull = $state('');
 	let notes = $state('');

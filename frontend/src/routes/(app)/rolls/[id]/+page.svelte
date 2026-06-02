@@ -22,6 +22,7 @@
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder } from '$lib/utils/status';
+	import { todayLocal } from '$lib/utils/date';
 	import type { RollWithDetails, RollInsert, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
 
 	const id = $derived(Number(page.params.id));
@@ -97,14 +98,6 @@
 		if (!roll?.frame_count) return null;
 		return { current: shots.length, total: roll.frame_count };
 	});
-
-	// Local (not UTC) today as YYYY-MM-DD — used to stamp the finish date.
-	function todayLocal(): string {
-		const d = new Date();
-		const mm = String(d.getMonth() + 1).padStart(2, '0');
-		const dd = String(d.getDate()).padStart(2, '0');
-		return `${d.getFullYear()}-${mm}-${dd}`;
-	}
 
 	// Roll-full nudge state
 	let rollFullDismissed = $state(false);
@@ -252,6 +245,10 @@
 			const detail = await getRollDetail(id);
 			roll = detail.roll;
 			rollFullDismissed = false;
+			// Re-seed the finish-date default per roll (this component instance is
+			// reused across [id] changes) so an edit on one roll can't leak into the
+			// next roll's nudge, and "today" stays fresh across midnight.
+			finishDate = todayLocal();
 			shots = detail.shots;
 			labDev = detail.lab_dev;
 			selfDev = detail.self_dev;
@@ -445,15 +442,23 @@
 		return null;
 	}
 
-	async function updateStatus(status: RollStatus, finishDate?: string) {
+	async function updateStatus(status: RollStatus, finishDateOverride?: string) {
 		error = '';
 		try {
 			const patch: Partial<RollInsert> = { status };
-			// Capture the shooting→shot transition date — previously this moment
-			// was dropped on the floor. Use the explicit date from the nudge when
-			// provided, otherwise stamp today; never overwrite an existing value.
-			if (status === 'shot' && roll && !roll.date_finished) {
-				patch.date_finished = finishDate || todayLocal();
+			// Capture the finish date only when the roll is genuinely *advancing*
+			// into 'shot' from a pre-shot state — the real "finished shooting"
+			// moment. A backward correction into 'shot' (e.g. reverting from at-lab)
+			// must not invent a finish date. Use the nudge's date when it's a
+			// complete YYYY-MM-DD; a partial/invalid entry falls back to today.
+			const advancingToShot =
+				status === 'shot' &&
+				!!roll &&
+				!roll.date_finished &&
+				(roll.status === 'shooting' || roll.status === 'loaded');
+			if (advancingToShot) {
+				const typed = finishDateOverride ?? '';
+				patch.date_finished = /^\d{4}-\d{2}-\d{2}$/.test(typed) ? typed : todayLocal();
 			}
 			await updateRoll(id, patch);
 			await loadRollData();
@@ -708,7 +713,7 @@
 								class="px-4 py-1.5 text-xs font-medium transition-colors hover:bg-accent/25
 									{showDevPathMenu ? 'bg-accent/25 text-accent' : 'bg-accent/15 text-accent'}"
 							>
-								Develop&nbsp;⌄
+								Develop<span aria-hidden="true">&nbsp;⌄</span>
 							</button>
 							{#if showDevPathMenu}
 								<!-- click-away catcher -->
