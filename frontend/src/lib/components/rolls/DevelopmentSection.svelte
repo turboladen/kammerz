@@ -255,15 +255,10 @@
 
 <!-- Development Display -->
 <div class="mb-6">
-	<div class="mb-3 flex items-center justify-between">
-		<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Development</h2>
-		{#if !labDev && !selfDev}
-			<div class="flex gap-1">
-				<Button size="sm" onclick={openLabDevDialog}>+ Lab</Button>
-				<Button size="sm" onclick={openSelfDevDialog}>+ Self</Button>
-			</div>
-		{/if}
-	</div>
+	<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+		Development
+		<div class="flex-1 border-b border-border-subtle"></div>
+	</h2>
 
 	{#if labDev}
 		<div class="group rounded-lg border border-border bg-surface-raised p-4">

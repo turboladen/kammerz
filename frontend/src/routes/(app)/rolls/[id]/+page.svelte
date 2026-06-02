@@ -22,7 +22,8 @@
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder } from '$lib/utils/status';
-	import type { RollWithDetails, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
+	import { todayLocal, isValidIsoDate } from '$lib/utils/date';
+	import type { RollWithDetails, RollInsert, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
 
 	const id = $derived(Number(page.params.id));
 
@@ -100,12 +101,21 @@
 
 	// Roll-full nudge state
 	let rollFullDismissed = $state(false);
+	// Finish date shown in the roll-complete nudge. Seeded once per roll from the
+	// roll's existing date_finished (or today when unset) — see loadRollData. The
+	// per-roll guard keeps same-roll mutation reloads from clobbering an in-progress
+	// edit while still re-seeding on navigation to a different roll.
+	let finishDate = $state(todayLocal());
+	let finishDateSeededFor: number | null = $state(null);
 	const showRollFullNudge = $derived(
 		roll?.status === 'shooting' &&
 		frameProgress !== null &&
 		shots.length >= frameProgress.total &&
 		!rollFullDismissed
 	);
+
+	// Development-path picker popover (the live "Develop" chevron in the undecided flow).
+	let showDevPathMenu = $state(false);
 
 	// Status auto-sync (advance on create, revert on delete) is handled by the
 	// backend commands transactionally. The frontend just calls loadRollData()
@@ -238,6 +248,14 @@
 			const detail = await getRollDetail(id);
 			roll = detail.roll;
 			rollFullDismissed = false;
+			// Seed the nudge's finish date ONCE per roll: reflect an already-set
+			// date_finished (e.g. entered via the Edit form) instead of misleadingly
+			// showing today, but don't re-seed on same-roll mutation reloads, which
+			// would clobber an in-progress edit.
+			if (roll.id !== finishDateSeededFor) {
+				finishDateSeededFor = roll.id;
+				finishDate = roll.date_finished ?? todayLocal();
+			}
 			shots = detail.shots;
 			labDev = detail.lab_dev;
 			selfDev = detail.self_dev;
@@ -431,10 +449,26 @@
 		return null;
 	}
 
-	async function updateStatus(status: RollStatus) {
+	async function updateStatus(status: RollStatus, finishDateOverride?: string) {
 		error = '';
 		try {
-			await updateRoll(id, { status });
+			const patch: Partial<RollInsert> = { status };
+			// Capture the finish date only when the roll is genuinely *advancing*
+			// into 'shot' from a pre-shot state — the real "finished shooting"
+			// moment. A backward correction into 'shot' (e.g. reverting from
+			// at-lab) must not touch the date. A deliberate, valid date from the
+			// nudge wins (even over one set earlier via the Edit form); otherwise
+			// stamp today only when none is recorded yet, never clobbering an
+			// existing value on a no-op or invalid entry.
+			if (status === 'shot' && roll && (roll.status === 'shooting' || roll.status === 'loaded')) {
+				const explicit = finishDateOverride ?? '';
+				if (isValidIsoDate(explicit)) {
+					patch.date_finished = explicit;
+				} else if (!roll.date_finished) {
+					patch.date_finished = todayLocal();
+				}
+			}
+			await updateRoll(id, patch);
 			await loadRollData();
 			// Auto-prompt development dialogs
 			if (status === 'at-lab' && !labDev && !selfDev) {
@@ -456,6 +490,14 @@
 		} else {
 			updateStatus(status);
 		}
+	}
+
+	// Commit to a development path from the "Develop" chevron. Reuses the dev-dialog
+	// auto-prompt wiring: opening + saving a dev record makes getDevPath resolve to
+	// this path, the backend auto-syncs status, and the chevron bar re-renders.
+	function chooseDevPath(path: 'lab' | 'self') {
+		showDevPathMenu = false;
+		devAutoPrompt = path;
 	}
 
 	const pushPullOptions = [
@@ -667,14 +709,44 @@
 						{statusConfig[status].label}
 					</button>
 					{#if devPath === 'undecided' && status === 'shot'}
-						{#each ['·', '·'] as dot}
-							<div
+						<!-- Live next-step: the development decision happens here, in the flow,
+						     rather than as disconnected dead placeholders. Choosing a path
+						     opens the matching dev dialog and re-renders the bar to that flow. -->
+						<div class="relative">
+							<button
+								onclick={() => (showDevPathMenu = !showDevPathMenu)}
+								aria-haspopup="menu"
+								aria-expanded={showDevPathMenu}
 								style="clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)"
-								class="flex items-center justify-center px-4 py-1.5 text-xs font-medium bg-surface-overlay/40 text-text-faint"
+								class="px-4 py-1.5 text-xs font-medium transition-colors hover:bg-accent/25
+									{showDevPathMenu ? 'bg-accent/25 text-accent' : 'bg-accent/15 text-accent'}"
 							>
-								{dot}
-							</div>
-						{/each}
+								Develop<span aria-hidden="true">&nbsp;⌄</span>
+							</button>
+							{#if showDevPathMenu}
+								<!-- click-away catcher -->
+								<button
+									class="fixed inset-0 z-10 cursor-default"
+									aria-label="Close development menu"
+									onclick={() => (showDevPathMenu = false)}
+								></button>
+								<div
+									role="menu"
+									class="absolute left-1/2 top-full z-20 mt-1.5 -translate-x-1/2 overflow-hidden rounded-lg border border-border bg-surface-overlay shadow-lg"
+								>
+									<button
+										role="menuitem"
+										onclick={() => chooseDevPath('lab')}
+										class="block w-full whitespace-nowrap px-4 py-2 text-left text-xs font-medium text-text-muted transition-colors hover:bg-accent/15 hover:text-accent"
+									>Lab</button>
+									<button
+										role="menuitem"
+										onclick={() => chooseDevPath('self')}
+										class="block w-full whitespace-nowrap border-t border-border-subtle px-4 py-2 text-left text-xs font-medium text-text-muted transition-colors hover:bg-accent/15 hover:text-accent"
+									>Self / Home</button>
+								</div>
+							{/if}
+						</div>
 					{/if}
 				{/each}
 			</div>
@@ -721,15 +793,20 @@
 			</div>
 
 			{#if showRollFullNudge}
-				<div class="mb-3 flex items-center justify-between rounded-lg border border-accent/30 bg-accent/10 px-4 py-3">
-					<div>
-						<p class="text-sm font-medium text-accent">Roll complete</p>
-						<p class="text-xs text-accent/70">
-							All {frameProgress?.total} frames shot. Ready to mark as done?
-						</p>
+				<div class="mb-3 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3">
+					<div class="flex flex-col gap-2">
+						<div>
+							<p class="text-sm font-medium text-accent">Roll complete</p>
+							<p class="text-xs text-accent/70">
+								All {frameProgress?.total} frames shot. When did you finish it?
+							</p>
+						</div>
+						<div class="w-44">
+							<DateInput label="Finished shooting" bind:value={finishDate} />
+						</div>
 					</div>
 					<div class="flex items-center gap-2">
-						<Button size="sm" variant="primary" onclick={() => updateStatus('shot')}>Mark as Shot</Button>
+						<Button size="sm" variant="primary" onclick={() => updateStatus('shot', finishDate)}>Mark as Shot</Button>
 						<button
 							onclick={() => { rollFullDismissed = true; }}
 							class="text-accent/60 hover:text-accent transition-colors text-lg leading-none px-1"
