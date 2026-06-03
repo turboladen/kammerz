@@ -28,6 +28,9 @@ pub enum RollStatus {
     #[sea_orm(string_value = "scanned")]
     #[serde(rename = "scanned")]
     Scanned,
+    #[sea_orm(string_value = "post-processed")]
+    #[serde(rename = "post-processed")]
+    PostProcessed,
     #[sea_orm(string_value = "archived")]
     #[serde(rename = "archived")]
     Archived,
@@ -66,6 +69,9 @@ pub struct Model {
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
     pub date_finished: Option<String>,
+    pub date_scanned: Option<String>,
+    pub date_post_processed: Option<String>,
+    pub date_archived: Option<String>,
     pub date_fuzzy: Option<String>,
     pub push_pull: Option<PushPull>,
     pub notes: Option<String>,

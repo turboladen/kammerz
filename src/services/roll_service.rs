@@ -28,6 +28,9 @@ pub struct RollWithDetails {
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
     pub date_finished: Option<String>,
+    pub date_scanned: Option<String>,
+    pub date_post_processed: Option<String>,
+    pub date_archived: Option<String>,
     pub date_fuzzy: Option<String>,
     pub push_pull: Option<PushPull>,
     pub notes: Option<String>,
@@ -47,7 +50,8 @@ pub struct RollWithDetails {
 
 const ROLLS_WITH_DETAILS_SQL: &str = "\
     SELECT r.id, r.roll_id, r.camera_id, r.film_stock_id, r.lens_id, r.status, \
-           r.frame_count, r.date_loaded, r.date_finished, r.date_fuzzy, \
+           r.frame_count, r.date_loaded, r.date_finished, \
+           r.date_scanned, r.date_post_processed, r.date_archived, r.date_fuzzy, \
            r.push_pull, r.notes, r.created_at, r.updated_at, \
            c.brand AS camera_brand, c.model AS camera_model, \
            fs.brand AS film_stock_brand, fs.name AS film_stock_name, \

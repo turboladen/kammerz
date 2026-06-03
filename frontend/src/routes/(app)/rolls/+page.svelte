@@ -32,6 +32,7 @@
 		{ value: 'developing', label: 'Developing' },
 		{ value: 'developed', label: 'Developed' },
 		{ value: 'scanned', label: 'Scanned' },
+		{ value: 'post-processed', label: 'Post-processed' },
 		{ value: 'archived', label: 'Archived' }
 	];
 

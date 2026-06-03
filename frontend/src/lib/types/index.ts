@@ -138,6 +138,7 @@ export type RollStatus =
 	| 'developing'
 	| 'developed'
 	| 'scanned'
+	| 'post-processed'
 	| 'archived';
 
 export type PushPull = '-2' | '-1' | '+1' | '+2' | '+3';
@@ -152,6 +153,9 @@ export interface Roll {
 	frame_count: number | null;
 	date_loaded: string | null;
 	date_finished: string | null;
+	date_scanned: string | null;
+	date_post_processed: string | null;
+	date_archived: string | null;
 	date_fuzzy: string | null;
 	push_pull: PushPull | null;
 	notes: string | null;

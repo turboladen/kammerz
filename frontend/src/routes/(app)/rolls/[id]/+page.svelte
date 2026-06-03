@@ -22,6 +22,7 @@
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder } from '$lib/utils/status';
+	import { buildRollTimeline } from '$lib/utils/timeline';
 	import { todayLocal, isValidIsoDate } from '$lib/utils/date';
 	import type { RollWithDetails, RollInsert, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
 	import { Trash2 } from 'lucide-svelte';
@@ -53,6 +54,9 @@
 	let editFrameCount = $state('');
 	let editDateLoaded = $state('');
 	let editDateFinished = $state('');
+	let editDateScanned = $state('');
+	let editDatePostProcessed = $state('');
+	let editDateArchived = $state('');
 	let editDateFuzzy = $state('');
 	let editPushPull = $state('');
 	let editNotes = $state('');
@@ -89,6 +93,20 @@
 	);
 	const statusFlow = $derived(getFlowForPath(devPath));
 	const pathLabel = $derived(getPathLabel(devPath));
+
+	// Ordered lifecycle dates (path-aware) for the read-only timeline section.
+	const timeline = $derived(roll ? buildRollTimeline(roll, labDev, selfDev, devPath) : []);
+
+	// Statuses whose roll date column is auto-stamped (today) on the forward
+	// transition into them, when still empty. 'shot' → date_finished is handled
+	// separately in updateStatus so the nudge's explicit-date override wins.
+	const STATUS_DATE_FIELD: Partial<
+		Record<RollStatus, 'date_scanned' | 'date_post_processed' | 'date_archived'>
+	> = {
+		scanned: 'date_scanned',
+		'post-processed': 'date_post_processed',
+		archived: 'date_archived'
+	};
 
 	// Status backward-move confirmation
 	let pendingStatus: RollStatus | null = $state(null);
@@ -454,19 +472,25 @@
 		error = '';
 		try {
 			const patch: Partial<RollInsert> = { status };
-			// Capture the finish date only when the roll is genuinely *advancing*
-			// into 'shot' from a pre-shot state — the real "finished shooting"
-			// moment. A backward correction into 'shot' (e.g. reverting from
-			// at-lab) must not touch the date. A deliberate, valid date from the
-			// nudge wins (even over one set earlier via the Edit form); otherwise
-			// stamp today only when none is recorded yet, never clobbering an
-			// existing value on a no-op or invalid entry.
-			if (status === 'shot' && roll && (roll.status === 'shooting' || roll.status === 'loaded')) {
-				const explicit = finishDateOverride ?? '';
-				if (isValidIsoDate(explicit)) {
-					patch.date_finished = explicit;
-				} else if (!roll.date_finished) {
-					patch.date_finished = todayLocal();
+			// Auto-stamp the milestone date when the roll is genuinely *advancing*
+			// into a dated status (target ahead of current in the path's flow) and
+			// no date is recorded yet — the real moment that milestone happened.
+			// A backward correction (e.g. reverting at-lab → shot) must never touch
+			// the date, and we never clobber an existing value. The 'shot' nudge can
+			// pass a deliberate, valid date that wins even over an Edit-form value.
+			if (roll) {
+				const targetIdx = statusFlow.indexOf(status);
+				const advancing = currentStatusIdx === -1 || targetIdx > currentStatusIdx;
+				const dateField = STATUS_DATE_FIELD[status];
+				if (status === 'shot' && advancing) {
+					const explicit = finishDateOverride ?? '';
+					if (isValidIsoDate(explicit)) {
+						patch.date_finished = explicit;
+					} else if (!roll.date_finished) {
+						patch.date_finished = todayLocal();
+					}
+				} else if (dateField && advancing && !roll[dateField]) {
+					patch[dateField] = todayLocal();
 				}
 			}
 			await updateRoll(id, patch);
@@ -519,6 +543,9 @@
 		editFrameCount = roll.frame_count?.toString() ?? '';
 		editDateLoaded = roll.date_loaded ?? '';
 		editDateFinished = roll.date_finished ?? '';
+		editDateScanned = roll.date_scanned ?? '';
+		editDatePostProcessed = roll.date_post_processed ?? '';
+		editDateArchived = roll.date_archived ?? '';
 		editDateFuzzy = roll.date_fuzzy ?? '';
 		editPushPull = roll.push_pull ?? '';
 		editNotes = roll.notes ?? '';
@@ -536,6 +563,9 @@
 				frame_count: editFrameCount ? parseInt(editFrameCount) : null,
 				date_loaded: editDateLoaded || null,
 				date_finished: editDateFinished || null,
+				date_scanned: editDateScanned || null,
+				date_post_processed: editDatePostProcessed || null,
+				date_archived: editDateArchived || null,
 				date_fuzzy: editDateFuzzy || null,
 				push_pull: (editPushPull || null) as PushPull | null,
 				notes: editNotes || null
@@ -615,7 +645,12 @@
 					{/if}
 					<div class="grid grid-cols-2 gap-4">
 						<DateInput label="Date Loaded" bind:value={editDateLoaded} />
-						<DateInput label="Date Finished" bind:value={editDateFinished} />
+						<DateInput label="Finished Shooting" bind:value={editDateFinished} />
+					</div>
+					<div class="grid grid-cols-3 gap-4">
+						<DateInput label="Scanned" bind:value={editDateScanned} />
+						<DateInput label="Post-processed" bind:value={editDatePostProcessed} />
+						<DateInput label="Archived" bind:value={editDateArchived} />
 					</div>
 					<div class="grid grid-cols-2 gap-4">
 						<Select label="Push/Pull" bind:value={editPushPull} options={pushPullOptions} />
@@ -661,7 +696,7 @@
 								<span>Loaded {roll.date_loaded}</span>
 							{/if}
 							{#if roll.date_finished}
-								<span>Finished {roll.date_finished}</span>
+								<span>Finished shooting {roll.date_finished}</span>
 							{/if}
 						</div>
 						{#if roll.date_fuzzy}
@@ -751,6 +786,30 @@
 					{/if}
 				{/each}
 			</div>
+		</div>
+		</FadeIn>
+
+		<!-- Lifecycle Timeline -->
+		<FadeIn delay={75}>
+		<div class="mb-6">
+			<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+				Timeline
+				<div class="flex-1 border-b border-border-subtle"></div>
+			</h2>
+			<ol class="space-y-1.5">
+				{#each timeline as milestone (milestone.key)}
+					<li class="flex items-center gap-3 text-sm">
+						<span
+							class="h-1.5 w-1.5 shrink-0 rounded-full {milestone.date ? 'bg-accent' : 'bg-surface-overlay'}"
+						></span>
+						<span class={milestone.date ? 'text-text-muted' : 'text-text-faint'}>{milestone.label}</span>
+						<div class="flex-1 border-b border-dashed border-border-subtle/60"></div>
+						<span class="font-mono text-xs {milestone.date ? 'text-text' : 'text-text-faint'}">
+							{milestone.date ?? '—'}
+						</span>
+					</li>
+				{/each}
+			</ol>
 		</div>
 		</FadeIn>
 

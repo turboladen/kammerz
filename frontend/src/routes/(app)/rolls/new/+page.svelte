@@ -171,6 +171,9 @@
 				frame_count: frameCount ? parseInt(frameCount) : null,
 				date_loaded: dateLoaded || null,
 				date_finished: null,
+				date_scanned: null,
+				date_post_processed: null,
+				date_archived: null,
 				date_fuzzy: dateFuzzy || null,
 				push_pull: (pushPull || null) as PushPull | null,
 				notes: notes || null

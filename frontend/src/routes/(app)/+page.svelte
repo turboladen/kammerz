@@ -33,8 +33,8 @@
 		rolls.filter((r) => r.status === 'loaded' || r.status === 'shooting')
 	);
 
-	// Rolls in post-shooting processing (shot through scanned)
-	const processingStatuses: RollStatus[] = ['shot', 'at-lab', 'lab-done', 'developing', 'developed', 'scanned'];
+	// Rolls in post-shooting processing (shot through post-processed)
+	const processingStatuses: RollStatus[] = ['shot', 'at-lab', 'lab-done', 'developing', 'developed', 'scanned', 'post-processed'];
 	const processingRolls = $derived.by(() => {
 		return rolls
 			.filter((r) => processingStatuses.includes(r.status))
