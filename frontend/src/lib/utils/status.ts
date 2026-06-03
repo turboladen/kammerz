@@ -66,6 +66,12 @@ export const statusConfig: Record<
 		pillClasses: 'bg-status-scanned/10 text-status-scanned',
 		dotClass: 'bg-status-scanned'
 	},
+	'post-processed': {
+		label: 'Post-processed',
+		colorVar: 'var(--color-status-post-processed)',
+		pillClasses: 'bg-status-post-processed/10 text-status-post-processed',
+		dotClass: 'bg-status-post-processed'
+	},
 	archived: {
 		label: 'Archived',
 		colorVar: 'var(--color-status-archived)',
@@ -86,6 +92,7 @@ export const labFlow: RollStatus[] = [
 	'at-lab',
 	'lab-done',
 	'scanned',
+	'post-processed',
 	'archived'
 ];
 
@@ -97,11 +104,19 @@ export const selfFlow: RollStatus[] = [
 	'developing',
 	'developed',
 	'scanned',
+	'post-processed',
 	'archived'
 ];
 
 /** Undecided path (no dev record): shows shared prefix + suffix with a visual gap. */
-export const undecidedFlow: RollStatus[] = ['loaded', 'shooting', 'shot', 'scanned', 'archived'];
+export const undecidedFlow: RollStatus[] = [
+	'loaded',
+	'shooting',
+	'shot',
+	'scanned',
+	'post-processed',
+	'archived'
+];
 
 /**
  * Combined sort order — includes ALL statuses for cross-roll sorting contexts
@@ -117,6 +132,7 @@ export const allStatusOrder: RollStatus[] = [
 	'developing',
 	'developed',
 	'scanned',
+	'post-processed',
 	'archived'
 ];
 

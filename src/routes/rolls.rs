@@ -28,6 +28,9 @@ pub struct CreateRollDto {
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
     pub date_finished: Option<String>,
+    pub date_scanned: Option<String>,
+    pub date_post_processed: Option<String>,
+    pub date_archived: Option<String>,
     pub date_fuzzy: Option<String>,
     pub push_pull: Option<PushPull>,
     pub notes: Option<String>,
@@ -50,6 +53,12 @@ pub struct UpdateRollDto {
     pub date_loaded: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
     pub date_finished: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_scanned: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_post_processed: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_archived: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
     pub date_fuzzy: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
@@ -113,6 +122,9 @@ async fn create(
         frame_count: Set(data.frame_count),
         date_loaded: trim_opt(data.date_loaded),
         date_finished: trim_opt(data.date_finished),
+        date_scanned: trim_opt(data.date_scanned),
+        date_post_processed: trim_opt(data.date_post_processed),
+        date_archived: trim_opt(data.date_archived),
         date_fuzzy: trim_opt(data.date_fuzzy),
         push_pull: Set(data.push_pull),
         notes: trim_opt(data.notes),
@@ -163,6 +175,15 @@ async fn update(
     }
     if let Some(v) = data.date_finished {
         model.date_finished = trim_opt(v);
+    }
+    if let Some(v) = data.date_scanned {
+        model.date_scanned = trim_opt(v);
+    }
+    if let Some(v) = data.date_post_processed {
+        model.date_post_processed = trim_opt(v);
+    }
+    if let Some(v) = data.date_archived {
+        model.date_archived = trim_opt(v);
     }
     if let Some(v) = data.date_fuzzy {
         model.date_fuzzy = trim_opt(v);
