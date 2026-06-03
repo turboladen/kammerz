@@ -16,7 +16,7 @@ Prerequisites: Rust (stable), [Bun](https://bun.sh), and [`just`](https://github
 just dev
 ```
 
-This runs the axum backend on `:3002` and the Vite dev server on `:5173` (which proxies `/api` → `:3002`). Open <http://localhost:5173>. The dev database is `./kammerz.db` (created on first run; override with `DATABASE_URL`).
+This runs the axum backend on `:3002` and the Vite dev server on `:5273` (which proxies `/api` → `:3002`). Open <http://localhost:5273>. The dev database is `./kammerz.db` (created on first run; override with `DATABASE_URL`).
 
 Run the halves separately with `just dev-backend` / `just dev-frontend`.
 

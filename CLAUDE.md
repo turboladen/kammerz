@@ -15,13 +15,13 @@ Film photography catalog — a self-hosted web app built with axum + SvelteKit +
 
 ## Commands
 
-- `just dev` — Run backend (axum on :3002) + frontend (Vite on :5173, proxies `/api` → :3002) together for development
+- `just dev` — Run backend (axum on :3002) + frontend (Vite on :5273, proxies `/api` → :3002) together for development
 - `just dev-backend` / `just dev-frontend` — Run either half alone
 - `just build` — Production build: `frontend/build` (Vite) then `cargo build --release` (embeds it). Binary at `target/release/kammerz`
 - `just check` — `bun run check` (svelte-check) + `cargo build` + `cargo test`
 - `cargo test -p kammerz` — Backend integration tests (in-memory SQLite, real migrations + seed)
 - `echo -n <pw> | kammerz hash-password` — Generate the argon2 hash for `KAMMERZ_PASSWORD_HASH`. **Reads the password from stdin, never argv** (argv leaks into shell history / `ps`). On a TTY it prompts with echo off.
-- **Verification:** This is a normal browser app — browser/Playwright verification is valid. Run via `just dev` (axum :3002 + Vite :5173 proxy) and open `http://localhost:5173`, or build and run the release binary on :3002. Verify backend with `cargo test`, frontend markup/types with `bun run build` / `bun run check`, data with `sqlite3` queries against the configured `DATABASE_URL` (dev default `./kammerz.db`).
+- **Verification:** This is a normal browser app — browser/Playwright verification is valid. Run via `just dev` (axum :3002 + Vite :5273 proxy) and open `http://localhost:5273`, or build and run the release binary on :3002. Verify backend with `cargo test`, frontend markup/types with `bun run build` / `bun run check`, data with `sqlite3` queries against the configured `DATABASE_URL` (dev default `./kammerz.db`).
 
 ## Architecture
 
