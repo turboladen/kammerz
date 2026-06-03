@@ -83,8 +83,17 @@
 	--font-display: 'Instrument Serif', Georgia, serif;
 }
 
+/* Photographic vignette — painted into the root canvas BEHIND all content, so it
+   darkens only the bare page surface that shows through the main-content gaps and
+   page edges. Opaque cards/sidebar sit on top untouched. Because every glyph is
+   light-on-dark, darkening the surface can only RAISE text contrast, never lower
+   it — so this can be far stronger (0.45 vs. the old over-content cap of 0.12)
+   without risking WCAG AA (text-faint on the darkened corner is ≈5.8:1). The
+   gradient lives on the root element so it covers the viewport regardless of
+   scroll/content height; no z-index juggling and nothing opaque covers it. */
 html {
 	background-color: var(--color-surface);
+	background-image: radial-gradient(125% 125% at 50% 32%, transparent 48%, rgb(0 0 0 / 0.45) 100%);
 	color: var(--color-text);
 }
 
@@ -92,18 +101,6 @@ body {
 	font-family: var(--font-sans);
 	-webkit-font-smoothing: antialiased;
 	margin: 0;
-}
-
-/* Subtle photographic vignette — darkens only the far corners for depth/mood.
-   Capped low (0.12) and started late (70%) so it can't pull even faint text in a
-   corner below WCAG AA — it's a fixed overlay that sits over scrolling content. */
-body::before {
-	content: '';
-	position: fixed;
-	inset: 0;
-	pointer-events: none;
-	z-index: 9998;
-	background: radial-gradient(130% 130% at 50% 38%, transparent 70%, rgb(0 0 0 / 0.12) 100%);
 }
 
 /* Film grain texture — analog atmosphere */

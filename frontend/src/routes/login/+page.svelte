@@ -50,7 +50,9 @@
 
 <svelte:head><title>Sign in — Kammerz</title></svelte:head>
 
-<div class="flex min-h-screen items-center justify-center bg-surface px-4">
+<!-- No bg-surface: let the html canvas (surface color + vignette) show through so
+     the login screen carries the same photographic vignette as the app pages. -->
+<div class="flex min-h-screen items-center justify-center px-4">
 	<div class="w-full max-w-sm rounded-xl border border-border-subtle bg-surface-raised p-8 shadow-2xl">
 		<div class="mb-6 flex items-center gap-3">
 			<span class="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/15 text-accent">
