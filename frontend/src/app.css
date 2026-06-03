@@ -88,7 +88,7 @@
    page edges. Opaque cards/sidebar sit on top untouched. Because every glyph is
    light-on-dark, darkening the surface can only RAISE text contrast, never lower
    it — so this can be far stronger (0.45 vs. the old over-content cap of 0.12)
-   without risking WCAG AA (text-faint on the darkened corner is ≈5.9:1). The
+   without risking WCAG AA (text-faint on the darkened corner is ≈5.8:1). The
    gradient lives on the root element so it covers the viewport regardless of
    scroll/content height; no z-index juggling and nothing opaque covers it. */
 html {
