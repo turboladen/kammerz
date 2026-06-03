@@ -532,7 +532,7 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 					</div>
 					<Input label="Frame Count" type="number" bind:value={frameCount} />
 					<DateInput label="Date Loaded" bind:value={dateLoaded} />
-					<DateInput label="Date Finished" bind:value={dateFinished} />
+					<DateInput label="Finished Shooting" bind:value={dateFinished} />
 					<div class="col-span-2">
 						<Input label="Notes" bind:value={rollNotes} />
 					</div>
