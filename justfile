@@ -2,7 +2,7 @@
 default:
     @just --list
 
-# Run backend (axum, :3002) and frontend (vite, :5173) together for dev.
+# Run backend (axum, :3002) and frontend (vite, :5273) together for dev.
 dev:
     #!/usr/bin/env bash
     trap 'kill 0' EXIT
