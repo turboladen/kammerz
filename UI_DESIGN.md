@@ -377,7 +377,7 @@ Rapid single-frame logging optimized for active shooting sessions:
 Refinement comes from material and texture, layered so nothing sits behind text and contrast is preserved. All in `frontend/src/app.css`:
 
 - **Film grain** — SVG noise `body::after` at 5% opacity, `position: fixed`, `pointer-events: none`, `z-index: 9999`. Subliminal analog quality.
-- **Vignette** — `body::before` radial gradient darkening only the far corners (`z-index: 9998`). Photographic depth without dimming content.
+- **Vignette** — a radial gradient painted into the root canvas (`html` `background-image`, darker toward the corners) so it sits *behind* all content. Opaque cards/sidebar cover it; the darkening shows only through the bare page-surface gaps and page edges. Because every glyph is light-on-dark, darkening the surface can only raise text contrast, so it runs strong (0.45 black at the corner) — `text-faint` on a darkened corner is ≈5.8:1, *higher* than on the lit center (≈5.6:1). (Earlier it was a `body::before` overlay at `z-index: 9998`, capped at 0.12 because painting over content could pull faint corner text below AA.)
 - **Material cards** — raised rounded panels (`.bg-surface-raised.rounded-lg`) get a lit top "catch-light" edge (`border-top-color`) and a faint top-down sheen (`linear-gradient`); plain cards add a soft elevation shadow. A `:not(.shadow-xl):not(.shadow-2xl)` guard preserves dialogs'/menus' own shadows. This is the "silver/chrome" half of black & silver.
 
 ### Dialog Animations
