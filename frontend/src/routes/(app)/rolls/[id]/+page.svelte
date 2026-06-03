@@ -97,12 +97,12 @@
 	// Ordered lifecycle dates (path-aware) for the read-only timeline section.
 	const timeline = $derived(roll ? buildRollTimeline(roll, labDev, selfDev, devPath) : []);
 
-	// Status → roll date column auto-stamped on the forward transition into it.
-	// 'shot' is listed for documentation but handled specially (nudge override).
+	// Statuses whose roll date column is auto-stamped (today) on the forward
+	// transition into them, when still empty. 'shot' → date_finished is handled
+	// separately in updateStatus so the nudge's explicit-date override wins.
 	const STATUS_DATE_FIELD: Partial<
-		Record<RollStatus, 'date_finished' | 'date_scanned' | 'date_post_processed' | 'date_archived'>
+		Record<RollStatus, 'date_scanned' | 'date_post_processed' | 'date_archived'>
 	> = {
-		shot: 'date_finished',
 		scanned: 'date_scanned',
 		'post-processed': 'date_post_processed',
 		archived: 'date_archived'
