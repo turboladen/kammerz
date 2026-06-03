@@ -24,6 +24,7 @@
 	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder } from '$lib/utils/status';
 	import { todayLocal, isValidIsoDate } from '$lib/utils/date';
 	import type { RollWithDetails, RollInsert, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
+	import { Trash2 } from 'lucide-svelte';
 
 	const id = $derived(Number(page.params.id));
 
@@ -583,7 +584,7 @@
 	</div>
 {:else}
 	<PageHeader title="Roll {roll.roll_id}" backHref={backNav.href} backLabel={backNav.label}>
-		<Button variant="danger" onclick={handleDelete}>Delete</Button>
+		<Button variant="danger" onclick={handleDelete}><Trash2 size={16} strokeWidth={2} aria-hidden="true" />Delete</Button>
 	</PageHeader>
 
 	<div class="p-6">
@@ -703,8 +704,8 @@
 							{roll.status === status
 							? 'bg-accent text-surface'
 							: idx < currentStatusIdx
-								? 'bg-accent/10 text-accent/70 hover:bg-accent/20'
-								: 'bg-surface-overlay text-text-muted hover:text-text'}"
+								? 'bg-surface-overlay text-accent hover:bg-surface-overlay/80'
+								: 'bg-surface-raised text-text-muted hover:text-text'}"
 					>
 						{statusConfig[status].label}
 					</button>
@@ -945,6 +946,7 @@
 		title="Move Status Back"
 		message={`Move status back to ${statusConfig[pendingStatus].label}? This will revert progress.`}
 		confirmLabel="Move Back"
+		variant="primary"
 		onconfirm={() => { updateStatus(pendingStatus!); pendingStatus = null; }}
 		oncancel={() => { pendingStatus = null; }}
 	/>

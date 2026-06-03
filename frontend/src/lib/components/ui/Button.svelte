@@ -15,7 +15,7 @@
 		primary: 'bg-accent text-surface hover:bg-accent-hover',
 		secondary: 'bg-surface-overlay text-text border border-border hover:bg-surface-overlay/80',
 		ghost: 'text-text-muted hover:bg-surface-overlay hover:text-text',
-		danger: 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+		danger: 'bg-danger text-white hover:bg-danger-hover'
 	};
 
 	const sizes = {

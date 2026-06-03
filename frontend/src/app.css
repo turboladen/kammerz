@@ -38,35 +38,43 @@
 }
 
 @theme {
-	/* Surfaces: warm dark tones, like darkroom walls */
-	--color-surface: #151210;
-	--color-surface-raised: #1e1a17;
-	--color-surface-overlay: #272220;
+	/* Surfaces: near-neutral graphite with only a whisper of warmth — a black camera
+	   body, not brown, not sterile gray. Dark enough to hold contrast. */
+	--color-surface: #0d0d0c;
+	--color-surface-raised: #161615;
+	--color-surface-overlay: #211f1e;
 
-	/* Borders: warm grays */
-	--color-border: #3d3530;
-	--color-border-subtle: #2d2723;
+	/* Borders: graphite grays */
+	--color-border: #2f2d2a;
+	--color-border-subtle: #242220;
 
-	/* Text: cream/warm white, like aged paper */
-	--color-text: #e8e2d9;
-	--color-text-muted: #a09488;
-	--color-text-faint: #6d6258;
+	/* Text: silver with a faint warm lean — bright (high contrast), like brushed aluminum */
+	--color-text: #eeebe7;
+	--color-text-muted: #bab4ad;
+	--color-text-faint: #8f8981;
 
-	/* Accent: amber/gold, like a darkroom safelight */
-	--color-accent: #d4915c;
-	--color-accent-hover: #e4a876;
-	--color-accent-muted: #a06830;
+	/* Accent: amber/gold "safelight" — the single warm spark */
+	--color-accent: #e2a45e;
+	--color-accent-hover: #eeb878;
+	--color-accent-muted: #7d5a32;
 
-	/* Status colors: shifted warmer, still distinct */
-	--color-status-loaded: #6ca4d4;
-	--color-status-shooting: #5cb88a;
-	--color-status-shot: #a38bc7;
-	--color-status-at-lab: #d4a84e;
-	--color-status-lab-done: #d4c24e;
-	--color-status-developing: #c87a42;
-	--color-status-developed: #b384c7;
-	--color-status-scanned: #5aaf9e;
-	--color-status-archived: #7a726a;
+	/* Danger: destructive actions. Solid fill takes white text ≥4.5:1 on BOTH the
+	   base and the (darker) hover; the lighter -fg is for danger icons/text on the
+	   dark surface. */
+	--color-danger: #c0473a;
+	--color-danger-hover: #b03f33;
+	--color-danger-fg: #e88c80;
+
+	/* Status colors: red/green-safe — blue (shooting phase) → amber (development) → neutral (finished) */
+	--color-status-loaded: #6fbcff;
+	--color-status-shooting: #93c4ec;
+	--color-status-shot: #afb3ea;
+	--color-status-at-lab: #e3a347;
+	--color-status-lab-done: #f0cf57;
+	--color-status-developing: #dd8b44;
+	--color-status-developed: #ecc185;
+	--color-status-scanned: #a8cdd8;
+	--color-status-archived: #b3a99c;
 
 	/* Typography */
 	--font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
@@ -85,17 +93,41 @@ body {
 	margin: 0;
 }
 
-/* Film grain texture — subtle analog atmosphere */
+/* Subtle photographic vignette — darkens only the far corners for depth/mood.
+   Capped low (0.12) and started late (70%) so it can't pull even faint text in a
+   corner below WCAG AA — it's a fixed overlay that sits over scrolling content. */
+body::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	z-index: 9998;
+	background: radial-gradient(130% 130% at 50% 38%, transparent 70%, rgb(0 0 0 / 0.12) 100%);
+}
+
+/* Film grain texture — analog atmosphere */
 body::after {
 	content: '';
 	position: fixed;
 	inset: 0;
 	pointer-events: none;
 	z-index: 9999;
-	opacity: 0.03;
+	opacity: 0.05;
 	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
 	background-repeat: repeat;
 	background-size: 256px 256px;
+}
+
+/* Material depth on plain cards — the "silver/chrome" half of black & silver:
+   a lit top catch-light edge, a faint top sheen, and a soft elevation shadow.
+   The :not() scopes the whole treatment to plain cards: dialogs/menus bring their
+   own (stronger) shadow and keep a uniform border, so they're excluded entirely.
+   No effect on chevrons (clip-path), chips (overlay), or the sidebar (not raised). */
+.bg-surface-raised.rounded-lg:not(.shadow-xl):not(.shadow-2xl),
+.bg-surface-raised.rounded-xl:not(.shadow-xl):not(.shadow-2xl) {
+	background-image: linear-gradient(to bottom, rgb(255 255 255 / 0.025), rgb(255 255 255 / 0) 45%);
+	border-top-color: #47433d;
+	box-shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 2px 10px rgb(0 0 0 / 0.18);
 }
 
 /* Dialog entry animation */

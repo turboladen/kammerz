@@ -2,70 +2,90 @@
 
 Kammerz's visual identity draws from two analog photography metaphors:
 
-1. **The darkroom** — warm amber safelight glow, deep blacks, chemical warmth
+1. **The darkroom** — deep graphite blacks lit by a single amber safelight; brushed-metal camera bodies, atmospheric film grain
 2. **The field log** — photographer's notebook, precise frame numbers, monospaced data, ledger-style precision
 
-This is not skeuomorphism. It's tonal warmth, typographic character, and atmospheric density translated into a modern desktop UI.
+The palette is intentionally near-monochrome — black/graphite surfaces and brushed-silver text — so the one warm accent (amber) and the status colors carry all the meaning. It's built for **readability** (every text tier clears WCAG AA) and for **red/green color vision** (status is distinguished on the blue↔yellow axis plus lightness, never by hue alone). Refinement comes from material and texture — a top catch-light and soft elevation on cards, film grain, and a subtle vignette — not from a warm color wash (which is what crushed contrast in the earlier brown theme).
 
 ---
 
 ## Color Palette
 
-All colors are defined as CSS custom properties in `src/app.css` via Tailwind CSS 4's `@theme` block. Every component references these tokens — changing the theme transforms the entire app.
+All colors are defined as CSS custom properties in `frontend/src/app.css` via Tailwind CSS 4's `@theme` block. Every component references these tokens — changing the theme transforms the entire app.
 
-### Surfaces (warm dark tones, like darkroom walls)
+### Surfaces (graphite / black — a camera body, not warm brown)
 
-| Token | Hex | Usage |
-|---|---|---|
-| `--color-surface` | `#151210` | Page background, input backgrounds |
-| `--color-surface-raised` | `#1e1a17` | Cards, sidebar, dialog panels |
-| `--color-surface-overlay` | `#272220` | Dropdown menus, hover states, code badges |
-
-### Borders (warm grays)
+Near-neutral with only a whisper of warmth. Dark enough to hold contrast; the warmth is mood, the brightness lives in the text.
 
 | Token | Hex | Usage |
 |---|---|---|
-| `--color-border` | `#3d3530` | Card borders, input borders, dividers |
-| `--color-border-subtle` | `#2d2723` | Sidebar border, softer dividers |
+| `--color-surface` | `#0d0d0c` | Page background, input backgrounds |
+| `--color-surface-raised` | `#161615` | Cards, sidebar, dialog panels |
+| `--color-surface-overlay` | `#211f1e` | Dropdown menus, hover states, chips |
 
-### Text (cream/warm white, like aged paper)
-
-| Token | Hex | Usage |
-|---|---|---|
-| `--color-text` | `#e8e2d9` | Primary text, headings |
-| `--color-text-muted` | `#a09488` | Secondary text, labels, descriptions |
-| `--color-text-faint` | `#6d6258` | Tertiary text, hints, timestamps |
-
-### Accent (amber/gold, like a darkroom safelight)
+### Borders (graphite grays)
 
 | Token | Hex | Usage |
 |---|---|---|
-| `--color-accent` | `#d4915c` | Primary buttons, active states, brand |
-| `--color-accent-hover` | `#e4a876` | Button hover states |
-| `--color-accent-muted` | `#a06830` | Subtle accent backgrounds |
+| `--color-border` | `#2f2d2a` | Card borders, input borders, dividers |
+| `--color-border-subtle` | `#242220` | Sidebar border, softer dividers |
 
-### Status Colors (warm-shifted, still distinct)
+### Text (brushed silver — bright, faint warm lean)
 
-| Status | Hex | Visual |
+| Token | Hex | Usage |
 |---|---|---|
-| Loaded | `#6ca4d4` | Dusty blue |
-| Shooting | `#5cb88a` | Sage green |
-| Shot | `#a38bc7` | Muted lavender |
-| At Lab | `#d4a84e` | Warm gold |
-| Developing | `#c87a42` | Burnt orange |
-| Developed | `#b384c7` | Soft purple |
-| Scanned | `#5aaf9e` | Teal |
-| Archived | `#7a726a` | Warm gray |
+| `--color-text` | `#eeebe7` | Primary text, headings (~16:1 on surface) |
+| `--color-text-muted` | `#bab4ad` | Secondary text, labels, descriptions (~9:1) |
+| `--color-text-faint` | `#8f8981` | Tertiary text, hints, timestamps (~5.6:1 — all tiers clear WCAG AA) |
+
+### Accent (amber/gold — the single warm "safelight" spark)
+
+The one warm element against the neutral field. Used deliberately for primary actions, active states, and the brand — not as a pervasive wash.
+
+| Token | Hex | Usage |
+|---|---|---|
+| `--color-accent` | `#e2a45e` | Primary buttons, active states, brand |
+| `--color-accent-hover` | `#eeb878` | Button hover states |
+| `--color-accent-muted` | `#7d5a32` | Subtle accent backgrounds |
+
+### Status Colors (red/green-safe, grouped by lifecycle phase)
+
+Statuses are distinguished primarily on the **blue↔yellow axis** (the axis red/green
+color vision reads reliably) plus lightness, grouped by phase: shooting = cool blues,
+development = warm ambers, finished = neutral (cool `scanned` vs warm `archived`). The
+status label text is always shown alongside the color, so color is never the sole signal.
+
+| Status | Hex | Phase |
+|---|---|---|
+| Loaded | `#6fbcff` | Shooting — vivid azure |
+| Shooting | `#93c4ec` | Shooting — sky blue |
+| Shot | `#afb3ea` | Shooting — blue-violet |
+| At Lab | `#e3a347` | Development — amber |
+| Lab Done | `#f0cf57` | Development — yellow |
+| Developing | `#dd8b44` | Development — orange |
+| Developed | `#ecc185` | Development — light tan |
+| Scanned | `#a8cdd8` | Finished — cool slate |
+| Archived | `#b3a99c` | Finished — warm taupe |
 
 ### Danger
 
-Use `#c45c4a` for destructive actions (warm red, not pure red).
+Destructive actions must read as dangerous without relying on red hue (the app
+supports red/green color vision). Tokens: `--color-danger` (`#c0473a`, solid fill,
+white text ~5:1), `--color-danger-hover` (`#b03f33`, a *darker* hover so white text
+stays ≥4.5:1 — a lighter hover would drop below AA), `--color-danger-fg` (`#e88c80`,
+danger icons/text on the dark surface). The `danger` Button variant is a solid fill,
+and destructive commits carry a `Trash2` line icon; `ConfirmDialog` adds an
+`AlertTriangle` in the header. Informational error banners may stay tinted (they carry
+explanatory text and are not actions). For **reversible** actions that need confirmation
+but aren't data loss (e.g. moving a roll's status backward), use `ConfirmDialog
+variant="primary"` — an amber confirm with no warning icon or trash — so the destructive
+styling stays reserved for true deletes.
 
 ---
 
 ## Typography
 
-Fonts are self-hosted in `static/fonts/` and loaded via `@font-face` declarations in `src/app.css`.
+Fonts are self-hosted in `frontend/static/fonts/` and loaded via `@font-face` declarations in `frontend/src/app.css`.
 
 ### Font Stack
 
@@ -90,7 +110,7 @@ Fonts are self-hosted in `static/fonts/` and loaded via `@font-face` declaration
 
 ## Components
 
-### Button (`src/lib/components/ui/Button.svelte`)
+### Button (`frontend/src/lib/components/ui/Button.svelte`)
 
 Four variants, two sizes:
 
@@ -99,11 +119,11 @@ Four variants, two sizes:
 | `primary` | Solid amber accent background |
 | `secondary` | Bordered, overlay background |
 | `ghost` | Text-only, overlay on hover |
-| `danger` | Red-tinted background |
+| `danger` | Solid red fill, white text (high-emphasis destructive); pair with a `Trash2` icon |
 
 Sizes: `md` (default, px-4 py-2) and `sm` (px-2.5 py-1.5).
 
-### Badge (`src/lib/components/ui/Badge.svelte`)
+### Badge (`frontend/src/lib/components/ui/Badge.svelte`)
 
 Roll status pills with a small color dot indicator:
 - 1.5px solid dot before the label text
@@ -112,7 +132,7 @@ Roll status pills with a small color dot indicator:
 - `rounded-full` shape
 - Always use `<Badge>` for roll statuses — never inline status pills.
 
-### Dialog (`src/lib/components/ui/Dialog.svelte`)
+### Dialog (`frontend/src/lib/components/ui/Dialog.svelte`)
 
 - Backdrop: `bg-black/50` with `backdrop-blur-sm`
 - Panel: `rounded-lg`, `shadow-2xl`, `border-border`
@@ -120,7 +140,7 @@ Roll status pills with a small color dot indicator:
 - Entry animation: 150ms scale from 0.95 + fade
 - Backdrop animation: 100ms fade
 
-### ConfirmDialog (`src/lib/components/ui/ConfirmDialog.svelte`)
+### ConfirmDialog (`frontend/src/lib/components/ui/ConfirmDialog.svelte`)
 
 Same animations and styling as Dialog, smaller max-width (`max-w-sm`).
 
@@ -131,11 +151,11 @@ Same animations and styling as Dialog, smaller max-width (`max-w-sm`).
 - Labels: `text-xs font-medium text-text-muted`
 - Hints: `text-xs text-text-faint`
 
-### EmptyState (`src/lib/components/ui/EmptyState.svelte`)
+### EmptyState (`frontend/src/lib/components/ui/EmptyState.svelte`)
 
 Centered message with optional CTA button. Used when lists are empty.
 
-### FadeIn (`src/lib/components/ui/FadeIn.svelte`)
+### FadeIn (`frontend/src/lib/components/ui/FadeIn.svelte`)
 
 Wraps content in staggered `fade-in-up` animation (200ms, ease-out). Use on all page sections for sequential reveal:
 - `delay` prop for staggering (typically 50ms increments between sections)
@@ -145,7 +165,7 @@ Wraps content in staggered `fade-in-up` animation (200ms, ease-out). Use on all 
 
 ## Layout
 
-### App Shell (`src/routes/+layout.svelte`)
+### App Shell (`frontend/src/routes/+layout.svelte`)
 
 ```
 ┌──────────────────────────────────────────┐
@@ -162,7 +182,7 @@ Wraps content in staggered `fade-in-up` animation (200ms, ease-out). Use on all 
 - `flex h-screen overflow-hidden`
 - Sidebar is fixed width, main content scrolls independently
 
-### Sidebar (`src/lib/components/layout/Sidebar.svelte`)
+### Sidebar (`frontend/src/lib/components/layout/Sidebar.svelte`)
 
 - **Brand**: "Kammerz" in Instrument Serif (amber), "film log" subtitle in IBM Plex Mono (uppercase, tracked)
 - **Background**: Gradient from `surface-raised` to `surface` (top to bottom)
@@ -193,7 +213,7 @@ Navigation is split into two groups with a subtle separator:
 | `/search` | Search | `Search` |
 | `/stats` | Stats | `BarChart3` |
 
-### PageHeader (`src/lib/components/layout/PageHeader.svelte`)
+### PageHeader (`frontend/src/lib/components/layout/PageHeader.svelte`)
 
 - Title in `font-display text-xl`
 - Description in `text-sm text-text-faint`
@@ -352,16 +372,17 @@ Rapid single-frame logging optimized for active shooting sessions:
 
 ## Atmospheric Effects
 
-### Film Grain Texture
+### Texture & Depth
 
-Defined in `src/app.css` as a `body::after` pseudo-element:
-- SVG noise pattern at 3% opacity
-- `position: fixed`, `pointer-events: none`, `z-index: 9999`
-- Adds subliminal analog quality without interfering with interaction
+Refinement comes from material and texture, layered so nothing sits behind text and contrast is preserved. All in `frontend/src/app.css`:
+
+- **Film grain** — SVG noise `body::after` at 5% opacity, `position: fixed`, `pointer-events: none`, `z-index: 9999`. Subliminal analog quality.
+- **Vignette** — `body::before` radial gradient darkening only the far corners (`z-index: 9998`). Photographic depth without dimming content.
+- **Material cards** — raised rounded panels (`.bg-surface-raised.rounded-lg`) get a lit top "catch-light" edge (`border-top-color`) and a faint top-down sheen (`linear-gradient`); plain cards add a soft elevation shadow. A `:not(.shadow-xl):not(.shadow-2xl)` guard preserves dialogs'/menus' own shadows. This is the "silver/chrome" half of black & silver.
 
 ### Dialog Animations
 
-Defined as `@keyframes` in `src/app.css`:
+Defined as `@keyframes` in `frontend/src/app.css`:
 - `dialog-enter`: scale 0.95 → 1.0 + opacity 0 → 1 over 150ms ease-out
 - `backdrop-enter`: opacity 0 → 1 over 100ms ease-out
 
@@ -375,11 +396,11 @@ Defined as `@keyframes` in `src/app.css`:
 
 ## Design Principles
 
-1. **Warm, not cool.** Every surface, border, and text color has a brown/amber undertone, never blue/purple.
+1. **Graphite & silver, not brown.** Surfaces are near-neutral black/graphite (only a whisper of warmth); text is brushed silver. The single amber accent and the status colors carry the color — the field stays near-monochrome so they read, and so contrast holds.
 2. **Precise, not soft.** `rounded-lg` (8px), monospaced data, uppercase section headers — the UI of a precision tool.
 3. **Atmospheric, not decorative.** Film grain and subtle gradients create mood without adding visual noise.
 4. **Typography tells the story.** Serif for brand identity, mono for data, sans for everything else.
-5. **The accent is the safelight.** Amber `#d4915c` is the single warm light source in a dark room.
+5. **The accent is the safelight.** Amber `#e2a45e` is the single warm light source in a dark room.
 6. **Consistent entrance.** Every page section uses `FadeIn` with staggered delays for sequential reveal.
 7. **Hover at `/40`.** Card hover borders always use `hover:border-accent/40` — never other opacities.
 
@@ -391,7 +412,7 @@ Defined as `@keyframes` in `src/app.css`:
 |---|---|---|
 | `lucide-svelte` | ^0.564.0 | Tree-shakeable SVG icon components |
 
-Self-hosted fonts (in `static/fonts/`, loaded via `@font-face` in `src/app.css`):
+Self-hosted fonts (in `frontend/static/fonts/`, loaded via `@font-face` in `frontend/src/app.css`):
 - [DM Sans](https://fonts.google.com/specimen/DM+Sans) — 400, 500, 600
 - [IBM Plex Mono](https://fonts.google.com/specimen/IBM+Plex+Mono) — 400, 500
 - [Instrument Serif](https://fonts.google.com/specimen/Instrument+Serif) — 400

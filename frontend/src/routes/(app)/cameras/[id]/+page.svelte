@@ -18,6 +18,7 @@
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import { lensDisplayName, buildMountOptions } from '$lib/utils/lens';
 	import type { Camera, CameraFormat, CameraType, MaintenanceType, CameraMaintenance, CameraMaintenanceInsert, Lens, LensMount, RollWithDetails } from '$lib/types';
+	import { Trash2 } from 'lucide-svelte';
 
 	const id = $derived(Number(page.params.id));
 
@@ -372,7 +373,7 @@
 {:else}
 	<PageHeader title="{camera.brand} {camera.model}" backHref={cameraBackNav.href} backLabel={cameraBackNav.label}>
 		<Button variant="ghost" onclick={startEditing}>Edit</Button>
-		<Button variant="danger" onclick={handleDelete}>Delete</Button>
+		<Button variant="danger" onclick={handleDelete}><Trash2 size={16} strokeWidth={2} aria-hidden="true" />Delete</Button>
 	</PageHeader>
 
 	<div class="p-6">
