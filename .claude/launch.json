@@ -2,12 +2,6 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "tauri-dev",
-      "runtimeExecutable": "bun",
-      "runtimeArgs": ["run", "tauri", "dev"],
-      "port": 1420
-    },
-    {
       "name": "vite-dev",
       "runtimeExecutable": "bun",
       "runtimeArgs": ["run", "dev"],
