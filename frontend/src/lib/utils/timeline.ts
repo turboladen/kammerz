@@ -10,7 +10,8 @@ export type DateTarget =
 	| { kind: 'lab'; field: 'date_dropped_off' | 'date_received' }
 	| { kind: 'self'; field: 'date_processed' };
 
-/** One dated milestone in a roll's lifecycle. `date` is null until the milestone is reached. */
+/** One dated milestone in a roll's lifecycle. `date` is null when the milestone hasn't been
+ *  reached yet — or when it was reached but its date was intentionally cleared in the Timeline. */
 export interface TimelineMilestone {
 	key: string;
 	label: string;
@@ -28,7 +29,8 @@ export interface TimelineMilestone {
  * scanned / post-processed / archived, while the development middle is owned by the dev records
  * (lab: dropped-off + received-back; self: developed = date_processed). The lab/self middle is
  * mutually exclusive and mirrors labFlow/selfFlow in status.ts; the undecided path omits the
- * middle. A null date renders as a not-yet-reached milestone.
+ * middle. A null date renders as an undated milestone — either not yet reached, or reached
+ * but cleared from the Timeline.
  */
 export function buildRollTimeline(
 	roll: RollWithDetails,

@@ -36,6 +36,13 @@
 		if (open) draft = value;
 	});
 
+	// When clearing isn't allowed (the transition prompt, or setting a not-yet-set
+	// date), an empty value can't Confirm — confirming nothing would be a backdoor
+	// "Skip", which the design deliberately dropped. Enter a date or Cancel. When
+	// `allowClear` is on, an empty Confirm is just an explicit clear (== the Clear
+	// button), so it's allowed.
+	const canConfirm = $derived(allowClear || !!draft.trim());
+
 	function confirm() {
 		onconfirm(draft.trim() ? draft.trim() : null);
 	}
@@ -49,7 +56,7 @@
 				<Button variant="ghost" onclick={() => onconfirm(null)}>Clear</Button>
 			{/if}
 			<Button variant="ghost" onclick={oncancel}>Cancel</Button>
-			<Button variant="primary" onclick={confirm}>{confirmLabel}</Button>
+			<Button variant="primary" disabled={!canConfirm} onclick={confirm}>{confirmLabel}</Button>
 		</div>
 	</div>
 </Dialog>

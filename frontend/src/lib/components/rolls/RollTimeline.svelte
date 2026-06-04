@@ -44,6 +44,7 @@
 			<div class="flex-1 border-b border-dashed border-border-subtle/60"></div>
 			{#if milestone.editable}
 				<button
+					type="button"
 					onclick={() => startEdit(milestone)}
 					class="group flex items-center gap-1.5 rounded px-1 py-0.5 transition-colors hover:bg-surface-overlay"
 					aria-label={milestone.date ? `Edit ${milestone.label} date` : `Set ${milestone.label} date`}
