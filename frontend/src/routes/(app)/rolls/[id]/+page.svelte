@@ -12,7 +12,10 @@
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import DevelopmentSection from '$lib/components/rolls/DevelopmentSection.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
+	import RollTimeline from '$lib/components/rolls/RollTimeline.svelte';
 	import { getRollDetail, updateRoll, deleteRoll } from '$lib/api/rolls';
+	import { updateLabDev, updateSelfDev } from '$lib/api/development';
+	import type { TimelineMilestone } from '$lib/utils/timeline';
 	import { listCameras } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
 	import { listLenses } from '$lib/api/lenses';
@@ -506,6 +509,24 @@
 		}
 	}
 
+	// Persist an inline Timeline date edit to whichever record owns it, then refresh.
+	async function saveTimelineDate(milestone: TimelineMilestone, date: string | null) {
+		error = '';
+		try {
+			const t = milestone.target;
+			if (t.kind === 'roll') {
+				await updateRoll(id, { [t.field]: date });
+			} else if (t.kind === 'lab' && labDev) {
+				await updateLabDev(labDev.id, { [t.field]: date });
+			} else if (t.kind === 'self' && selfDev) {
+				await updateSelfDev(selfDev.id, { [t.field]: date });
+			}
+			await loadRollData();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
 	function handleStatusClick(status: RollStatus) {
 		if (!roll) return;
 		const targetIdx = statusFlow.indexOf(status);
@@ -796,20 +817,7 @@
 				Timeline
 				<div class="flex-1 border-b border-border-subtle"></div>
 			</h2>
-			<ol class="space-y-1.5">
-				{#each timeline as milestone (milestone.key)}
-					<li class="flex items-center gap-3 text-sm">
-						<span
-							class="h-1.5 w-1.5 shrink-0 rounded-full {milestone.date ? 'bg-accent' : 'bg-surface-overlay'}"
-						></span>
-						<span class={milestone.date ? 'text-text-muted' : 'text-text-faint'}>{milestone.label}</span>
-						<div class="flex-1 border-b border-dashed border-border-subtle/60"></div>
-						<span class="font-mono text-xs {milestone.date ? 'text-text' : 'text-text-faint'}">
-							{milestone.date ?? '—'}
-						</span>
-					</li>
-				{/each}
-			</ol>
+			<RollTimeline milestones={timeline} onedit={saveTimelineDate} />
 		</div>
 		</FadeIn>
 
