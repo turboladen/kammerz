@@ -914,7 +914,7 @@
 						</div>
 					</div>
 					<div class="flex items-center gap-2">
-						<Button size="sm" variant="primary" onclick={() => updateStatus('shot', finishDate)}>Mark as Shot</Button>
+						<Button size="sm" variant="primary" disabled={!finishDate.trim()} onclick={() => updateStatus('shot', finishDate)}>Mark as Shot</Button>
 						<button
 							onclick={() => { rollFullDismissed = true; }}
 							class="text-accent/60 hover:text-accent transition-colors text-lg leading-none px-1"
