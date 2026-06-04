@@ -84,3 +84,61 @@ async fn roll_detail_composite_includes_shots() {
     assert!(detail["self_dev"].is_null());
     assert!(detail["dev_stages"].as_array().unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn roll_with_details_reports_shot_count() {
+    let app = open_app().await;
+    let roll_pk = create_roll(&app, "TEST-SHOTCOUNT").await;
+
+    // A fresh roll has no shots → shot_count is 0 (not null/absent).
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
+        .await
+        .unwrap();
+    let roll: Value = json_body(res).await;
+    assert_eq!(
+        roll["shot_count"].as_i64(),
+        Some(0),
+        "a new roll reports shot_count = 0"
+    );
+
+    // Add two shots.
+    for frame in ["1", "2"] {
+        let res = app
+            .clone()
+            .oneshot(post_json(
+                "/api/shots",
+                &json!({ "roll_id": roll_pk, "frame_number": frame }),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+    }
+
+    // shot_count increments on the single-roll endpoint…
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
+        .await
+        .unwrap();
+    let roll: Value = json_body(res).await;
+    assert_eq!(
+        roll["shot_count"].as_i64(),
+        Some(2),
+        "shot_count reflects the two shots we added"
+    );
+
+    // …and on the list endpoint that the dashboard/list frame counters use.
+    let res = app.oneshot(get("/api/rolls")).await.unwrap();
+    let rolls: Vec<Value> = json_body(res).await;
+    let ours = rolls
+        .iter()
+        .find(|r| r["roll_id"] == "TEST-SHOTCOUNT")
+        .expect("our roll is present in the list");
+    assert_eq!(
+        ours["shot_count"].as_i64(),
+        Some(2),
+        "the list endpoint also reports shot_count"
+    );
+}

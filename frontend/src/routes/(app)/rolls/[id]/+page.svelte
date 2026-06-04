@@ -12,6 +12,8 @@
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import DevelopmentSection from '$lib/components/rolls/DevelopmentSection.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
+	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
+	import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
 	import { getRollDetail, updateRoll, deleteRoll } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
@@ -624,7 +626,7 @@
 
 		<!-- Roll Header -->
 		<FadeIn delay={0}>
-		<div class="mb-6 rounded-lg border border-border bg-surface-raised p-5">
+		<div class="relative mb-6 overflow-hidden rounded-lg border border-border bg-surface-raised p-5">
 			{#if editingRoll}
 				<div class="space-y-4">
 					<div class="grid grid-cols-2 gap-4">
@@ -663,6 +665,7 @@
 					</div>
 				</div>
 			{:else}
+				<FilmStrip />
 				<div class="flex items-start justify-between">
 					<div>
 						<div class="mb-2 flex items-center gap-3">
@@ -706,7 +709,12 @@
 							<p class="mt-2 text-sm text-text-muted whitespace-pre-wrap">{roll.notes}</p>
 						{/if}
 					</div>
-					<Button size="sm" variant="ghost" onclick={startEditRoll}>Edit</Button>
+					<div class="flex flex-col items-end gap-3">
+						{#if frameProgress}
+							<FrameCounter current={frameProgress.current} total={frameProgress.total} size="lg" />
+						{/if}
+						<Button size="sm" variant="ghost" onclick={startEditRoll}>Edit</Button>
+					</div>
 				</div>
 			{/if}
 		</div>

@@ -11,6 +11,7 @@
 	import GroupHeader from '$lib/components/ui/GroupHeader.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
+	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
 	import { Film } from 'lucide-svelte';
 	import { listFilmStocks, createFilmStock, deleteFilmStock, listDistinctFilmBrands } from '$lib/api/film-stocks';
 	import { filterBySearch, groupItems, sortByString, sortByNumber, sortByDate } from '$lib/utils/list';
@@ -239,11 +240,15 @@
 			<div class="mb-4 grid gap-1.5">
 				{#each groupStocks as stock, i}
 					<FadeIn delay={Math.min(i, 10) * 30}>
-						<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-2.5 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px">
+						<div class="group relative flex items-center justify-between overflow-hidden rounded-lg border border-border bg-surface-raised py-2.5 pl-5 pr-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px">
+							<FilmStrip orientation="vertical" />
 							<div class="flex items-center gap-3">
 								<span class="text-sm font-semibold leading-snug">{stock.brand} {stock.name}</span>
 								{#if stock.iso}
-									<span class="rounded bg-surface-overlay px-1.5 py-0.5 font-mono text-[11px] text-text-muted">ISO {stock.iso}</span>
+									<span class="inline-flex items-center gap-1 rounded border border-border-subtle bg-surface px-1.5 py-0.5 font-mono text-[11px] text-text-muted">
+										<span aria-hidden="true" class="dx-barcode"></span>
+										ISO {stock.iso}
+									</span>
 								{/if}
 								<span class="text-xs text-text-faint">{stock.format}</span>
 								<span class="text-xs text-text-faint">{typeDisplayNames[stock.stock_type] ?? stock.stock_type}</span>

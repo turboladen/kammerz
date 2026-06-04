@@ -3,14 +3,19 @@
 		message: string;
 		title?: string;
 		icon?: import('svelte').Snippet;
+		// Optional decorative artwork (e.g. a film-leader strip) rendered above the
+		// title — a richer alternative to the small `icon` circle.
+		art?: import('svelte').Snippet;
 		children?: import('svelte').Snippet;
 	}
 
-	let { message, title, icon, children }: Props = $props();
+	let { message, title, icon, art, children }: Props = $props();
 </script>
 
 <div class="flex flex-col items-center justify-center gap-4 py-16 text-center">
-	{#if icon}
+	{#if art}
+		{@render art()}
+	{:else if icon}
 		<div class="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent">
 			{@render icon()}
 		</div>

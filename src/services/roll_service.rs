@@ -46,6 +46,8 @@ pub struct RollWithDetails {
     // Joined lens fields
     pub lens_brand: Option<String>,
     pub lens_name: Option<String>,
+    // Aggregate: number of shots logged on this roll (for the frame counter)
+    pub shot_count: i64,
 }
 
 const ROLLS_WITH_DETAILS_SQL: &str = "\
@@ -57,7 +59,8 @@ const ROLLS_WITH_DETAILS_SQL: &str = "\
            fs.brand AS film_stock_brand, fs.name AS film_stock_name, \
            fs.iso AS film_stock_iso, \
            l.brand AS lens_brand, \
-           COALESCE(l.model, l.focal_length) AS lens_name \
+           COALESCE(l.model, l.focal_length) AS lens_name, \
+           (SELECT COUNT(*) FROM shots s WHERE s.roll_id = r.id) AS shot_count \
     FROM rolls r \
     LEFT JOIN cameras c ON r.camera_id = c.id \
     LEFT JOIN film_stocks fs ON r.film_stock_id = fs.id \

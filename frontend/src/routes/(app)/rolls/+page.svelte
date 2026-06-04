@@ -4,6 +4,9 @@
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
+	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
+	import FilmLeader from '$lib/components/ui/FilmLeader.svelte';
+	import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
 	import ListToolbar from '$lib/components/ui/ListToolbar.svelte';
 	import GroupHeader from '$lib/components/ui/GroupHeader.svelte';
 	import { Film } from 'lucide-svelte';
@@ -158,7 +161,7 @@
 			title="No Rolls"
 			message="Create your first roll to get started."
 		>
-			{#snippet icon()}<Film size={24} strokeWidth={1.5} />{/snippet}
+			{#snippet art()}<FilmLeader />{/snippet}
 			<Button variant="primary" href="/rolls/new">+ New Roll</Button>
 		</EmptyState>
 	{:else if resultCount === 0}
@@ -182,8 +185,9 @@
 					<FadeIn delay={Math.min(i, 10) * 30}>
 						<a
 							href="/rolls/{roll.id}"
-							class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-2.5 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+							class="group relative flex items-center justify-between overflow-hidden rounded-lg border border-border bg-surface-raised py-2.5 pl-5 pr-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 						>
+							<FilmStrip orientation="vertical" />
 							<div class="flex items-center gap-3">
 								<span class="font-mono text-sm font-semibold">{roll.roll_id}</span>
 								<Badge status={roll.status} />
@@ -203,6 +207,7 @@
 								{#if roll.date_loaded}
 									<span class="text-xs text-text-faint">{roll.date_loaded}</span>
 								{/if}
+								<FrameCounter current={roll.shot_count} total={roll.frame_count} />
 								<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
 							</div>
 						</a>
