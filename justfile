@@ -24,13 +24,14 @@ build:
     # clean checkout still has the dir rust-embed's #[folder] points at.
     touch frontend/build/.gitkeep
 
-# Hard gates first (cargo + frontend build); svelte-check is informational —
-# it currently reports 31 pre-existing type errors tracked separately.
+# Quality gates — all hard gates, matching what CI enforces on every PR and
+# push to main (.github/workflows/ci.yml). `bun run check` (svelte-check) must
+# pass before opening a PR.
 check:
     cargo build
     cargo test
+    cd frontend && bun run check
     cd frontend && bun run build
-    -cd frontend && bun run check
 
 migrate:
     cargo run -- # migrations run on startup; this just boots once
