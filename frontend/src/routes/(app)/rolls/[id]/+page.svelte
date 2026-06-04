@@ -27,7 +27,7 @@
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder } from '$lib/utils/status';
 	import { buildRollTimeline } from '$lib/utils/timeline';
-	import { todayLocal, isValidIsoDate } from '$lib/utils/date';
+	import { todayLocal } from '$lib/utils/date';
 	import type { RollWithDetails, RollInsert, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
 	import { Trash2 } from 'lucide-svelte';
 
@@ -505,7 +505,10 @@
 			}
 			await updateRoll(id, patch);
 
-			// Dev-owned dates (lab/self) are a follow-up write to the dev record.
+			// Dev-owned dates (lab/self) are a follow-up write to the dev record —
+			// non-atomic with the status PATCH above (same two-phase pattern as
+			// saveTimelineDate). On a single-user LAN this is acceptable: a failed
+			// second write surfaces via `error` and the date can be re-entered.
 			if (advancing && date && target?.kind === 'lab' && labDev) {
 				await updateLabDev(labDev.id, { [target.field]: date });
 			} else if (advancing && date && target?.kind === 'self' && selfDev) {
@@ -560,7 +563,10 @@
 			datePromptOpen = true;
 			return;
 		}
-		// Otherwise advance directly (no date to capture, or already recorded).
+		// Otherwise advance directly: no date target, the date is already recorded,
+		// or — for lab/self — the dev record doesn't exist yet. That last case is
+		// off the normal flow: reaching lab-done/developed goes through at-lab/
+		// developing, which auto-open the dialog that creates the dev record.
 		updateStatus(status);
 	}
 
