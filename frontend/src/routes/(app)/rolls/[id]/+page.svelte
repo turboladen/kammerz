@@ -887,7 +887,7 @@
 							<span class="text-xs text-text-faint">{frameProgress.current}/{frameProgress.total}</span>
 							<div class="h-1.5 w-24 overflow-hidden rounded-full bg-surface-overlay">
 								<div
-									class="h-full rounded-full transition-all duration-300 {frameProgress.current > frameProgress.total ? 'bg-red-400' : 'bg-accent'}"
+									class="h-full rounded-full transition-all duration-300 {frameProgress.current > frameProgress.total ? 'bg-danger' : 'bg-accent'}"
 									style="width: {Math.min((frameProgress.current / frameProgress.total) * 100, 100)}%"
 								></div>
 							</div>
