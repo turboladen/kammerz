@@ -10,11 +10,15 @@
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
+	import DateConfirm from '$lib/components/ui/DateConfirm.svelte';
 	import DevelopmentSection from '$lib/components/rolls/DevelopmentSection.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
+	import RollTimeline from '$lib/components/rolls/RollTimeline.svelte';
 	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
 	import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
 	import { getRollDetail, updateRoll, deleteRoll } from '$lib/api/rolls';
+	import { updateLabDev, updateSelfDev } from '$lib/api/development';
+	import type { TimelineMilestone, DateTarget } from '$lib/utils/timeline';
 	import { listCameras } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
 	import { listLenses } from '$lib/api/lenses';
@@ -25,7 +29,7 @@
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder } from '$lib/utils/status';
 	import { buildRollTimeline } from '$lib/utils/timeline';
-	import { todayLocal, isValidIsoDate } from '$lib/utils/date';
+	import { todayLocal } from '$lib/utils/date';
 	import type { RollWithDetails, RollInsert, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
 	import { Trash2 } from 'lucide-svelte';
 
@@ -54,11 +58,6 @@
 	let editFilmStockId = $state('');
 	let editLensId = $state('');
 	let editFrameCount = $state('');
-	let editDateLoaded = $state('');
-	let editDateFinished = $state('');
-	let editDateScanned = $state('');
-	let editDatePostProcessed = $state('');
-	let editDateArchived = $state('');
 	let editDateFuzzy = $state('');
 	let editPushPull = $state('');
 	let editNotes = $state('');
@@ -99,20 +98,37 @@
 	// Ordered lifecycle dates (path-aware) for the read-only timeline section.
 	const timeline = $derived(roll ? buildRollTimeline(roll, labDev, selfDev, devPath) : []);
 
-	// Statuses whose roll date column is auto-stamped (today) on the forward
-	// transition into them, when still empty. 'shot' → date_finished is handled
-	// separately in updateStatus so the nudge's explicit-date override wins.
-	const STATUS_DATE_FIELD: Partial<
-		Record<RollStatus, 'date_scanned' | 'date_post_processed' | 'date_archived'>
-	> = {
-		scanned: 'date_scanned',
-		'post-processed': 'date_post_processed',
-		archived: 'date_archived'
+	// Which date a forward transition into each status records, and where it lives.
+	// At-lab / developing are intentionally absent — their full dev dialogs capture
+	// those dates. Shot records date_finished (the roll-full nudge also sets it).
+	const STATUS_DATE_TARGET: Partial<Record<RollStatus, DateTarget>> = {
+		shot: { kind: 'roll', field: 'date_finished' },
+		'lab-done': { kind: 'lab', field: 'date_received' },
+		developed: { kind: 'self', field: 'date_processed' },
+		scanned: { kind: 'roll', field: 'date_scanned' },
+		'post-processed': { kind: 'roll', field: 'date_post_processed' },
+		archived: { kind: 'roll', field: 'date_archived' }
 	};
+
+	// Helper: the current value of a status's target date (for the forward+empty check).
+	function targetDate(t: DateTarget): string | null {
+		if (!roll) return null;
+		if (t.kind === 'roll') return roll[t.field] ?? null;
+		if (t.kind === 'lab') return labDev?.[t.field] ?? null;
+		return selfDev?.[t.field] ?? null;
+	}
 
 	// Status backward-move confirmation
 	let pendingStatus: RollStatus | null = $state(null);
 	const currentStatusIdx = $derived(roll ? statusFlow.indexOf(roll.status as RollStatus) : -1);
+
+	// Confirm-on-transition prompt state. The label is derived from the pending
+	// status so it can never drift out of sync.
+	let datePromptOpen = $state(false);
+	let datePromptStatus: RollStatus | null = $state(null);
+	const datePromptLabel = $derived.by(() =>
+		datePromptStatus ? statusConfig[datePromptStatus].label : ''
+	);
 
 	// Frame progress
 	const frameProgress = $derived.by(() => {
@@ -470,34 +486,41 @@
 		return null;
 	}
 
-	async function updateStatus(status: RollStatus, finishDateOverride?: string) {
+	// Commit a status change. When `date` is provided (from the prompt or the
+	// roll-full nudge) and the move is a forward advance, also write it to the
+	// status's target record. Backward moves never write a date.
+	async function updateStatus(status: RollStatus, date?: string) {
 		error = '';
 		try {
 			const patch: Partial<RollInsert> = { status };
-			// Auto-stamp the milestone date when the roll is genuinely *advancing*
-			// into a dated status (target ahead of current in the path's flow) and
-			// no date is recorded yet — the real moment that milestone happened.
-			// A backward correction (e.g. reverting at-lab → shot) must never touch
-			// the date, and we never clobber an existing value. The 'shot' nudge can
-			// pass a deliberate, valid date that wins even over an Edit-form value.
-			if (roll) {
-				const targetIdx = statusFlow.indexOf(status);
-				const advancing = currentStatusIdx === -1 || targetIdx > currentStatusIdx;
-				const dateField = STATUS_DATE_FIELD[status];
-				if (status === 'shot' && advancing) {
-					const explicit = finishDateOverride ?? '';
-					if (isValidIsoDate(explicit)) {
-						patch.date_finished = explicit;
-					} else if (!roll.date_finished) {
-						patch.date_finished = todayLocal();
-					}
-				} else if (dateField && advancing && !roll[dateField]) {
-					patch[dateField] = todayLocal();
-				}
+			const target = STATUS_DATE_TARGET[status];
+			const targetIdx = statusFlow.indexOf(status);
+			const advancing = currentStatusIdx === -1 || targetIdx > currentStatusIdx;
+
+			// Roll-owned dates go in the same PATCH as the status. Use Object.assign
+			// with a computed key (not `patch[target.field] = date`) — a union-keyed
+			// index assignment trips TS2322 ("not assignable to never").
+			if (advancing && date && target?.kind === 'roll') {
+				Object.assign(patch, { [target.field]: date });
 			}
 			await updateRoll(id, patch);
+
+			// Dev-owned dates (lab/self) are a follow-up write to the dev record —
+			// non-atomic with the status PATCH above. The status is already committed,
+			// so surface a failed date write via `error` but STILL refresh below —
+			// otherwise the UI would keep showing the old status. The date can then be
+			// re-entered from the Timeline. (Roll-owned dates were co-batched above.)
+			try {
+				if (advancing && date && target && target.kind !== 'roll') {
+					await writeDateTarget(target, date);
+				}
+			} catch (err) {
+				error = err instanceof Error ? err.message : String(err);
+			}
+
 			await loadRollData();
-			// Auto-prompt development dialogs
+
+			// Auto-prompt development dialogs (unchanged).
 			if (status === 'at-lab' && !labDev && !selfDev) {
 				devAutoPrompt = 'lab';
 			} else if (status === 'developing' && !selfDev && !labDev) {
@@ -508,15 +531,64 @@
 		}
 	}
 
+	// Write a milestone date (or null to clear) to whichever record owns it. Shared
+	// by the inline Timeline editor and the confirm-on-transition flow so the
+	// roll/lab/self dispatch lives in one place. A lab/self target whose dev record
+	// doesn't exist is a no-op (the date lives on that record).
+	async function writeDateTarget(t: DateTarget, date: string | null): Promise<void> {
+		if (t.kind === 'roll') {
+			await updateRoll(id, { [t.field]: date });
+		} else if (t.kind === 'lab' && labDev) {
+			await updateLabDev(labDev.id, { [t.field]: date });
+		} else if (t.kind === 'self' && selfDev) {
+			await updateSelfDev(selfDev.id, { [t.field]: date });
+		}
+	}
+
+	// Persist an inline Timeline date edit, then refresh.
+	async function saveTimelineDate(milestone: TimelineMilestone, date: string | null) {
+		error = '';
+		try {
+			await writeDateTarget(milestone.target, date);
+			await loadRollData();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
 	function handleStatusClick(status: RollStatus) {
 		if (!roll) return;
 		const targetIdx = statusFlow.indexOf(status);
+		// Backward move — confirm, never touch dates.
 		if (currentStatusIdx !== -1 && targetIdx < currentStatusIdx) {
-			// Backward move — ask for confirmation
 			pendingStatus = status;
-		} else {
-			updateStatus(status);
+			return;
 		}
+		// Forward into a date-bearing status whose date isn't recorded yet → prompt.
+		const target = STATUS_DATE_TARGET[status];
+		const recordExists = !target || target.kind === 'roll' || (target.kind === 'lab' && labDev) || (target.kind === 'self' && selfDev);
+		if (target && recordExists && !targetDate(target)) {
+			datePromptStatus = status;
+			datePromptOpen = true;
+			return;
+		}
+		// Otherwise advance directly: no date target, the date is already recorded,
+		// or — for lab/self — the dev record doesn't exist yet. That last case is
+		// off the normal flow: reaching lab-done/developed goes through at-lab/
+		// developing, which auto-open the dialog that creates the dev record.
+		updateStatus(status);
+	}
+
+	function confirmDatePrompt(date: string | null) {
+		const status = datePromptStatus;
+		datePromptOpen = false;
+		datePromptStatus = null;
+		if (status) updateStatus(status, date ?? undefined);
+	}
+
+	function cancelDatePrompt() {
+		datePromptOpen = false;
+		datePromptStatus = null;
 	}
 
 	// Commit to a development path from the "Develop" chevron. Reuses the dev-dialog
@@ -543,11 +615,6 @@
 		editFilmStockId = roll.film_stock_id?.toString() ?? '';
 		editLensId = roll.lens_id?.toString() ?? '';
 		editFrameCount = roll.frame_count?.toString() ?? '';
-		editDateLoaded = roll.date_loaded ?? '';
-		editDateFinished = roll.date_finished ?? '';
-		editDateScanned = roll.date_scanned ?? '';
-		editDatePostProcessed = roll.date_post_processed ?? '';
-		editDateArchived = roll.date_archived ?? '';
 		editDateFuzzy = roll.date_fuzzy ?? '';
 		editPushPull = roll.push_pull ?? '';
 		editNotes = roll.notes ?? '';
@@ -563,11 +630,6 @@
 				film_stock_id: editFilmStockId ? Number(editFilmStockId) : null,
 				lens_id: editLensId ? Number(editLensId) : null,
 				frame_count: editFrameCount ? parseInt(editFrameCount) : null,
-				date_loaded: editDateLoaded || null,
-				date_finished: editDateFinished || null,
-				date_scanned: editDateScanned || null,
-				date_post_processed: editDatePostProcessed || null,
-				date_archived: editDateArchived || null,
 				date_fuzzy: editDateFuzzy || null,
 				push_pull: (editPushPull || null) as PushPull | null,
 				notes: editNotes || null
@@ -645,15 +707,6 @@
 					{:else}
 						<Select label="Default Lens" bind:value={editLensId} options={editLensOptions} />
 					{/if}
-					<div class="grid grid-cols-2 gap-4">
-						<DateInput label="Date Loaded" bind:value={editDateLoaded} />
-						<DateInput label="Finished Shooting" bind:value={editDateFinished} />
-					</div>
-					<div class="grid grid-cols-3 gap-4">
-						<DateInput label="Scanned" bind:value={editDateScanned} />
-						<DateInput label="Post-processed" bind:value={editDatePostProcessed} />
-						<DateInput label="Archived" bind:value={editDateArchived} />
-					</div>
 					<div class="grid grid-cols-2 gap-4">
 						<Select label="Push/Pull" bind:value={editPushPull} options={pushPullOptions} />
 						<Input label="Fuzzy Date" bind:value={editDateFuzzy} placeholder="e.g. 'early October 2025'" />
@@ -804,20 +857,7 @@
 				Timeline
 				<div class="flex-1 border-b border-border-subtle"></div>
 			</h2>
-			<ol class="space-y-1.5">
-				{#each timeline as milestone (milestone.key)}
-					<li class="flex items-center gap-3 text-sm">
-						<span
-							class="h-1.5 w-1.5 shrink-0 rounded-full {milestone.date ? 'bg-accent' : 'bg-surface-overlay'}"
-						></span>
-						<span class={milestone.date ? 'text-text-muted' : 'text-text-faint'}>{milestone.label}</span>
-						<div class="flex-1 border-b border-dashed border-border-subtle/60"></div>
-						<span class="font-mono text-xs {milestone.date ? 'text-text' : 'text-text-faint'}">
-							{milestone.date ?? '—'}
-						</span>
-					</li>
-				{/each}
-			</ol>
+			<RollTimeline milestones={timeline} onedit={saveTimelineDate} />
 		</div>
 		</FadeIn>
 
@@ -874,7 +914,7 @@
 						</div>
 					</div>
 					<div class="flex items-center gap-2">
-						<Button size="sm" variant="primary" onclick={() => updateStatus('shot', finishDate)}>Mark as Shot</Button>
+						<Button size="sm" variant="primary" disabled={!finishDate.trim()} onclick={() => updateStatus('shot', finishDate)}>Mark as Shot</Button>
 						<button
 							onclick={() => { rollFullDismissed = true; }}
 							class="text-accent/60 hover:text-accent transition-colors text-lg leading-none px-1"
@@ -1018,3 +1058,13 @@
 		oncancel={() => { pendingStatus = null; }}
 	/>
 {/if}
+
+<!-- Forward Status Date Prompt -->
+<DateConfirm
+	bind:open={datePromptOpen}
+	title={`Date for "${datePromptLabel}"`}
+	value={todayLocal()}
+	confirmLabel="Confirm"
+	onconfirm={confirmDatePrompt}
+	oncancel={cancelDatePrompt}
+/>
