@@ -10,12 +10,13 @@
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
+	import DateConfirm from '$lib/components/ui/DateConfirm.svelte';
 	import DevelopmentSection from '$lib/components/rolls/DevelopmentSection.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import RollTimeline from '$lib/components/rolls/RollTimeline.svelte';
 	import { getRollDetail, updateRoll, deleteRoll } from '$lib/api/rolls';
 	import { updateLabDev, updateSelfDev } from '$lib/api/development';
-	import type { TimelineMilestone } from '$lib/utils/timeline';
+	import type { TimelineMilestone, DateTarget } from '$lib/utils/timeline';
 	import { listCameras } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
 	import { listLenses } from '$lib/api/lenses';
@@ -100,20 +101,34 @@
 	// Ordered lifecycle dates (path-aware) for the read-only timeline section.
 	const timeline = $derived(roll ? buildRollTimeline(roll, labDev, selfDev, devPath) : []);
 
-	// Statuses whose roll date column is auto-stamped (today) on the forward
-	// transition into them, when still empty. 'shot' → date_finished is handled
-	// separately in updateStatus so the nudge's explicit-date override wins.
-	const STATUS_DATE_FIELD: Partial<
-		Record<RollStatus, 'date_scanned' | 'date_post_processed' | 'date_archived'>
-	> = {
-		scanned: 'date_scanned',
-		'post-processed': 'date_post_processed',
-		archived: 'date_archived'
+	// Which date a forward transition into each status records, and where it lives.
+	// At-lab / developing are intentionally absent — their full dev dialogs capture
+	// those dates. Shot records date_finished (the roll-full nudge also sets it).
+	const STATUS_DATE_TARGET: Partial<Record<RollStatus, DateTarget>> = {
+		shot: { kind: 'roll', field: 'date_finished' },
+		'lab-done': { kind: 'lab', field: 'date_received' },
+		developed: { kind: 'self', field: 'date_processed' },
+		scanned: { kind: 'roll', field: 'date_scanned' },
+		'post-processed': { kind: 'roll', field: 'date_post_processed' },
+		archived: { kind: 'roll', field: 'date_archived' }
 	};
+
+	// Helper: the current value of a status's target date (for the forward+empty check).
+	function targetDate(t: DateTarget): string | null {
+		if (!roll) return null;
+		if (t.kind === 'roll') return roll[t.field] ?? null;
+		if (t.kind === 'lab') return labDev?.[t.field] ?? null;
+		return selfDev?.[t.field] ?? null;
+	}
 
 	// Status backward-move confirmation
 	let pendingStatus: RollStatus | null = $state(null);
 	const currentStatusIdx = $derived(roll ? statusFlow.indexOf(roll.status as RollStatus) : -1);
+
+	// Confirm-on-transition prompt state.
+	let datePromptOpen = $state(false);
+	let datePromptStatus: RollStatus | null = $state(null);
+	let datePromptLabel = $state('');
 
 	// Frame progress
 	const frameProgress = $derived.by(() => {
@@ -471,34 +486,35 @@
 		return null;
 	}
 
-	async function updateStatus(status: RollStatus, finishDateOverride?: string) {
+	// Commit a status change. When `date` is provided (from the prompt or the
+	// roll-full nudge) and the move is a forward advance, also write it to the
+	// status's target record. Backward moves never write a date.
+	async function updateStatus(status: RollStatus, date?: string) {
 		error = '';
 		try {
 			const patch: Partial<RollInsert> = { status };
-			// Auto-stamp the milestone date when the roll is genuinely *advancing*
-			// into a dated status (target ahead of current in the path's flow) and
-			// no date is recorded yet — the real moment that milestone happened.
-			// A backward correction (e.g. reverting at-lab → shot) must never touch
-			// the date, and we never clobber an existing value. The 'shot' nudge can
-			// pass a deliberate, valid date that wins even over an Edit-form value.
-			if (roll) {
-				const targetIdx = statusFlow.indexOf(status);
-				const advancing = currentStatusIdx === -1 || targetIdx > currentStatusIdx;
-				const dateField = STATUS_DATE_FIELD[status];
-				if (status === 'shot' && advancing) {
-					const explicit = finishDateOverride ?? '';
-					if (isValidIsoDate(explicit)) {
-						patch.date_finished = explicit;
-					} else if (!roll.date_finished) {
-						patch.date_finished = todayLocal();
-					}
-				} else if (dateField && advancing && !roll[dateField]) {
-					patch[dateField] = todayLocal();
-				}
+			const target = STATUS_DATE_TARGET[status];
+			const targetIdx = statusFlow.indexOf(status);
+			const advancing = currentStatusIdx === -1 || targetIdx > currentStatusIdx;
+
+			// Roll-owned dates go in the same PATCH as the status. Use Object.assign
+			// with a computed key (not `patch[target.field] = date`) — a union-keyed
+			// index assignment trips TS2322 ("not assignable to never").
+			if (advancing && date && target?.kind === 'roll') {
+				Object.assign(patch, { [target.field]: date });
 			}
 			await updateRoll(id, patch);
+
+			// Dev-owned dates (lab/self) are a follow-up write to the dev record.
+			if (advancing && date && target?.kind === 'lab' && labDev) {
+				await updateLabDev(labDev.id, { [target.field]: date });
+			} else if (advancing && date && target?.kind === 'self' && selfDev) {
+				await updateSelfDev(selfDev.id, { [target.field]: date });
+			}
+
 			await loadRollData();
-			// Auto-prompt development dialogs
+
+			// Auto-prompt development dialogs (unchanged).
 			if (status === 'at-lab' && !labDev && !selfDev) {
 				devAutoPrompt = 'lab';
 			} else if (status === 'developing' && !selfDev && !labDev) {
@@ -530,12 +546,34 @@
 	function handleStatusClick(status: RollStatus) {
 		if (!roll) return;
 		const targetIdx = statusFlow.indexOf(status);
+		// Backward move — confirm, never touch dates.
 		if (currentStatusIdx !== -1 && targetIdx < currentStatusIdx) {
-			// Backward move — ask for confirmation
 			pendingStatus = status;
-		} else {
-			updateStatus(status);
+			return;
 		}
+		// Forward into a date-bearing status whose date isn't recorded yet → prompt.
+		const target = STATUS_DATE_TARGET[status];
+		const recordExists = !target || target.kind === 'roll' || (target.kind === 'lab' && labDev) || (target.kind === 'self' && selfDev);
+		if (target && recordExists && !targetDate(target)) {
+			datePromptStatus = status;
+			datePromptLabel = statusConfig[status].label;
+			datePromptOpen = true;
+			return;
+		}
+		// Otherwise advance directly (no date to capture, or already recorded).
+		updateStatus(status);
+	}
+
+	function confirmDatePrompt(date: string | null) {
+		const status = datePromptStatus;
+		datePromptOpen = false;
+		datePromptStatus = null;
+		if (status) updateStatus(status, date ?? undefined);
+	}
+
+	function cancelDatePrompt() {
+		datePromptOpen = false;
+		datePromptStatus = null;
 	}
 
 	// Commit to a development path from the "Develop" chevron. Reuses the dev-dialog
@@ -1018,3 +1056,13 @@
 		oncancel={() => { pendingStatus = null; }}
 	/>
 {/if}
+
+<!-- Forward Status Date Prompt -->
+<DateConfirm
+	bind:open={datePromptOpen}
+	title={`Date for "${datePromptLabel}"`}
+	value={todayLocal()}
+	confirmLabel="Confirm"
+	onconfirm={confirmDatePrompt}
+	oncancel={cancelDatePrompt}
+/>
