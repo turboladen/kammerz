@@ -120,10 +120,13 @@
 	let pendingStatus: RollStatus | null = $state(null);
 	const currentStatusIdx = $derived(roll ? statusFlow.indexOf(roll.status as RollStatus) : -1);
 
-	// Confirm-on-transition prompt state.
+	// Confirm-on-transition prompt state. The label is derived from the pending
+	// status so it can never drift out of sync.
 	let datePromptOpen = $state(false);
 	let datePromptStatus: RollStatus | null = $state(null);
-	let datePromptLabel = $state('');
+	const datePromptLabel = $derived.by(() =>
+		datePromptStatus ? statusConfig[datePromptStatus].label : ''
+	);
 
 	// Frame progress
 	const frameProgress = $derived.by(() => {
@@ -501,16 +504,13 @@
 			await updateRoll(id, patch);
 
 			// Dev-owned dates (lab/self) are a follow-up write to the dev record —
-			// non-atomic with the status PATCH above (same two-phase pattern as
-			// saveTimelineDate). The status is already committed, so surface a failed
-			// date write via `error` but STILL refresh below — otherwise the UI would
-			// keep showing the old status. The date can then be re-entered from the
-			// Timeline.
+			// non-atomic with the status PATCH above. The status is already committed,
+			// so surface a failed date write via `error` but STILL refresh below —
+			// otherwise the UI would keep showing the old status. The date can then be
+			// re-entered from the Timeline. (Roll-owned dates were co-batched above.)
 			try {
-				if (advancing && date && target?.kind === 'lab' && labDev) {
-					await updateLabDev(labDev.id, { [target.field]: date });
-				} else if (advancing && date && target?.kind === 'self' && selfDev) {
-					await updateSelfDev(selfDev.id, { [target.field]: date });
+				if (advancing && date && target && target.kind !== 'roll') {
+					await writeDateTarget(target, date);
 				}
 			} catch (err) {
 				error = err instanceof Error ? err.message : String(err);
@@ -529,18 +529,25 @@
 		}
 	}
 
-	// Persist an inline Timeline date edit to whichever record owns it, then refresh.
+	// Write a milestone date (or null to clear) to whichever record owns it. Shared
+	// by the inline Timeline editor and the confirm-on-transition flow so the
+	// roll/lab/self dispatch lives in one place. A lab/self target whose dev record
+	// doesn't exist is a no-op (the date lives on that record).
+	async function writeDateTarget(t: DateTarget, date: string | null): Promise<void> {
+		if (t.kind === 'roll') {
+			await updateRoll(id, { [t.field]: date });
+		} else if (t.kind === 'lab' && labDev) {
+			await updateLabDev(labDev.id, { [t.field]: date });
+		} else if (t.kind === 'self' && selfDev) {
+			await updateSelfDev(selfDev.id, { [t.field]: date });
+		}
+	}
+
+	// Persist an inline Timeline date edit, then refresh.
 	async function saveTimelineDate(milestone: TimelineMilestone, date: string | null) {
 		error = '';
 		try {
-			const t = milestone.target;
-			if (t.kind === 'roll') {
-				await updateRoll(id, { [t.field]: date });
-			} else if (t.kind === 'lab' && labDev) {
-				await updateLabDev(labDev.id, { [t.field]: date });
-			} else if (t.kind === 'self' && selfDev) {
-				await updateSelfDev(selfDev.id, { [t.field]: date });
-			}
+			await writeDateTarget(milestone.target, date);
 			await loadRollData();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -560,7 +567,6 @@
 		const recordExists = !target || target.kind === 'roll' || (target.kind === 'lab' && labDev) || (target.kind === 'self' && selfDev);
 		if (target && recordExists && !targetDate(target)) {
 			datePromptStatus = status;
-			datePromptLabel = statusConfig[status].label;
 			datePromptOpen = true;
 			return;
 		}
