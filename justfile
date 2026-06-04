@@ -32,6 +32,9 @@ check:
     cargo test
     cd frontend && bun run check
     cd frontend && bun run build
+    # adapter-static wipes frontend/build; restore the tracked placeholder so the
+    # working tree stays clean (rust-embed's #[folder] needs the dir present).
+    touch frontend/build/.gitkeep
 
 migrate:
     cargo run -- # migrations run on startup; this just boots once

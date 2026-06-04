@@ -10,6 +10,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege: every job only reads the repo (build/test/e2e) — none push,
+# comment, or publish, so the GITHUB_TOKEN needs no write scopes.
+permissions:
+  contents: read
+
 jobs:
   # Backend gate: cargo build + test. Compiles against the empty
   # frontend/build embed (the committed .gitkeep satisfies rust-embed's
