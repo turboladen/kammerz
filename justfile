@@ -30,6 +30,9 @@ build:
 check:
     cargo build
     cargo test
+    # bun install first so a clean checkout (frontend/node_modules is gitignored)
+    # has svelte-check/svelte-kit available — mirrors what each CI job does.
+    cd frontend && bun install
     cd frontend && bun run check
     cd frontend && bun run build
     # adapter-static wipes frontend/build; restore the tracked placeholder so the
