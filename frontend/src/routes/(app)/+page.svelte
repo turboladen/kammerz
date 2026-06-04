@@ -3,7 +3,10 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
-	import { Camera, AlertTriangle } from 'lucide-svelte';
+	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
+	import FilmLeader from '$lib/components/ui/FilmLeader.svelte';
+	import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
+	import { AlertTriangle } from 'lucide-svelte';
 	import { listRolls } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import { listLenses } from '$lib/api/lenses';
@@ -119,9 +122,7 @@
 		<!-- Empty state CTA -->
 		<FadeIn delay={50}>
 			<div class="flex flex-col items-center gap-6 py-16 text-center">
-				<div class="rounded-full bg-accent/10 p-4">
-					<Camera size={32} class="text-accent" />
-				</div>
+				<FilmLeader />
 				<div>
 					<h2 class="font-display text-2xl text-text">Start your log</h2>
 					<p class="mt-2 max-w-sm text-sm text-text-muted">Add your cameras, pick your film stocks, and create your first roll to begin tracking your film photography.</p>
@@ -136,11 +137,13 @@
 		{#snippet rollCard(roll: RollWithDetails)}
 			<a
 				href="/rolls/{roll.id}?from=dashboard"
-				class="group flex h-full flex-col rounded-lg border border-border bg-surface-raised px-3.5 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+				class="group relative flex h-full flex-col overflow-hidden rounded-lg border border-border bg-surface-raised px-3.5 py-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 			>
+				<FilmStrip />
 				<div class="flex items-center gap-2">
 					<span class="font-mono text-sm font-semibold">{roll.roll_id}</span>
 					<Badge status={roll.status} />
+					<span class="ml-auto"><FrameCounter current={roll.shot_count} total={roll.frame_count} /></span>
 				</div>
 				<div class="mt-1 text-xs text-text-muted">
 					{#if roll.camera_brand}
@@ -224,7 +227,7 @@
 						<div class="flex-1 border-b border-border-subtle"></div>
 					</h2>
 					<!-- Bar -->
-					<div class="mb-3 flex h-4 overflow-hidden rounded-full bg-surface-overlay">
+					<div class="animate-pipeline mb-3 flex h-4 overflow-hidden rounded-full bg-surface-overlay">
 						{#each statusSegments as segment}
 							<div
 								style="width: {segment.pct}%; background-color: {segment.colorVar}"

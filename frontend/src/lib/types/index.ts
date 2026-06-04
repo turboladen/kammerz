@@ -174,6 +174,7 @@ export interface RollWithDetails extends Roll {
 	film_stock_iso: number | null;
 	lens_brand: string | null;
 	lens_name: string | null;
+	shot_count: number;
 }
 
 // Composite roll detail (single IPC call for roll detail page)

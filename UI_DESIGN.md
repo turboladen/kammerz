@@ -153,7 +153,9 @@ Same animations and styling as Dialog, smaller max-width (`max-w-sm`).
 
 ### EmptyState (`frontend/src/lib/components/ui/EmptyState.svelte`)
 
-Centered message with optional CTA button. Used when lists are empty.
+Centered message with optional CTA button. Used when lists are empty. Optional `art` snippet
+renders decorative artwork above the title (e.g. `FilmLeader` for first-run film/roll empties);
+falls back to the small `icon` circle for filtered "no matches" states.
 
 ### DateConfirm (`frontend/src/lib/components/ui/DateConfirm.svelte`)
 
@@ -406,6 +408,55 @@ Defined as `@keyframes` in `frontend/src/app.css`:
 - `fade-in-up`: translateY(8px) → 0 + opacity 0 → 1 over 200ms ease-out
 - Applied via `FadeIn` component with staggered `delay` props
 - `success-flash`: green highlight flash (600ms) for Quick Entry save feedback
+- `pipeline-grow`: the dashboard Roll Pipeline bar scales in from the left (`scaleX 0→1`, 600ms) via `.animate-pipeline`
+
+### Reduced Motion
+
+A `@media (prefers-reduced-motion: reduce)` block in `frontend/src/app.css` neutralizes all
+animation/transition durations (standard reset). Motion-sensitive users get the full layout —
+sprockets, counters, depth — with no entrance/pipeline motion and no hover lift.
+
+---
+
+## Film Identity Motifs
+
+The "bold film identity" layer (kammerz-r35). One rule governs all of it: **the motif follows
+meaning — film visuals appear only on things that ARE film (rolls, film stocks), never on gear
+(cameras, lenses).** This keeps the motif distinctive instead of becoming wallpaper. Every piece
+is decorative geometry only (`aria-hidden`, `pointer-events: none`, never under text), so it sits
+on top of the accessible theme without touching any color token or contrast ratio.
+
+### Sprocket-edge film strip — the signature (`FilmStrip.svelte` + `.film-perfs-*`)
+
+Perforated 35mm edges turn a film entity into a literal strip of film. `.film-perfs-x` (top/bottom
+rails) and `.film-perfs-y` (left rail) in `app.css` paint a repeating inline-SVG of rounded
+"punched" holes — hole fill is the page surface (darker than the card) with a 1px catch-light lip,
+echoing the card material language. `FilmStrip.svelte` is a drop-in decorative component: place it
+inside a `relative overflow-hidden` card/row and give that container padding to clear the rail
+(~16px on the railed side). `orientation="horizontal"` (default) = top+bottom rails (cards);
+`orientation="vertical"` = single left rail (list rows).
+
+Applied to: dashboard roll cards, the roll-detail hero card, roll list rows, film-stock rows.
+
+### Frame counter (`FrameCounter.svelte`)
+
+A mechanical mono `current/total` plaque, like a camera's frame window. `size="lg"` is the
+roll-detail hero plaque (with a "frames" caption); `size="sm"` is a compact chip for dashboard/list
+cards. Over-count (more shots than `frame_count`) is flagged with the existing `--color-danger-fg`
+token — no new colors. Renders nothing when there's no data. Backed by `RollWithDetails.shot_count`
+(a `COUNT(*)` subquery added to the rolls list query) so the live count is available everywhere,
+not just on the detail page.
+
+### DX-code label (`.dx-barcode`)
+
+Film-stock ISO chips render as printed canister labels: a small barcode flourish (`.dx-barcode`,
+an irregular repeating-gradient in the faint text token) prefixes the recessed mono `ISO nnn` chip.
+
+### Film leader (`FilmLeader.svelte`)
+
+A short sprocketed strip with blank frames — "unexposed leader" artwork for first-run empty states.
+Rendered via the `EmptyState` `art` slot (see below). Used on the dashboard "Start your log" empty
+state and the rolls first-run empty state.
 
 ---
 
@@ -418,6 +469,8 @@ Defined as `@keyframes` in `frontend/src/app.css`:
 5. **The accent is the safelight.** Amber `#e2a45e` is the single warm light source in a dark room.
 6. **Consistent entrance.** Every page section uses `FadeIn` with staggered delays for sequential reveal.
 7. **Hover at `/40`.** Card hover borders always use `hover:border-accent/40` — never other opacities.
+8. **The motif follows meaning.** Film visuals (sprockets, frame counters, DX labels) appear only on things that ARE film — rolls and film stocks. Gear (cameras, lenses) stays clean. Decoration is always `aria-hidden`/non-text, so it never affects contrast.
+9. **Motion is optional.** All entrance/decorative motion is disabled under `prefers-reduced-motion`.
 
 ---
 
