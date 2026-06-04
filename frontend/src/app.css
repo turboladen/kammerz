@@ -174,20 +174,23 @@ body::after {
 
 /* Sprocket-hole perforation rails — the signature "film strip" motif, applied only
    to entities that ARE film (rolls, film stocks). Holes read as punched through the
-   card to the darker page, with a faint catch-light lip echoing the card material
+   card to the page beneath, with a faint catch-light lip echoing the card material
    language (app.css card treatment above). Painted as a repeating inline-SVG data-URI
    (same technique as the film-grain texture). Decorative only: the rails are
    aria-hidden, pointer-events:none, and never sit under text, so contrast is
-   unaffected. `-x` repeats along a top/bottom rail; `-y` along a left rail. */
+   unaffected. `-x` repeats along a top/bottom rail; `-y` along a left rail.
+   NOTE: the hole fill (%230d0d0c) is the `--color-surface` token value — a data-URI
+   SVG can't reference CSS custom properties, so keep this literal in sync if the
+   surface token changes. */
 .film-perfs-x {
-	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='14'%3E%3Crect x='4' y='4' width='10' height='6' rx='2' fill='%230a0a09' stroke='%23ffffff' stroke-opacity='0.05'/%3E%3C/svg%3E");
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='14'%3E%3Crect x='4' y='4' width='10' height='6' rx='2' fill='%230d0d0c' stroke='%23ffffff' stroke-opacity='0.05'/%3E%3C/svg%3E");
 	background-repeat: repeat-x;
 	background-position: center;
 	background-size: 18px 14px;
 }
 
 .film-perfs-y {
-	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='18'%3E%3Crect x='4' y='4' width='6' height='10' rx='2' fill='%230a0a09' stroke='%23ffffff' stroke-opacity='0.05'/%3E%3C/svg%3E");
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='18'%3E%3Crect x='4' y='4' width='6' height='10' rx='2' fill='%230d0d0c' stroke='%23ffffff' stroke-opacity='0.05'/%3E%3C/svg%3E");
 	background-repeat: repeat-y;
 	background-position: center;
 	background-size: 14px 18px;
@@ -235,6 +238,14 @@ body::after {
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.01ms !important;
 		scroll-behavior: auto !important;
+	}
+
+	/* Zeroing the transition only removes the *easing* of the card hover lift — the
+	   1px translate would still snap. Cancel the transform itself so there is truly
+	   no hover lift under reduced motion (the card's hover border still indicates
+	   focus). Targets the Tailwind `hover:-translate-y-px` utility. */
+	.hover\:-translate-y-px:hover {
+		transform: none !important;
 	}
 }
 

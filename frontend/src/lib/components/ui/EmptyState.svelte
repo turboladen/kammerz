@@ -15,8 +15,7 @@
 <div class="flex flex-col items-center justify-center gap-4 py-16 text-center">
 	{#if art}
 		{@render art()}
-	{/if}
-	{#if icon}
+	{:else if icon}
 		<div class="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent">
 			{@render icon()}
 		</div>
