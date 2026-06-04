@@ -56,11 +56,6 @@
 	let editFilmStockId = $state('');
 	let editLensId = $state('');
 	let editFrameCount = $state('');
-	let editDateLoaded = $state('');
-	let editDateFinished = $state('');
-	let editDateScanned = $state('');
-	let editDatePostProcessed = $state('');
-	let editDateArchived = $state('');
 	let editDateFuzzy = $state('');
 	let editPushPull = $state('');
 	let editNotes = $state('');
@@ -606,11 +601,6 @@
 		editFilmStockId = roll.film_stock_id?.toString() ?? '';
 		editLensId = roll.lens_id?.toString() ?? '';
 		editFrameCount = roll.frame_count?.toString() ?? '';
-		editDateLoaded = roll.date_loaded ?? '';
-		editDateFinished = roll.date_finished ?? '';
-		editDateScanned = roll.date_scanned ?? '';
-		editDatePostProcessed = roll.date_post_processed ?? '';
-		editDateArchived = roll.date_archived ?? '';
 		editDateFuzzy = roll.date_fuzzy ?? '';
 		editPushPull = roll.push_pull ?? '';
 		editNotes = roll.notes ?? '';
@@ -626,11 +616,6 @@
 				film_stock_id: editFilmStockId ? Number(editFilmStockId) : null,
 				lens_id: editLensId ? Number(editLensId) : null,
 				frame_count: editFrameCount ? parseInt(editFrameCount) : null,
-				date_loaded: editDateLoaded || null,
-				date_finished: editDateFinished || null,
-				date_scanned: editDateScanned || null,
-				date_post_processed: editDatePostProcessed || null,
-				date_archived: editDateArchived || null,
 				date_fuzzy: editDateFuzzy || null,
 				push_pull: (editPushPull || null) as PushPull | null,
 				notes: editNotes || null
@@ -708,15 +693,6 @@
 					{:else}
 						<Select label="Default Lens" bind:value={editLensId} options={editLensOptions} />
 					{/if}
-					<div class="grid grid-cols-2 gap-4">
-						<DateInput label="Date Loaded" bind:value={editDateLoaded} />
-						<DateInput label="Finished Shooting" bind:value={editDateFinished} />
-					</div>
-					<div class="grid grid-cols-3 gap-4">
-						<DateInput label="Scanned" bind:value={editDateScanned} />
-						<DateInput label="Post-processed" bind:value={editDatePostProcessed} />
-						<DateInput label="Archived" bind:value={editDateArchived} />
-					</div>
 					<div class="grid grid-cols-2 gap-4">
 						<Select label="Push/Pull" bind:value={editPushPull} options={pushPullOptions} />
 						<Input label="Fuzzy Date" bind:value={editDateFuzzy} placeholder="e.g. 'early October 2025'" />
