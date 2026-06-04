@@ -19,6 +19,9 @@
 	let editing: TimelineMilestone | null = $state(null);
 
 	function startEdit(m: TimelineMilestone) {
+		// Order matters: set `editing` first so the {#if editing} block mounts
+		// DateConfirm, then flip `editOpen` true so its $effect seeds the date on
+		// mount. Reversing these would mount the dialog a frame before the seed.
 		editing = m;
 		editOpen = true;
 	}
