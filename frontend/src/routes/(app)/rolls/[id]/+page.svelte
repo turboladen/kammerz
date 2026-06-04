@@ -502,12 +502,18 @@
 
 			// Dev-owned dates (lab/self) are a follow-up write to the dev record —
 			// non-atomic with the status PATCH above (same two-phase pattern as
-			// saveTimelineDate). On a single-user LAN this is acceptable: a failed
-			// second write surfaces via `error` and the date can be re-entered.
-			if (advancing && date && target?.kind === 'lab' && labDev) {
-				await updateLabDev(labDev.id, { [target.field]: date });
-			} else if (advancing && date && target?.kind === 'self' && selfDev) {
-				await updateSelfDev(selfDev.id, { [target.field]: date });
+			// saveTimelineDate). The status is already committed, so surface a failed
+			// date write via `error` but STILL refresh below — otherwise the UI would
+			// keep showing the old status. The date can then be re-entered from the
+			// Timeline.
+			try {
+				if (advancing && date && target?.kind === 'lab' && labDev) {
+					await updateLabDev(labDev.id, { [target.field]: date });
+				} else if (advancing && date && target?.kind === 'self' && selfDev) {
+					await updateSelfDev(selfDev.id, { [target.field]: date });
+				}
+			} catch (err) {
+				error = err instanceof Error ? err.message : String(err);
 			}
 
 			await loadRollData();
