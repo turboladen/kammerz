@@ -155,6 +155,21 @@ Same animations and styling as Dialog, smaller max-width (`max-w-sm`).
 
 Centered message with optional CTA button. Used when lists are empty.
 
+### DateConfirm (`frontend/src/lib/components/ui/DateConfirm.svelte`)
+
+Small date-pick dialog (built on `Dialog` + `DateInput`). Confirm / Cancel, with an
+optional **Clear** (commits null) for inline edits. Used for both the
+confirm-on-transition prompt and inline Timeline date editing. No "Skip" — to leave a
+date blank, advance then Clear it in the Timeline.
+
+### RollTimeline (`frontend/src/lib/components/rolls/RollTimeline.svelte`)
+
+The roll lifecycle Timeline (dot + label + dashed rule + date), with each editable
+milestone click-to-edit via `DateConfirm`. Emits `onedit(milestone, date|null)`; the
+roll-detail page routes the write to the roll / lab-dev / self-dev record by the
+milestone's `target` (see `buildRollTimeline` in `utils/timeline.ts`). The Timeline is
+the single home for lifecycle dates — the roll Edit form has no date pickers.
+
 ### FadeIn (`frontend/src/lib/components/ui/FadeIn.svelte`)
 
 Wraps content in staggered `fade-in-up` animation (200ms, ease-out). Use on all page sections for sequential reveal:
