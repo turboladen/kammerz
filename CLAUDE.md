@@ -22,6 +22,7 @@ Film photography catalog — a self-hosted web app built with axum + SvelteKit +
 - `cargo test -p kammerz` — Backend integration tests (in-memory SQLite, real migrations + seed)
 - **CI** (`.github/workflows/ci.yml`) runs on every PR and push to `main`: a `backend` job (`cargo test`), a `frontend` job (`bun run check` + `bun run build`), and an `e2e` job (Playwright `smoke.spec.ts` against the release binary on :3002). The first two are required gates; mirror them locally with `just check`.
 - `echo -n <pw> | kammerz hash-password` — Generate the argon2 hash for `KAMMERZ_PASSWORD_HASH`. **Reads the password from stdin, never argv** (argv leaks into shell history / `ps`). On a TTY it prompts with echo off.
+- **Build wipes `frontend/build/`** — `bun run build` (and thus `just check` / `just build`) deletes the tracked `frontend/build/.gitkeep` (the adapter-static output dir is regenerated). Restore it before committing: `git checkout -- frontend/build/.gitkeep`. Don't commit its deletion.
 - **Verification:** This is a normal browser app — browser/Playwright verification is valid. Run via `just dev` (axum :3002 + Vite :5273 proxy) and open `http://localhost:5273`, or build and run the release binary on :3002. Verify backend with `cargo test`, frontend markup/types with `bun run build` / `bun run check`, data with `sqlite3` queries against the configured `DATABASE_URL` (dev default `./kammerz.db`).
 
 ## Architecture
@@ -163,6 +164,9 @@ Every former Tauri command maps to one route: reads `GET`, creates `POST` (→ `
 - All colors use CSS custom properties defined in `frontend/src/app.css` via Tailwind's `@theme`. Never use raw hex colors.
 - Fonts: DM Sans (UI), IBM Plex Mono (data), Instrument Serif (display). Self-hosted in `frontend/static/fonts/`.
 - Keep `UI_DESIGN.md` updated when design decisions change.
+
+### Git / Branch Hygiene
+- **PRs are squash-merged.** `git branch --merged origin/main` therefore *lies* — squash breaks ancestry, so merged branches show as unmerged. Verify with `gh pr list --state merged --json headRefName` before deleting. GitHub doesn't auto-delete branches on merge, so remote branches accumulate; prune with `git push origin --delete <branch>`.
 
 ## Reference
 
