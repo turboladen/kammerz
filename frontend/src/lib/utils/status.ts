@@ -161,9 +161,20 @@ export function getDevPath(
 ): DevPath {
 	if (hasLabDev) return 'lab';
 	if (hasSelfDev) return 'self';
+	// No dev record yet — fall back to the status's intrinsic dev kind (orphaned edge case).
+	return devKindForStatus(status) ?? 'undecided';
+}
+
+/**
+ * Which development record a status belongs to, or null for roll-owned / undecided statuses.
+ * The single source of the status→record-kind inference (also used by {@link getDevPath}) — a
+ * pure lookup independent of whether the record exists. Used to gate "open the dev dialog before
+ * advancing" so a forward transition never strands a status with no backing dev record.
+ */
+export function devKindForStatus(status: RollStatus): 'lab' | 'self' | null {
 	if (status === 'at-lab' || status === 'lab-done') return 'lab';
 	if (status === 'developing' || status === 'developed') return 'self';
-	return 'undecided';
+	return null;
 }
 
 /** Get the status flow array for a given development path. */

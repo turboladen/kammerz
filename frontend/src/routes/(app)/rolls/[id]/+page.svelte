@@ -27,7 +27,7 @@
 	import { lensDisplayName, buildLensOptions } from '$lib/utils/lens';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
-	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder } from '$lib/utils/status';
+	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder, devKindForStatus } from '$lib/utils/status';
 	import { buildRollTimeline, readDateTarget, STATUS_DATE_TARGET } from '$lib/utils/timeline';
 	import { todayLocal } from '$lib/utils/date';
 	import type { RollWithDetails, RollInsert, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
@@ -507,13 +507,6 @@
 			}
 
 			await loadRollData();
-
-			// Auto-prompt development dialogs (unchanged).
-			if (status === 'at-lab' && !labDev && !selfDev) {
-				devAutoPrompt = 'lab';
-			} else if (status === 'developing' && !selfDev && !labDev) {
-				devAutoPrompt = 'self';
-			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -552,18 +545,28 @@
 			pendingStatus = status;
 			return;
 		}
-		// Forward into a date-bearing status whose date isn't recorded yet → prompt.
+		// Forward into a lab/self status whose dev record doesn't exist yet → open the matching
+		// dev dialog instead of advancing. Creating the record auto-syncs the status (backend),
+		// so a status is never stranded at at-lab/lab-done/developing/developed with no backing
+		// record (and no way to capture its dates). Mirrors the "Develop" menu (chooseDevPath).
+		const devKind = devKindForStatus(status);
+		if (devKind === 'lab' && !labDev) {
+			devAutoPrompt = 'lab';
+			return;
+		}
+		if (devKind === 'self' && !selfDev) {
+			devAutoPrompt = 'self';
+			return;
+		}
+		// Forward into a date-bearing status whose date isn't recorded yet → prompt. The dev
+		// record (for lab/self targets) is guaranteed to exist here, gated by the guard above.
 		const target = STATUS_DATE_TARGET[status];
-		const recordExists = !target || target.kind === 'roll' || (target.kind === 'lab' && labDev) || (target.kind === 'self' && selfDev);
-		if (target && recordExists && !targetDate(target)) {
+		if (target && !targetDate(target)) {
 			datePromptStatus = status;
 			datePromptOpen = true;
 			return;
 		}
-		// Otherwise advance directly: no date target, the date is already recorded,
-		// or — for lab/self — the dev record doesn't exist yet. That last case is
-		// off the normal flow: reaching lab-done/developed goes through at-lab/
-		// developing, which auto-open the dialog that creates the dev record.
+		// Otherwise advance directly: no date target, or the date is already recorded.
 		updateStatus(status);
 	}
 
