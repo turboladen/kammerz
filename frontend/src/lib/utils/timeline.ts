@@ -133,8 +133,14 @@ const STATUS_MILESTONE: Record<RollStatus, MilestoneKey | null> = {
  * Status → date target, derived from STATUS_MILESTONE + MILESTONE_DEFS. Used by the roll
  * detail page to decide which date a forward status transition records, and where it lives.
  */
-export const STATUS_DATE_TARGET: Partial<Record<RollStatus, DateTarget>> = Object.fromEntries(
-	Object.entries(STATUS_MILESTONE)
-		.filter(([, key]) => key !== null)
-		.map(([status, key]) => [status, MILESTONE_DEFS[key as MilestoneKey].target])
-) as Partial<Record<RollStatus, DateTarget>>;
+export const STATUS_DATE_TARGET: Partial<Record<RollStatus, DateTarget>> = (() => {
+	const map: Partial<Record<RollStatus, DateTarget>> = {};
+	// STATUS_MILESTONE is a total Record<RollStatus, …>, so its keys are exactly RollStatus.
+	for (const status of Object.keys(STATUS_MILESTONE) as RollStatus[]) {
+		const key = STATUS_MILESTONE[status];
+		// `if (key !== null)` narrows `key` to MilestoneKey here (control-flow narrowing on a
+		// plain variable, unlike a destructured tuple in .filter) — so no `key as MilestoneKey`.
+		if (key !== null) map[status] = MILESTONE_DEFS[key].target;
+	}
+	return map;
+})();
