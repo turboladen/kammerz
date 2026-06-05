@@ -166,14 +166,12 @@ async fn create_lab_dev(
                 };
                 let result = model.insert(txn).await?;
 
-                // Auto-advance: → at-lab when lab dev record is created
-                RollService::auto_sync_status(
-                    txn,
-                    data.roll_id,
-                    &[RollStatus::Loaded, RollStatus::Shooting, RollStatus::Shot],
-                    RollStatus::AtLab,
-                )
-                .await?;
+                // Auto-advance forward: → at-lab (or lab-done if a received date was
+                // stored), from any prior status on the lab path including an orphaned
+                // at-lab. Derive the signal from the persisted value so the status
+                // decision matches exactly what `trim_opt` stored (empty → None).
+                RollService::sync_lab_dev_status(txn, data.roll_id, result.date_received.is_some())
+                    .await?;
 
                 Ok(result.id)
             })
@@ -308,12 +306,14 @@ async fn create_self_dev(
                         .await?;
                 }
 
-                // Auto-advance: → developing when self dev record is created
-                RollService::auto_sync_status(
+                // Auto-advance forward: → developing (or developed if a processed date
+                // was stored), from any prior status on the self path including an
+                // orphaned developing. Derive the signal from the persisted value so the
+                // status decision matches exactly what `trim_opt` stored (empty → None).
+                RollService::sync_self_dev_status(
                     txn,
                     data.roll_id,
-                    &[RollStatus::Loaded, RollStatus::Shooting, RollStatus::Shot],
-                    RollStatus::Developing,
+                    result.date_processed.is_some(),
                 )
                 .await?;
 

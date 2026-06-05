@@ -80,6 +80,31 @@ pub struct ImportShotEntry {
 
 pub struct RollService;
 
+/// Lab development path, in progression order. Used by `advance_status_along` to
+/// reconcile a roll forward when a lab dev record is created (kammerz-afc).
+const LAB_FLOW: &[RollStatus] = &[
+    RollStatus::Loaded,
+    RollStatus::Shooting,
+    RollStatus::Shot,
+    RollStatus::AtLab,
+    RollStatus::LabDone,
+    RollStatus::Scanned,
+    RollStatus::PostProcessed,
+    RollStatus::Archived,
+];
+
+/// Self development path, in progression order (mirror of `LAB_FLOW`).
+const SELF_FLOW: &[RollStatus] = &[
+    RollStatus::Loaded,
+    RollStatus::Shooting,
+    RollStatus::Shot,
+    RollStatus::Developing,
+    RollStatus::Developed,
+    RollStatus::Scanned,
+    RollStatus::PostProcessed,
+    RollStatus::Archived,
+];
+
 impl RollService {
     pub async fn list_all_with_details(
         db: &DatabaseConnection,
@@ -214,6 +239,73 @@ impl RollService {
         } else {
             Ok(false)
         }
+    }
+
+    /// Advance a roll forward along a development `flow` to `target`, but only if
+    /// the roll currently sits at an *earlier* rung of that flow. Unlike
+    /// `auto_sync_status` (a conditional set against an explicit from-set), this
+    /// reconciles forward from ANY prior status on the path — including a roll
+    /// already orphaned at an intermediate dev status (kammerz-afc). Never moves
+    /// backward, and no-ops when the roll's status isn't on the flow (e.g. the
+    /// sibling dev path). Returns `true` if status was changed.
+    async fn advance_status_along(
+        db: &impl ConnectionTrait,
+        roll_id: i32,
+        flow: &[RollStatus],
+        target: RollStatus,
+    ) -> Result<bool, DbErr> {
+        let roll_record = Roll::find_by_id(roll_id)
+            .one(db)
+            .await?
+            .ok_or_else(|| DbErr::Custom(format!("Roll {roll_id} not found")))?;
+
+        let current_idx = flow.iter().position(|s| *s == roll_record.status);
+        let target_idx = flow.iter().position(|s| *s == target);
+
+        match (current_idx, target_idx) {
+            (Some(cur), Some(tgt)) if cur < tgt => {
+                let now = now_string();
+                let mut model: roll::ActiveModel = roll_record.into();
+                model.status = Set(target);
+                model.updated_at = Set(now);
+                model.update(db).await?;
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
+    }
+
+    /// Reconcile a roll's status when a lab dev record is created. Data-driven:
+    /// a recorded `date_received` means the lab is done (→ `lab-done`); otherwise
+    /// the roll is at the lab (→ `at-lab`). Advances forward only, so the normal
+    /// shot→at-lab transition and orphan at-lab→lab-done recovery share one path.
+    pub async fn sync_lab_dev_status(
+        db: &impl ConnectionTrait,
+        roll_id: i32,
+        has_received: bool,
+    ) -> Result<bool, DbErr> {
+        let target = if has_received {
+            RollStatus::LabDone
+        } else {
+            RollStatus::AtLab
+        };
+        Self::advance_status_along(db, roll_id, LAB_FLOW, target).await
+    }
+
+    /// Reconcile a roll's status when a self dev record is created. Data-driven:
+    /// a recorded `date_processed` means it's developed (→ `developed`); otherwise
+    /// it's in process (→ `developing`). Mirror of `sync_lab_dev_status`.
+    pub async fn sync_self_dev_status(
+        db: &impl ConnectionTrait,
+        roll_id: i32,
+        has_processed: bool,
+    ) -> Result<bool, DbErr> {
+        let target = if has_processed {
+            RollStatus::Developed
+        } else {
+            RollStatus::Developing
+        };
+        Self::advance_status_along(db, roll_id, SELF_FLOW, target).await
     }
 
     /// Suggest a roll ID in YYMMDD-N format.
