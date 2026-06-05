@@ -153,12 +153,6 @@ async fn create_lab_dev(
     let result_id = db
         .transaction::<_, i32, DbErr>(|txn| {
             Box::pin(async move {
-                // A recorded received date means the lab is done — drives at-lab vs lab-done.
-                let has_received = data
-                    .date_received
-                    .as_deref()
-                    .is_some_and(|s| !s.trim().is_empty());
-
                 let model = development_lab::ActiveModel {
                     roll_id: Set(data.roll_id),
                     lab_id: Set(data.lab_id),
@@ -172,9 +166,12 @@ async fn create_lab_dev(
                 };
                 let result = model.insert(txn).await?;
 
-                // Auto-advance forward: → at-lab (or lab-done if received), from any
-                // prior status on the lab path including an orphaned at-lab.
-                RollService::sync_lab_dev_status(txn, data.roll_id, has_received).await?;
+                // Auto-advance forward: → at-lab (or lab-done if a received date was
+                // stored), from any prior status on the lab path including an orphaned
+                // at-lab. Derive the signal from the persisted value so the status
+                // decision matches exactly what `trim_opt` stored (empty → None).
+                RollService::sync_lab_dev_status(txn, data.roll_id, result.date_received.is_some())
+                    .await?;
 
                 Ok(result.id)
             })
@@ -285,12 +282,6 @@ async fn create_self_dev(
     let result_id = db
         .transaction::<_, i32, DbErr>(|txn| {
             Box::pin(async move {
-                // A recorded processed date means it's developed — drives developing vs developed.
-                let has_processed = data
-                    .date_processed
-                    .as_deref()
-                    .is_some_and(|s| !s.trim().is_empty());
-
                 let model = development_self::ActiveModel {
                     roll_id: Set(data.roll_id),
                     date_processed: trim_opt(data.date_processed),
@@ -315,9 +306,16 @@ async fn create_self_dev(
                         .await?;
                 }
 
-                // Auto-advance forward: → developing (or developed if processed), from any
-                // prior status on the self path including an orphaned developing.
-                RollService::sync_self_dev_status(txn, data.roll_id, has_processed).await?;
+                // Auto-advance forward: → developing (or developed if a processed date
+                // was stored), from any prior status on the self path including an
+                // orphaned developing. Derive the signal from the persisted value so the
+                // status decision matches exactly what `trim_opt` stored (empty → None).
+                RollService::sync_self_dev_status(
+                    txn,
+                    data.roll_id,
+                    result.date_processed.is_some(),
+                )
+                .await?;
 
                 Ok(result.id)
             })
