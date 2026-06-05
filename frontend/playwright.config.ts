@@ -14,7 +14,11 @@ export default defineConfig({
 	reporter: 'list',
 	use: {
 		baseURL,
-		trace: 'on-first-retry'
+		// retries: 0 means every test runs once and is never a "retry", so
+		// 'on-first-retry' would never capture anything. Key off the outcome
+		// instead so a failed single attempt writes a trace.zip + screenshot.
+		trace: 'retain-on-failure',
+		screenshot: 'only-on-failure'
 	},
 	projects: [
 		{

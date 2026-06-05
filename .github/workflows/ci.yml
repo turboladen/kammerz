@@ -117,3 +117,15 @@ jobs:
       - name: Server log (on failure)
         if: failure()
         run: cat server.log || true
+
+      # Client-side complement to server.log: upload the Playwright trace.zip +
+      # screenshots so a maintainer can replay the failed run's DOM/network
+      # locally (npx playwright show-trace). Default outputDir is test-results/.
+      - name: Upload Playwright artifacts (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: frontend/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
