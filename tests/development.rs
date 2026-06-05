@@ -6,6 +6,12 @@ use serde_json::{json, Value};
 use tower::ServiceExt;
 
 async fn create_shot_roll(app: &axum::Router, roll_id: &str) -> i32 {
+    create_roll_at_status(app, roll_id, "shot").await
+}
+
+/// Create a roll directly at a given status. Used to simulate imported rolls
+/// orphaned past 'shot' with no backing dev record.
+async fn create_roll_at_status(app: &axum::Router, roll_id: &str, status: &str) -> i32 {
     let res = app.clone().oneshot(get("/api/cameras")).await.unwrap();
     let cams: Vec<Value> = json_body(res).await;
     let camera_id = cams[0]["id"].as_i64().unwrap() as i32;
@@ -13,7 +19,7 @@ async fn create_shot_roll(app: &axum::Router, roll_id: &str) -> i32 {
     let payload = json!({
         "roll_id": roll_id,
         "camera_id": camera_id,
-        "status": "shot",
+        "status": status,
         "date_loaded": "2026-05-01"
     });
     let res = app
@@ -117,4 +123,91 @@ async fn create_lab_dev_advances_status() {
         .unwrap();
     let roll: Value = json_body(res).await;
     assert_eq!(roll["status"], "at-lab", "lab dev advances roll to at-lab");
+}
+
+// kammerz-afc: an imported roll orphaned at at-lab (no lab dev record). Clicking
+// 'Lab Done' opens the lab dialog; entering date_received + Save must land the
+// roll at lab-done in ONE action — the create is data-driven (a received date
+// means the lab is done), not stranded at at-lab requiring a second click.
+#[tokio::test]
+async fn create_lab_dev_with_received_date_advances_orphan_at_lab_to_lab_done() {
+    let app = open_app().await;
+    let roll_pk = create_roll_at_status(&app, "DEV-ORPHAN-LAB", "at-lab").await;
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/lab",
+            &json!({ "roll_id": roll_pk, "date_received": "2026-05-10" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let res = app
+        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
+        .await
+        .unwrap();
+    let roll: Value = json_body(res).await;
+    assert_eq!(
+        roll["status"], "lab-done",
+        "lab dev with received date lands an orphaned at-lab roll at lab-done in one action"
+    );
+}
+
+// Symmetric self-dev case: orphan at 'developing' (no self dev). Recording a
+// self dev with date_processed (= developed) advances to 'developed' in one action.
+#[tokio::test]
+async fn create_self_dev_with_processed_date_advances_orphan_developing_to_developed() {
+    let app = open_app().await;
+    let roll_pk = create_roll_at_status(&app, "DEV-ORPHAN-SELF", "developing").await;
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/self",
+            &json!({ "roll_id": roll_pk, "date_processed": "2026-05-12" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let res = app
+        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
+        .await
+        .unwrap();
+    let roll: Value = json_body(res).await;
+    assert_eq!(
+        roll["status"], "developed",
+        "self dev with processed date lands an orphaned developing roll at developed in one action"
+    );
+}
+
+// Regression guard: a self dev with NO processed date on a fresh 'shot' roll
+// advances only to 'developing' (the normal shot→developing transition is
+// unchanged — the date-driven jump is opt-in via the date field).
+#[tokio::test]
+async fn create_self_dev_without_processed_date_stops_at_developing() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "DEV-SELF-NODATE").await;
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/self",
+            &json!({ "roll_id": roll_pk, "developer": "HC-110" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let res = app
+        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
+        .await
+        .unwrap();
+    let roll: Value = json_body(res).await;
+    assert_eq!(
+        roll["status"], "developing",
+        "self dev without a processed date advances only to developing"
+    );
 }
