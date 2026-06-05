@@ -28,7 +28,7 @@
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder } from '$lib/utils/status';
-	import { buildRollTimeline } from '$lib/utils/timeline';
+	import { buildRollTimeline, readDateTarget, STATUS_DATE_TARGET } from '$lib/utils/timeline';
 	import { todayLocal } from '$lib/utils/date';
 	import type { RollWithDetails, RollInsert, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
 	import { Trash2 } from 'lucide-svelte';
@@ -98,24 +98,12 @@
 	// Ordered lifecycle dates (path-aware) for the read-only timeline section.
 	const timeline = $derived(roll ? buildRollTimeline(roll, labDev, selfDev, devPath) : []);
 
-	// Which date a forward transition into each status records, and where it lives.
-	// At-lab / developing are intentionally absent — their full dev dialogs capture
-	// those dates. Shot records date_finished (the roll-full nudge also sets it).
-	const STATUS_DATE_TARGET: Partial<Record<RollStatus, DateTarget>> = {
-		shot: { kind: 'roll', field: 'date_finished' },
-		'lab-done': { kind: 'lab', field: 'date_received' },
-		developed: { kind: 'self', field: 'date_processed' },
-		scanned: { kind: 'roll', field: 'date_scanned' },
-		'post-processed': { kind: 'roll', field: 'date_post_processed' },
-		archived: { kind: 'roll', field: 'date_archived' }
-	};
-
 	// Helper: the current value of a status's target date (for the forward+empty check).
+	// STATUS_DATE_TARGET and the read dispatch live in timeline.ts so the status→date
+	// facts have a single source of truth (see kammerz-mfj).
 	function targetDate(t: DateTarget): string | null {
 		if (!roll) return null;
-		if (t.kind === 'roll') return roll[t.field] ?? null;
-		if (t.kind === 'lab') return labDev?.[t.field] ?? null;
-		return selfDev?.[t.field] ?? null;
+		return readDateTarget(t, roll, labDev, selfDev);
 	}
 
 	// Status backward-move confirmation
