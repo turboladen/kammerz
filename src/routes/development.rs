@@ -193,28 +193,46 @@ async fn update_lab_dev(
         .or_404("Lab development", id)?;
 
     let now = now_string();
-    let mut model: development_lab::ActiveModel = existing.into();
 
-    if let Some(v) = data.lab_id {
-        model.lab_id = Set(v);
-    }
-    if let Some(v) = data.date_dropped_off {
-        model.date_dropped_off = trim_opt(v);
-    }
-    if let Some(v) = data.date_received {
-        model.date_received = trim_opt(v);
-    }
-    if let Some(v) = data.cost {
-        model.cost = Set(v);
-    }
-    if let Some(v) = data.notes {
-        model.notes = trim_opt(v);
-    }
-    model.updated_at = Set(now);
+    db.transaction::<_, (), DbErr>(|txn| {
+        Box::pin(async move {
+            let mut model: development_lab::ActiveModel = existing.into();
 
-    DevelopmentService::update_lab_dev(&db, model)
-        .await
-        .map_err(|e| AppError::UnprocessableEntity(friendly_err("lab development", e)))?;
+            if let Some(v) = data.lab_id {
+                model.lab_id = Set(v);
+            }
+            if let Some(v) = data.date_dropped_off {
+                model.date_dropped_off = trim_opt(v);
+            }
+            if let Some(v) = data.date_received {
+                model.date_received = trim_opt(v);
+            }
+            if let Some(v) = data.cost {
+                model.cost = Set(v);
+            }
+            if let Some(v) = data.notes {
+                model.notes = trim_opt(v);
+            }
+            model.updated_at = Set(now);
+
+            let result = DevelopmentService::update_lab_dev(txn, model).await?;
+
+            // Data-driven status reconcile (kammerz-42u): adding a received date
+            // advances → lab-done, clearing it reverts lab-done → at-lab. Derive
+            // the signal from the persisted value, matching the create path.
+            RollService::resync_lab_dev_status(
+                txn,
+                result.roll_id,
+                result.date_received.is_some(),
+            )
+            .await?;
+
+            Ok(())
+        })
+    })
+    .await
+    .map_err(|e| AppError::UnprocessableEntity(friendly_err("lab development", e)))?;
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -377,11 +395,20 @@ async fn update_self_dev(
             }
             model.updated_at = Set(now);
 
-            DevelopmentService::update_self_dev(txn, model).await?;
+            let result = DevelopmentService::update_self_dev(txn, model).await?;
 
             if let Some(stages) = data.stages {
                 DevelopmentService::set_stages(txn, id, stages_to_inputs(stages)).await?;
             }
+
+            // Data-driven status reconcile (kammerz-42u): adding a processed date
+            // advances → developed, clearing it reverts developed → developing.
+            RollService::resync_self_dev_status(
+                txn,
+                result.roll_id,
+                result.date_processed.is_some(),
+            )
+            .await?;
 
             Ok(())
         })

@@ -113,7 +113,7 @@ impl DevelopmentService {
     }
 
     pub async fn update_lab_dev(
-        db: &DatabaseConnection,
+        db: &impl ConnectionTrait,
         model: development_lab::ActiveModel,
     ) -> Result<development_lab::Model, DbErr> {
         model.update(db).await
