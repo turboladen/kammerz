@@ -1,7 +1,7 @@
 mod common;
 
 use axum::http::StatusCode;
-use common::{get, json_body, open_app, post_json, put_json};
+use common::{delete, get, json_body, open_app, post_json, put_json};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
@@ -398,4 +398,37 @@ async fn update_lab_dev_clears_received_date_leaves_scanned_untouched() {
         "scanned",
         "clearing a received date must not pull a scanned roll back to at-lab"
     );
+}
+
+// kammerz-rwa: deleting a lab dev that doesn't exist (e.g. a stale-id
+// double-delete from the frontend) must return 404 NOT_FOUND, not 422. The
+// lookup runs inside the txn closure; or_404_db + friendly_txn_err classify the
+// resulting DbErr::RecordNotFound as a 404 (matching non-transactional handlers).
+#[tokio::test]
+async fn delete_missing_lab_dev_returns_404() {
+    let app = open_app().await;
+
+    let res = app
+        .oneshot(delete("/api/development/lab/999999"))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "NOT_FOUND");
+    assert_eq!(body["error"]["message"], "Lab development 999999 not found");
+}
+
+// kammerz-rwa: symmetric self-dev case — delete of a missing self dev is 404.
+#[tokio::test]
+async fn delete_missing_self_dev_returns_404() {
+    let app = open_app().await;
+
+    let res = app
+        .oneshot(delete("/api/development/self/999999"))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "NOT_FOUND");
+    assert_eq!(body["error"]["message"], "Self development 999999 not found");
 }

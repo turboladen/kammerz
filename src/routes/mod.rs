@@ -1,8 +1,10 @@
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use sea_orm::{DbErr, TransactionError};
 use serde_json::{json, Value};
 
 use crate::auth::handlers;
+use crate::error::AppError;
 use crate::AppState;
 
 pub mod cameras;
@@ -92,4 +94,18 @@ pub fn friendly_err(context: &str, e: impl std::fmt::Display) -> String {
 
     // Default: neutral verb so the message reads correctly with a noun context
     format!("Could not save {context}: {raw}")
+}
+
+/// Classify a transaction error into the right HTTP status. A not-found lookup
+/// inside the closure — `DbErr::RecordNotFound`, produced by
+/// [`crate::error::DbOptionExt::or_404_db`] — becomes a 404; every other error
+/// stays a friendly 422. The transactional delete handlers (shots, lab/self dev)
+/// use this so a double-delete of a stale id returns NOT_FOUND, matching the
+/// non-transactional handlers' `or_404`. The inner message is taken directly
+/// (not via `Display`) to avoid SeaORM's "RecordNotFound Error: " prefix.
+pub fn friendly_txn_err(context: &str, e: TransactionError<DbErr>) -> AppError {
+    match e {
+        TransactionError::Transaction(DbErr::RecordNotFound(m)) => AppError::NotFound(m),
+        other => AppError::UnprocessableEntity(friendly_err(context, other)),
+    }
 }

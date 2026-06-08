@@ -60,3 +60,19 @@ impl<T> OptionExt<T> for Option<T> {
         self.ok_or_else(|| AppError::NotFound(format!("{label} {id} not found")))
     }
 }
+
+/// `or_404` for use *inside* a transaction closure, whose error channel is typed
+/// to `DbErr` rather than `AppError`. Produces `DbErr::RecordNotFound` (same
+/// message format as [`OptionExt::or_404`]) so the post-transaction classifier
+/// [`crate::routes::friendly_txn_err`] can map it to a 404 instead of a friendly
+/// 422. Without this, a missing-row lookup leaked out as a generic `DbErr` and
+/// every transactional delete returned 422 for an already-deleted id.
+pub trait DbOptionExt<T> {
+    fn or_404_db(self, label: &str, id: i32) -> Result<T, sea_orm::DbErr>;
+}
+
+impl<T> DbOptionExt<T> for Option<T> {
+    fn or_404_db(self, label: &str, id: i32) -> Result<T, sea_orm::DbErr> {
+        self.ok_or_else(|| sea_orm::DbErr::RecordNotFound(format!("{label} {id} not found")))
+    }
+}

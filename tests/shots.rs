@@ -1,7 +1,7 @@
 mod common;
 
 use axum::http::StatusCode;
-use common::{get, json_body, open_app, post_json};
+use common::{delete, get, json_body, open_app, post_json};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
@@ -111,12 +111,11 @@ async fn delete_last_shot_reverts_status() {
     let shot_id: i32 = json_body(res).await;
 
     // Deleting the only shot should revert shooting → loaded.
-    let req = axum::http::Request::builder()
-        .method("DELETE")
-        .uri(format!("/api/shots/{shot_id}"))
-        .body(axum::body::Body::empty())
+    let res = app
+        .clone()
+        .oneshot(delete(&format!("/api/shots/{shot_id}")))
+        .await
         .unwrap();
-    let res = app.clone().oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::NO_CONTENT);
 
     let res = app
@@ -125,4 +124,19 @@ async fn delete_last_shot_reverts_status() {
         .unwrap();
     let roll: Value = json_body(res).await;
     assert_eq!(roll["status"], "loaded", "auto_sync_status reverted the roll");
+}
+
+// kammerz-rwa: deleting a shot that doesn't exist (e.g. a stale-id double-delete
+// from the frontend) must return 404 NOT_FOUND, not 422. The lookup runs inside
+// the txn closure; or_404_db + friendly_txn_err classify the resulting
+// DbErr::RecordNotFound as a 404, matching non-transactional handlers.
+#[tokio::test]
+async fn delete_missing_shot_returns_404() {
+    let app = open_app().await;
+
+    let res = app.oneshot(delete("/api/shots/999999")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "NOT_FOUND");
+    assert_eq!(body["error"]["message"], "Shot 999999 not found");
 }

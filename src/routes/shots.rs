@@ -9,9 +9,9 @@ use sea_orm::{
 use serde::Deserialize;
 
 use crate::auth::middleware::RequireAuth;
-use crate::error::{AppError, AppResult, OptionExt};
+use crate::error::{AppError, AppResult, DbOptionExt, OptionExt};
 use crate::patch::{double_option, now_string, trim, trim_opt};
-use crate::routes::friendly_err;
+use crate::routes::{friendly_err, friendly_txn_err};
 use crate::services::roll_service::RollService;
 use crate::services::shot_service::ShotService;
 use crate::AppState;
@@ -215,7 +215,7 @@ async fn delete_one(
             let shot_record = shot::Entity::find_by_id(id)
                 .one(txn)
                 .await?
-                .ok_or_else(|| DbErr::Custom(format!("Shot {id} not found")))?;
+                .or_404_db("Shot", id)?;
             let roll_id = shot_record.roll_id;
 
             // Delete the shot (shot_lenses cascade-deleted by FK)
@@ -241,7 +241,7 @@ async fn delete_one(
         })
     })
     .await
-    .map_err(|e| AppError::UnprocessableEntity(friendly_err("shot", e)))?;
+    .map_err(|e| friendly_txn_err("shot", e))?;
 
     Ok(StatusCode::NO_CONTENT)
 }
