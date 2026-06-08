@@ -56,6 +56,15 @@ pub fn get(path: &str) -> Request<Body> {
         .unwrap()
 }
 
+/// Build a DELETE request (no body).
+pub fn delete(path: &str) -> Request<Body> {
+    Request::builder()
+        .method("DELETE")
+        .uri(path)
+        .body(Body::empty())
+        .unwrap()
+}
+
 /// Build a POST request with a JSON body.
 pub fn post_json<T: Serialize>(path: &str, value: &T) -> Request<Body> {
     Request::builder()

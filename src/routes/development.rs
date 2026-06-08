@@ -11,9 +11,9 @@ use sea_orm::{
 use serde::Deserialize;
 
 use crate::auth::middleware::RequireAuth;
-use crate::error::{AppError, AppResult, OptionExt};
+use crate::error::{AppError, AppResult, DbOptionExt, OptionExt};
 use crate::patch::{double_option, now_string, trim_opt};
-use crate::routes::friendly_err;
+use crate::routes::{friendly_err, friendly_txn_err};
 use crate::services::development_service::{
     DevelopmentService, SelfDevWithStages, StageInput,
 };
@@ -247,7 +247,7 @@ async fn delete_lab_dev(
             let dev = development_lab::Entity::find_by_id(id)
                 .one(txn)
                 .await?
-                .ok_or_else(|| DbErr::Custom(format!("Lab development {id} not found")))?;
+                .or_404_db("Lab development", id)?;
             let roll_id = dev.roll_id;
 
             // Delete the dev record
@@ -275,7 +275,7 @@ async fn delete_lab_dev(
         })
     })
     .await
-    .map_err(|e| AppError::UnprocessableEntity(friendly_err("lab development", e)))?;
+    .map_err(|e| friendly_txn_err("lab development", e))?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -430,7 +430,7 @@ async fn delete_self_dev(
             let dev = development_self::Entity::find_by_id(id)
                 .one(txn)
                 .await?
-                .ok_or_else(|| DbErr::Custom(format!("Self development {id} not found")))?;
+                .or_404_db("Self development", id)?;
             let roll_id = dev.roll_id;
 
             // Delete the dev record (dev stages cascade-deleted by FK)
@@ -458,7 +458,7 @@ async fn delete_self_dev(
         })
     })
     .await
-    .map_err(|e| AppError::UnprocessableEntity(friendly_err("self development", e)))?;
+    .map_err(|e| friendly_txn_err("self development", e))?;
 
     Ok(StatusCode::NO_CONTENT)
 }
