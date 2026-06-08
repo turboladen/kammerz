@@ -1,12 +1,23 @@
 mod common;
 
 use axum::http::StatusCode;
-use common::{get, json_body, open_app, post_json};
+use common::{get, json_body, open_app, post_json, put_json};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
 async fn create_shot_roll(app: &axum::Router, roll_id: &str) -> i32 {
     create_roll_at_status(app, roll_id, "shot").await
+}
+
+/// Fetch a roll's current status string.
+async fn roll_status(app: &axum::Router, roll_pk: i32) -> String {
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
+        .await
+        .unwrap();
+    let roll: Value = json_body(res).await;
+    roll["status"].as_str().unwrap().to_string()
 }
 
 /// Create a roll directly at a given status. Used to simulate imported rolls
@@ -209,5 +220,182 @@ async fn create_self_dev_without_processed_date_stops_at_developing() {
     assert_eq!(
         roll["status"], "developing",
         "self dev without a processed date advances only to developing"
+    );
+}
+
+// kammerz-42u: editing an existing lab dev to ADD a received date must advance
+// at-lab → lab-done in one save (the Edit dialog path, not the chevron).
+#[tokio::test]
+async fn update_lab_dev_adds_received_date_advances_to_lab_done() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "DEV-LAB-UPD-ADD").await;
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/lab",
+            &json!({ "roll_id": roll_pk, "cost": 12.5 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let dev_id: i32 = json_body(res).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "at-lab");
+
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/development/lab/{dev_id}"),
+            &json!({ "date_received": "2026-05-10" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "lab-done",
+        "adding a received date via PUT advances at-lab → lab-done"
+    );
+}
+
+// kammerz-42u: clearing the received date on an existing lab dev reverts
+// lab-done → at-lab (symmetric revert). Send an explicit null to clear.
+#[tokio::test]
+async fn update_lab_dev_clears_received_date_reverts_to_at_lab() {
+    let app = open_app().await;
+    let roll_pk = create_roll_at_status(&app, "DEV-LAB-UPD-CLR", "at-lab").await;
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/lab",
+            &json!({ "roll_id": roll_pk, "date_received": "2026-05-10" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let dev_id: i32 = json_body(res).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "lab-done");
+
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/development/lab/{dev_id}"),
+            &json!({ "date_received": null }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "at-lab",
+        "clearing the received date via PUT reverts lab-done → at-lab"
+    );
+}
+
+// kammerz-42u: editing an existing self dev to ADD a processed date advances
+// developing → developed in one save.
+#[tokio::test]
+async fn update_self_dev_adds_processed_date_advances_to_developed() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "DEV-SELF-UPD-ADD").await;
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/self",
+            &json!({ "roll_id": roll_pk, "developer": "HC-110" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let dev_id: i32 = json_body(res).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "developing");
+
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/development/self/{dev_id}"),
+            &json!({ "date_processed": "2026-05-12" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "developed",
+        "adding a processed date via PUT advances developing → developed"
+    );
+}
+
+// kammerz-42u: clearing the processed date on an existing self dev reverts
+// developed → developing (symmetric revert).
+#[tokio::test]
+async fn update_self_dev_clears_processed_date_reverts_to_developing() {
+    let app = open_app().await;
+    let roll_pk = create_roll_at_status(&app, "DEV-SELF-UPD-CLR", "developing").await;
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/self",
+            &json!({ "roll_id": roll_pk, "date_processed": "2026-05-12" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let dev_id: i32 = json_body(res).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "developed");
+
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/development/self/{dev_id}"),
+            &json!({ "date_processed": null }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "developing",
+        "clearing the processed date via PUT reverts developed → developing"
+    );
+}
+
+// kammerz-42u no-regression guard: a roll already past the completed status
+// (scanned) is NOT pulled back when a dev date is cleared — the revert is scoped
+// to the one adjacent rung (lab-done → at-lab), never scanned → at-lab.
+#[tokio::test]
+async fn update_lab_dev_clears_received_date_leaves_scanned_untouched() {
+    let app = open_app().await;
+    let roll_pk = create_roll_at_status(&app, "DEV-LAB-SCANNED", "scanned").await;
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/lab",
+            &json!({ "roll_id": roll_pk, "date_received": "2026-05-10" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let dev_id: i32 = json_body(res).await;
+    // create is advance-only, so the scanned roll is unchanged by the POST.
+    assert_eq!(roll_status(&app, roll_pk).await, "scanned");
+
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/development/lab/{dev_id}"),
+            &json!({ "date_received": null }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "scanned",
+        "clearing a received date must not pull a scanned roll back to at-lab"
     );
 }

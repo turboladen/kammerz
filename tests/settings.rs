@@ -1,19 +1,9 @@
 mod common;
 
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use common::{get, json_body, open_app};
+use axum::http::StatusCode;
+use common::{get, json_body, open_app, put_json};
 use serde_json::Value;
 use tower::ServiceExt;
-
-fn put_json(path: &str, value: &serde_json::Value) -> Request<Body> {
-    Request::builder()
-        .method("PUT")
-        .uri(path)
-        .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_vec(value).unwrap()))
-        .unwrap()
-}
 
 #[tokio::test]
 async fn set_then_get_setting_roundtrips() {

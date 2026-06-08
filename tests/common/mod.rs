@@ -66,6 +66,16 @@ pub fn post_json<T: Serialize>(path: &str, value: &T) -> Request<Body> {
         .unwrap()
 }
 
+/// Build a PUT request with a JSON body.
+pub fn put_json<T: Serialize>(path: &str, value: &T) -> Request<Body> {
+    Request::builder()
+        .method("PUT")
+        .uri(path)
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(value).unwrap()))
+        .unwrap()
+}
+
 /// Deserialize a response body as JSON.
 pub async fn json_body<T: DeserializeOwned>(response: Response) -> T {
     let bytes = response.into_body().collect().await.unwrap().to_bytes();

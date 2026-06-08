@@ -308,6 +308,50 @@ impl RollService {
         Self::advance_status_along(db, roll_id, SELF_FLOW, target).await
     }
 
+    /// Reconcile a roll's status when a lab dev record is *edited*. Like
+    /// `sync_lab_dev_status` it advances forward to the data-driven target
+    /// (lab-done if a received date is now present, else at-lab); additionally,
+    /// an edit that clears the received date reverts a completed roll
+    /// lab-done→at-lab. A roll already beyond lab-done (e.g. scanned) is never
+    /// disturbed, and off-flow rolls no-op. Returns `true` if status changed.
+    pub async fn resync_lab_dev_status(
+        db: &impl ConnectionTrait,
+        roll_id: i32,
+        has_received: bool,
+    ) -> Result<bool, DbErr> {
+        let advanced = Self::sync_lab_dev_status(db, roll_id, has_received).await?;
+        if has_received {
+            return Ok(advanced);
+        }
+        let reverted =
+            Self::auto_sync_status(db, roll_id, &[RollStatus::LabDone], RollStatus::AtLab).await?;
+        Ok(advanced || reverted)
+    }
+
+    /// Reconcile a roll's status when a self dev record is *edited*. Mirror of
+    /// `resync_lab_dev_status`: advances forward to the data-driven target
+    /// (developed if a processed date is present, else developing) and reverts a
+    /// completed roll developed→developing when the processed date is cleared.
+    /// A roll already beyond developed (e.g. scanned) is never disturbed.
+    pub async fn resync_self_dev_status(
+        db: &impl ConnectionTrait,
+        roll_id: i32,
+        has_processed: bool,
+    ) -> Result<bool, DbErr> {
+        let advanced = Self::sync_self_dev_status(db, roll_id, has_processed).await?;
+        if has_processed {
+            return Ok(advanced);
+        }
+        let reverted = Self::auto_sync_status(
+            db,
+            roll_id,
+            &[RollStatus::Developed],
+            RollStatus::Developing,
+        )
+        .await?;
+        Ok(advanced || reverted)
+    }
+
     /// Suggest a roll ID in YYMMDD-N format.
     pub async fn suggest_id(db: &DatabaseConnection) -> Result<String, DbErr> {
         let now = chrono::Local::now();
