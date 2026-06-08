@@ -1,22 +1,12 @@
 mod common;
 
 use axum::http::StatusCode;
-use common::{get, json_body, open_app, post_json};
+use common::{get, json_body, open_app, post_json, put_json};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
 async fn create_shot_roll(app: &axum::Router, roll_id: &str) -> i32 {
     create_roll_at_status(app, roll_id, "shot").await
-}
-
-/// Build a PUT request with a JSON body (the common helpers only cover GET/POST).
-fn put_json(path: &str, value: &Value) -> axum::http::Request<axum::body::Body> {
-    axum::http::Request::builder()
-        .method("PUT")
-        .uri(path)
-        .header("content-type", "application/json")
-        .body(axum::body::Body::from(serde_json::to_vec(value).unwrap()))
-        .unwrap()
 }
 
 /// Fetch a roll's current status string.
