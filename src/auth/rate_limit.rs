@@ -24,7 +24,9 @@ pub const LOGIN_BURST_SIZE: u32 = 5;
 
 /// Seconds to replenish one slot once the burst is spent (GCRA period). 1 attempt
 /// per 10s sustained — trivial for the password holder, painful for a brute-forcer.
-pub const LOGIN_REPLENISH_SECONDS: u64 = 10;
+/// Crate-internal: only `routes::create_router` consumes it (tests need only the
+/// burst size), so it stays off the public API surface.
+pub(crate) const LOGIN_REPLENISH_SECONDS: u64 = 10;
 
 /// Map a `GovernorError` onto the project's standard `{error:{code,message}}`
 /// envelope so a throttled login is byte-identical to every other API error (the
@@ -40,9 +42,11 @@ pub fn on_governor_error(err: GovernorError) -> Response {
             resp
         }
         // In production `ConnectInfo<SocketAddr>` is always present, so these are
-        // not expected; surface as a generic 500 rather than leaking limiter detail.
-        GovernorError::UnableToExtractKey | GovernorError::Other { .. } => {
-            AppError::Internal("rate limiter error".to_string()).into_response()
+        // not expected; surface as a generic 500. `AppError::Internal` logs its
+        // message server-side and returns an opaque body, so fold in the governor
+        // variant to keep the unexpected case diagnosable without leaking detail.
+        other @ (GovernorError::UnableToExtractKey | GovernorError::Other { .. }) => {
+            AppError::Internal(format!("login rate limiter: {other}")).into_response()
         }
     }
 }
