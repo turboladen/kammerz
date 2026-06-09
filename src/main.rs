@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::str::FromStr;
 
 use axum::http::{header, StatusCode, Uri};
@@ -92,7 +93,15 @@ async fn main() {
         .await
         .expect("failed to bind");
     tracing::info!("kammerz listening on http://0.0.0.0:{port}");
-    axum::serve(listener, app).await.expect("server error");
+    // `into_make_service_with_connect_info` installs `ConnectInfo<SocketAddr>` on
+    // each request — the login rate-limiter's `PeerIpKeyExtractor` reads it to key
+    // throttling by client IP.
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .expect("server error");
 }
 
 fn is_route_like(path: &str) -> bool {

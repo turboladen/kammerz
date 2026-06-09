@@ -2,8 +2,10 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use sea_orm::{DbErr, TransactionError};
 use serde_json::{json, Value};
+use tower_governor::governor::GovernorConfigBuilder;
+use tower_governor::GovernorLayer;
 
-use crate::auth::handlers;
+use crate::auth::{handlers, rate_limit};
 use crate::error::AppError;
 use crate::AppState;
 
@@ -21,9 +23,24 @@ pub mod shots;
 pub mod stats;
 
 pub fn create_router(state: AppState) -> Router {
+    // Per-IP brute-force guard, scoped to the login route only via `.layer()` on
+    // its MethodRouter (logout/me/business routes are untouched). See
+    // `auth::rate_limit` for the rationale and tuning constants.
+    let login_rate_limit = GovernorLayer::new(
+        GovernorConfigBuilder::default()
+            .burst_size(rate_limit::LOGIN_BURST_SIZE)
+            .per_second(rate_limit::LOGIN_REPLENISH_SECONDS)
+            .finish()
+            .expect("login rate-limit config is valid"),
+    )
+    .error_handler(rate_limit::on_governor_error);
+
     Router::<AppState>::new()
         .route("/api/health", get(health))
-        .route("/api/auth/login", post(handlers::login))
+        .route(
+            "/api/auth/login",
+            post(handlers::login).layer(login_rate_limit),
+        )
         .route("/api/auth/logout", post(handlers::logout))
         .route("/api/auth/me", get(handlers::me))
         .nest("/api/cameras", cameras::router())

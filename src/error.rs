@@ -11,6 +11,8 @@ pub enum AppError {
     NotFound(String),
     /// User-facing message already made friendly (e.g. via friendly_err).
     UnprocessableEntity(String),
+    /// Rate limit exceeded (e.g. brute-force guard on the login route).
+    TooManyRequests,
     Internal(String),
 }
 
@@ -26,6 +28,11 @@ impl IntoResponse for AppError {
             AppError::UnprocessableEntity(m) => {
                 (StatusCode::UNPROCESSABLE_ENTITY, "VALIDATION_ERROR", m)
             }
+            AppError::TooManyRequests => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "TOO_MANY_REQUESTS",
+                "Too many login attempts. Please wait and try again.".to_string(),
+            ),
             AppError::Internal(m) => {
                 tracing::error!("internal error: {m}");
                 (
