@@ -94,8 +94,8 @@ async fn main() {
         .expect("failed to bind");
     tracing::info!("kammerz listening on http://0.0.0.0:{port}");
     // `into_make_service_with_connect_info` installs `ConnectInfo<SocketAddr>` on
-    // each request — the login rate-limiter's `PeerIpKeyExtractor` reads it to key
-    // throttling by client IP.
+    // each request — the login handler reads it (via the `ConnectInfo` extractor)
+    // to key its failed-attempt throttle by client IP.
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

@@ -9,8 +9,9 @@ use tower::ServiceExt;
 
 /// Build a login POST carrying a `ConnectInfo<SocketAddr>` extension for the given
 /// client IP. In production `into_make_service_with_connect_info` installs this;
-/// `oneshot` bypasses that, so the login rate-limiter's `PeerIpKeyExtractor` would
-/// otherwise fail to extract a key. Distinct `ip` values are throttled independently.
+/// `oneshot` bypasses that, so the login handler's `ConnectInfo<SocketAddr>`
+/// extractor would otherwise reject the request. Distinct `ip` values are
+/// throttled independently.
 fn login_req(ip: &str, password: &str) -> Request<Body> {
     let mut req = Request::builder()
         .method("POST")

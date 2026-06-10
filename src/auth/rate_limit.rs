@@ -58,14 +58,16 @@ pub struct LoginRateLimiter {
 
 impl LoginRateLimiter {
     /// Consult the limiter for `ip`. Call this *before* verifying the password.
-    /// Expired records are dropped here so a stale window can't keep an IP locked.
+    ///
+    /// Runs on every login attempt, so it doubles as the keyspace bound: all
+    /// expired records are dropped here (not just `ip`'s), so even a one-off
+    /// failure from an IP that never returns is cleaned up by the next attempt
+    /// from anyone — no stale entry lingers and no background task is needed.
     pub fn check(&self, ip: IpAddr) -> Decision {
         let mut map = self.inner.lock().unwrap();
+        map.retain(|_, rec| rec.first_at.elapsed() < window());
         match map.get(&ip) {
-            Some(rec) if rec.first_at.elapsed() >= window() => {
-                map.remove(&ip); // window elapsed → fresh start
-                Decision::Allow
-            }
+            // Any surviving record is within its window (retain dropped the rest).
             Some(rec) if rec.count >= LOGIN_MAX_FAILURES => {
                 let remaining = window().saturating_sub(rec.first_at.elapsed());
                 // Round up so Retry-After never tells a client to retry too early.
@@ -78,11 +80,13 @@ impl LoginRateLimiter {
         }
     }
 
-    /// Record a wrong-password attempt from `ip`.
+    /// Record a wrong-password attempt from `ip`. Always preceded by `check()` in
+    /// the same request, which has already pruned expired records.
     pub fn record_failure(&self, ip: IpAddr) {
-        let mut map = self.inner.lock().unwrap();
-        map.retain(|_, rec| rec.first_at.elapsed() < window()); // bound the keyspace
-        map.entry(ip)
+        self.inner
+            .lock()
+            .unwrap()
+            .entry(ip)
             .or_insert_with(|| FailRecord {
                 count: 0,
                 first_at: Instant::now(),
