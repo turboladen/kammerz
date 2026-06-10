@@ -1,9 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
+import { AUTH_FILE, BASE } from './tests/shared';
 
 // E2E smoke/parity tests run against a manually-started release binary
 // (`target/release/kammerz`), not a Vite dev server — so there is no
 // `webServer` block. Point at the running server via E2E_BASE.
-const baseURL = process.env.E2E_BASE ?? 'http://localhost:3002';
+const baseURL = BASE;
 
 export default defineConfig({
 	testDir: './tests',
@@ -28,7 +29,7 @@ export default defineConfig({
 			// Section parity tests run pre-authenticated via the saved storageState,
 			// so they don't hit POST /api/auth/login. The login-flow tests in
 			// smoke.spec.ts opt back out to a clean state with `test.use(...)`.
-			use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/user.json' },
+			use: { ...devices['Desktop Chrome'], storageState: AUTH_FILE },
 			dependencies: ['setup'],
 			testIgnore: /auth\.setup\.ts/
 		}

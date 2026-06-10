@@ -1,12 +1,16 @@
 import { test, expect } from '@playwright/test';
-
-const BASE = process.env.E2E_BASE ?? 'http://localhost:3002';
-const PASSWORD = process.env.E2E_PASSWORD ?? 'secret';
+import { BASE, PASSWORD } from './shared';
 
 /**
  * Login-flow tests exercise the real login form, so they must start
  * UNauthenticated — opt out of the project's shared storageState (set by the
  * `setup` project, see auth.setup.ts) back to a clean state.
+ *
+ * RATE-LIMIT BUDGET: each test here does one real POST /api/auth/login, plus one
+ * from the setup project. The backend throttles login per IP and the whole suite
+ * shares one IP (LOGIN_BURST_SIZE = 5 in src/auth/rate_limit.rs). We currently
+ * use 4 of that budget — keep new real-login tests rare, or they'll re-trip the
+ * 429 throttle this storageState setup exists to avoid.
  */
 test.describe('login flow', () => {
 	test.use({ storageState: { cookies: [], origins: [] } });
