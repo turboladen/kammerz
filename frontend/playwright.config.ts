@@ -21,9 +21,16 @@ export default defineConfig({
 		screenshot: 'only-on-failure'
 	},
 	projects: [
+		// Logs in once and writes playwright/.auth/user.json (see auth.setup.ts).
+		{ name: 'setup', testMatch: /auth\.setup\.ts/ },
 		{
 			name: 'chromium',
-			use: { ...devices['Desktop Chrome'] }
+			// Section parity tests run pre-authenticated via the saved storageState,
+			// so they don't hit POST /api/auth/login. The login-flow tests in
+			// smoke.spec.ts opt back out to a clean state with `test.use(...)`.
+			use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/user.json' },
+			dependencies: ['setup'],
+			testIgnore: /auth\.setup\.ts/
 		}
 	]
 });

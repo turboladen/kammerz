@@ -27,6 +27,8 @@ vite.config.ts.timestamp-*
 /frontend/playwright-report/
 /frontend/blob-report/
 /frontend/.playwright/
+# Saved auth storageState from the Playwright `setup` project (auth.setup.ts)
+/frontend/playwright/.auth/
 # Playwright MCP snapshot/console artifacts (written to repo root)
 .playwright-mcp/
 

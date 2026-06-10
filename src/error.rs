@@ -1,4 +1,4 @@
-use axum::http::{header, HeaderValue, StatusCode};
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde_json::json;
@@ -11,16 +11,13 @@ pub enum AppError {
     NotFound(String),
     /// User-facing message already made friendly (e.g. via friendly_err).
     UnprocessableEntity(String),
-    /// Rate limit exceeded (brute-force guard on the login route). Carries the
-    /// seconds until the caller may retry, surfaced as a `Retry-After` header.
-    TooManyRequests { retry_after_secs: u64 },
+    /// Rate limit exceeded (e.g. brute-force guard on the login route).
+    TooManyRequests,
     Internal(String),
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        // Set on the 429 path so a throttled client knows when to retry.
-        let mut retry_after: Option<u64> = None;
         let (status, code, message) = match self {
             AppError::Unauthorized => (
                 StatusCode::UNAUTHORIZED,
@@ -31,14 +28,11 @@ impl IntoResponse for AppError {
             AppError::UnprocessableEntity(m) => {
                 (StatusCode::UNPROCESSABLE_ENTITY, "VALIDATION_ERROR", m)
             }
-            AppError::TooManyRequests { retry_after_secs } => {
-                retry_after = Some(retry_after_secs);
-                (
-                    StatusCode::TOO_MANY_REQUESTS,
-                    "TOO_MANY_REQUESTS",
-                    "Too many login attempts. Please wait and try again.".to_string(),
-                )
-            }
+            AppError::TooManyRequests => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "TOO_MANY_REQUESTS",
+                "Too many login attempts. Please wait and try again.".to_string(),
+            ),
             AppError::Internal(m) => {
                 tracing::error!("internal error: {m}");
                 (
@@ -48,14 +42,7 @@ impl IntoResponse for AppError {
                 )
             }
         };
-        let mut resp =
-            (status, Json(json!({ "error": { "code": code, "message": message } }))).into_response();
-        if let Some(secs) = retry_after {
-            if let Ok(value) = HeaderValue::from_str(&secs.to_string()) {
-                resp.headers_mut().insert(header::RETRY_AFTER, value);
-            }
-        }
-        resp
+        (status, Json(json!({ "error": { "code": code, "message": message } }))).into_response()
     }
 }
 

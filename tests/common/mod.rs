@@ -23,7 +23,7 @@ pub async fn open_app() -> axum::Router {
         anthropic_api_key: None,
         secure_cookies: false,
     };
-    kammerz::routes::create_router(AppState::new(db, config))
+    kammerz::routes::create_router(AppState { db, config })
 }
 
 /// Build an app with a single password configured, backed by a fresh in-memory
@@ -45,7 +45,7 @@ pub async fn app_with_password(pw: &str) -> axum::Router {
     let store = tower_sessions_sqlx_store::SqliteStore::new(pool);
     store.migrate().await.unwrap();
     let layer = tower_sessions::SessionManagerLayer::new(store);
-    kammerz::routes::create_router(AppState::new(db, config)).layer(layer)
+    kammerz::routes::create_router(AppState { db, config }).layer(layer)
 }
 
 /// Build a GET request with an empty body.
