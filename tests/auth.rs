@@ -4,7 +4,7 @@ use axum::body::Body;
 use axum::extract::ConnectInfo;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
-use kammerz::auth::rate_limit::LOGIN_BURST_SIZE;
+use kammerz::auth::rate_limit::LOGIN_MAX_FAILURES;
 use tower::ServiceExt;
 
 /// Build a login POST carrying a `ConnectInfo<SocketAddr>` extension for the given
@@ -43,7 +43,7 @@ async fn test_app(password_hash: Option<String>) -> axum::Router {
     let store = tower_sessions_sqlx_store::SqliteStore::new(pool);
     store.migrate().await.unwrap();
     let layer = tower_sessions::SessionManagerLayer::new(store);
-    kammerz::routes::create_router(kammerz::AppState { db, config }).layer(layer)
+    kammerz::routes::create_router(kammerz::AppState::new(db, config)).layer(layer)
 }
 
 #[tokio::test]
@@ -76,17 +76,17 @@ async fn login_with_wrong_password_is_401() {
 }
 
 #[tokio::test]
-async fn login_rate_limited_after_burst() {
+async fn login_locks_out_after_repeated_failures() {
     let app = test_app(Some(kammerz::auth::password::hash_password("pw").unwrap())).await;
 
-    // The burst quota of wrong-password attempts all reach the handler → 401.
-    for _ in 0..LOGIN_BURST_SIZE {
+    // The failure budget of wrong-password attempts all reach the handler → 401.
+    for _ in 0..LOGIN_MAX_FAILURES {
         let res = app.clone().oneshot(login_req("10.0.0.1", "nope")).await.unwrap();
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
     }
 
-    // The next attempt (within the replenish window) is throttled → 429, returned
-    // through the standard error envelope with a Retry-After header.
+    // The next attempt is locked out → 429, returned through the standard error
+    // envelope with a Retry-After header.
     let res = app.clone().oneshot(login_req("10.0.0.1", "nope")).await.unwrap();
     assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
     assert!(
@@ -99,37 +99,66 @@ async fn login_rate_limited_after_burst() {
 }
 
 #[tokio::test]
-async fn login_with_correct_password_succeeds_within_burst() {
+async fn locked_out_ip_cannot_use_even_the_correct_password() {
+    // The throttle is consulted before the password is verified, so once an IP is
+    // locked out it cannot log in even with the right password until the window
+    // elapses — this is what makes the limit a real brute-force control rather
+    // than a cosmetic status-code change.
+    let app = test_app(Some(kammerz::auth::password::hash_password("pw").unwrap())).await;
+    for _ in 0..LOGIN_MAX_FAILURES {
+        let res = app.clone().oneshot(login_req("10.0.0.5", "nope")).await.unwrap();
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    }
+    let res = app.oneshot(login_req("10.0.0.5", "pw")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
+}
+
+#[tokio::test]
+async fn correct_password_succeeds_and_resets_the_failure_budget() {
     let app = test_app(Some(kammerz::auth::password::hash_password("pw").unwrap())).await;
 
-    // A couple of fat-fingered failures (still inside the burst) must not lock the
-    // user out: the correct password on a later within-burst attempt still reaches
-    // the handler and succeeds.
-    for _ in 0..2 {
+    // Fat-finger up to the brink of lockout, then log in correctly.
+    for _ in 0..(LOGIN_MAX_FAILURES - 1) {
         let res = app.clone().oneshot(login_req("10.0.0.2", "nope")).await.unwrap();
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
     }
-    let res = app.oneshot(login_req("10.0.0.2", "pw")).await.unwrap();
+    let res = app.clone().oneshot(login_req("10.0.0.2", "pw")).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let body = res.into_body().collect().await.unwrap().to_bytes();
     let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(v["authenticated"], true);
+
+    // The success cleared the budget, so a fresh round of failures is allowed
+    // again rather than being immediately locked.
+    let res = app.oneshot(login_req("10.0.0.2", "nope")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn repeated_successful_logins_are_not_throttled() {
+    // Mirrors the e2e smoke suite: many successful logins from a single IP. Since
+    // only failures count toward the limit, these are never throttled.
+    let app = test_app(Some(kammerz::auth::password::hash_password("pw").unwrap())).await;
+    for _ in 0..(LOGIN_MAX_FAILURES * 4) {
+        let res = app.clone().oneshot(login_req("10.0.0.6", "pw")).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+    }
 }
 
 #[tokio::test]
 async fn rate_limit_is_per_ip() {
     let app = test_app(Some(kammerz::auth::password::hash_password("pw").unwrap())).await;
 
-    // Exhaust the burst for one IP — each priming request still reaches the
-    // handler (401), which also guards against a mis-sized burst masking the test.
-    for _ in 0..LOGIN_BURST_SIZE {
+    // Exhaust the failure budget for one IP — each priming request still reaches
+    // the handler (401), which also guards against a mis-sized budget masking the test.
+    for _ in 0..LOGIN_MAX_FAILURES {
         let res = app.clone().oneshot(login_req("10.0.0.3", "nope")).await.unwrap();
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
     }
     let blocked = app.clone().oneshot(login_req("10.0.0.3", "nope")).await.unwrap();
     assert_eq!(blocked.status(), StatusCode::TOO_MANY_REQUESTS);
 
-    // A different IP still has its own fresh quota.
+    // A different IP still has its own fresh budget.
     let other = app.clone().oneshot(login_req("10.0.0.4", "nope")).await.unwrap();
     assert_eq!(other.status(), StatusCode::UNAUTHORIZED);
 }

@@ -81,7 +81,7 @@ async fn main() {
         .with_http_only(true)
         .with_expiry(Expiry::OnInactivity(TimeDuration::days(30)));
 
-    let state = AppState { db, config };
+    let state = AppState::new(db, config);
 
     let app = routes::create_router(state)
         .fallback(serve_spa)
