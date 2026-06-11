@@ -7,6 +7,7 @@
 	import Dialog from './Dialog.svelte';
 	import DateInput from './DateInput.svelte';
 	import Button from './Button.svelte';
+	import { dateFieldError } from '$lib/utils/date';
 
 	interface Props {
 		open: boolean;
@@ -40,8 +41,9 @@
 	// date), an empty value can't Confirm — confirming nothing would be a backdoor
 	// "Skip", which the design deliberately dropped. Enter a date or Cancel. When
 	// `allowClear` is on, an empty Confirm is just an explicit clear (== the Clear
-	// button), so it's allowed.
-	const canConfirm = $derived(allowClear || !!draft.trim());
+	// button), so it's allowed. Either way a malformed date can never be confirmed.
+	const draftError = $derived(dateFieldError(draft));
+	const canConfirm = $derived((allowClear || !!draft.trim()) && !draftError);
 
 	function confirm() {
 		onconfirm(draft.trim() ? draft.trim() : null);

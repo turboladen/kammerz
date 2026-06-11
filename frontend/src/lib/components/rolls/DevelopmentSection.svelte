@@ -16,6 +16,7 @@
 		deleteSelfDev
 	} from '$lib/api/development';
 	import { secondsToMmSs, mmSsToSeconds } from '$lib/utils/duration';
+	import { dateFieldError } from '$lib/utils/date';
 	import type { Lab, DevelopmentLab, DevelopmentSelf, DevStage } from '$lib/types';
 
 	let {
@@ -51,6 +52,7 @@
 	let devCost = $state('');
 	let devLabNotes = $state('');
 	let devLabError = $state('');
+	const labDateError = $derived(dateFieldError(devDateDroppedOff) || dateFieldError(devDateReceived));
 
 	// Self dev form
 	let devDateProcessed = $state('');
@@ -66,6 +68,7 @@
 	let devSelfNotes = $state('');
 	let devFormStages: { stage_name: string; duration: string; notes: string }[] = $state([]);
 	let devSelfError = $state('');
+	const selfDateError = $derived(dateFieldError(devDateProcessed));
 
 	const labOptions = $derived([
 		{ value: '', label: 'No lab selected' },
@@ -361,7 +364,7 @@
 			{/if}
 			<div class="flex justify-end gap-2 pt-2">
 				<Button variant="ghost" onclick={() => { showLabDevDialog = false; resetLabDevForm(); }}>Cancel</Button>
-				<Button variant="primary" onclick={handleSaveLabDev}>Save</Button>
+				<Button variant="primary" disabled={!!labDateError} onclick={handleSaveLabDev}>Save</Button>
 			</div>
 		</div>
 	</Dialog>
@@ -438,7 +441,7 @@
 			{/if}
 			<div class="flex justify-end gap-2 pt-2">
 				<Button variant="ghost" onclick={() => { showSelfDevDialog = false; resetSelfDevForm(); }}>Cancel</Button>
-				<Button variant="primary" onclick={handleSaveSelfDev}>Save</Button>
+				<Button variant="primary" disabled={!!selfDateError} onclick={handleSaveSelfDev}>Save</Button>
 			</div>
 		</div>
 	</Dialog>

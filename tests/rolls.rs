@@ -1,7 +1,7 @@
 mod common;
 
 use axum::http::StatusCode;
-use common::{get, json_body, open_app, post_json};
+use common::{get, json_body, open_app, post_json, put_json};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
@@ -141,4 +141,58 @@ async fn roll_with_details_reports_shot_count() {
         Some(2),
         "the list endpoint also reports shot_count"
     );
+}
+
+// --- Date validation (kammerz-igc) ---
+
+async fn seeded_camera_id(app: &axum::Router) -> i32 {
+    let res = app.clone().oneshot(get("/api/cameras")).await.unwrap();
+    let cams: Vec<Value> = json_body(res).await;
+    cams[0]["id"].as_i64().unwrap() as i32
+}
+
+#[tokio::test]
+async fn create_roll_with_malformed_date_is_rejected() {
+    let app = open_app().await;
+    let camera_id = seeded_camera_id(&app).await;
+    let payload = json!({
+        "roll_id": "BAD-DATE",
+        "camera_id": camera_id,
+        "status": "loaded",
+        "date_loaded": "2026-13-45"
+    });
+    let res = app.oneshot(post_json("/api/rolls", &payload)).await.unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "VALIDATION_ERROR");
+    assert!(
+        body["error"]["message"].as_str().unwrap().contains("date_loaded"),
+        "message should name the offending field"
+    );
+}
+
+#[tokio::test]
+async fn create_roll_with_partial_date_is_accepted() {
+    let app = open_app().await;
+    let camera_id = seeded_camera_id(&app).await;
+    // YYYY and YYYY-MM remain valid (matches DateInput behavior).
+    let payload = json!({
+        "roll_id": "PARTIAL-DATE",
+        "camera_id": camera_id,
+        "status": "loaded",
+        "date_loaded": "2026-05"
+    });
+    let res = app.oneshot(post_json("/api/rolls", &payload)).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+}
+
+#[tokio::test]
+async fn update_roll_with_malformed_date_is_rejected() {
+    let app = open_app().await;
+    let id = create_roll(&app, "UPD-BAD-DATE").await;
+    let payload = json!({ "date_finished": "2026-02-30" });
+    let res = app.oneshot(put_json(&format!("/api/rolls/{id}"), &payload)).await.unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "VALIDATION_ERROR");
 }

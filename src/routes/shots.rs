@@ -14,6 +14,7 @@ use crate::patch::{double_option, now_string, trim, trim_opt};
 use crate::routes::{friendly_err, friendly_txn_err};
 use crate::services::roll_service::RollService;
 use crate::services::shot_service::ShotService;
+use crate::validate::validate_date_opt;
 use crate::AppState;
 use entity::roll::RollStatus;
 use entity::shot;
@@ -96,6 +97,8 @@ async fn create(
     State(db): State<DatabaseConnection>,
     Json(data): Json<CreateShotDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
+    validate_date_opt("date", &data.date)?;
+
     let now = now_string();
 
     let result_id = db
@@ -151,6 +154,10 @@ async fn update(
     Json(data): Json<UpdateShotDto>,
 ) -> AppResult<StatusCode> {
     let existing = ShotService::get_by_id(&db, id).await?.or_404("Shot", id)?;
+
+    if let Some(v) = &data.date {
+        validate_date_opt("date", v)?;
+    }
 
     let now = now_string();
 

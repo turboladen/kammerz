@@ -10,6 +10,7 @@
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
 	import ListToolbar from '$lib/components/ui/ListToolbar.svelte';
+	import { dateFieldError } from '$lib/utils/date';
 	import GroupHeader from '$lib/components/ui/GroupHeader.svelte';
 	import { Camera as CameraIcon } from 'lucide-svelte';
 	import { listCameras, createCamera, createCameraWithLens, listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
@@ -104,6 +105,7 @@
 	let purchasedFrom = $state('');
 	let dateSold = $state('');
 	let notes = $state('');
+	const addDateError = $derived(dateFieldError(datePurchased) || dateFieldError(dateSold));
 
 	// Inline fixed-lens fields
 	let lensModel = $state('');
@@ -362,7 +364,7 @@
 		{/if}
 		<div class="flex justify-end gap-2 pt-2">
 			<Button variant="ghost" onclick={() => { showAddDialog = false; resetForm(); }}>Cancel</Button>
-			<Button variant="primary" onclick={handleAdd}>Add Camera</Button>
+			<Button variant="primary" disabled={!!addDateError} onclick={handleAdd}>Add Camera</Button>
 		</div>
 	</div>
 </Dialog>

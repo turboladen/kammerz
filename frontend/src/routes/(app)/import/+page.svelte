@@ -13,6 +13,7 @@
 	import { listLenses } from '$lib/api/lenses';
 	import { lensDisplayName } from '$lib/utils/lens';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
+	import { dateFieldError } from '$lib/utils/date';
 	import type { ParsedRoll, Camera, FilmStock, Lens, ImportRollDto, ModelInfo, RollStatus } from '$lib/types';
 	import { ChevronDown, ChevronUp, Eye, EyeOff, RefreshCw, Trash2 } from 'lucide-svelte';
 
@@ -67,6 +68,14 @@
 		location: string;
 		notes: string;
 	}[] = $state([]);
+
+	// Block import while any roll or per-shot date is malformed. The shot dates use
+	// plain text inputs (not DateInput), so this is their only validation gate.
+	const importDateError = $derived(
+		dateFieldError(dateLoaded) ||
+			dateFieldError(dateFinished) ||
+			(shots.some((s) => dateFieldError(s.date)) ? 'A shot date is invalid' : '')
+	);
 
 	// Derived
 	const modelOptions = $derived(
@@ -587,7 +596,8 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 												bind:value={shot.date}
 												type="text"
 												placeholder="YYYY-MM-DD"
-												class="w-28 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs text-text placeholder-text-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+												class="w-28 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs text-text placeholder-text-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50
+													{dateFieldError(shot.date) ? 'border-red-500/60' : ''}"
 											/>
 										</td>
 										<td class="px-1 py-1">
@@ -622,9 +632,12 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 
 			<!-- Import Button -->
 			<FadeIn delay={100}>
-			<Button variant="primary" onclick={handleImport}>
+			<Button variant="primary" disabled={!!importDateError} onclick={handleImport}>
 				Import Roll & {shots.length} Shot{shots.length !== 1 ? 's' : ''}
 			</Button>
+			{#if importDateError}
+				<p class="mt-1.5 text-xs text-red-400">{importDateError}</p>
+			{/if}
 			</FadeIn>
 		</div>
 	{:else if step === 'importing'}

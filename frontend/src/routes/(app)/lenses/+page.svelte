@@ -19,6 +19,7 @@
 	import { filterBySearch, groupItems, sortByString, sortByNumber, sortByDate } from '$lib/utils/list';
 	import type { Camera, Lens, LensInsert, LensMount } from '$lib/types';
 	import { lensDisplayName, buildMountOptions } from '$lib/utils/lens';
+	import { dateFieldError } from '$lib/utils/date';
 
 	let lenses: Lens[] = $state([]);
 	let loading = $state(true);
@@ -123,6 +124,8 @@
 	let purchasedFrom = $state('');
 	let dateSold = $state('');
 	let notes = $state('');
+	// Both the Add and Edit dialogs bind these same vars, so one gate covers both.
+	const dateError = $derived(dateFieldError(datePurchased) || dateFieldError(dateSold));
 
 	async function load() {
 		try {
@@ -383,7 +386,7 @@
 		{/if}
 		<div class="flex justify-end gap-2 pt-2">
 			<Button variant="ghost" onclick={() => (showAddDialog = false)}>Cancel</Button>
-			<Button variant="primary" onclick={handleAdd}>Add Lens</Button>
+			<Button variant="primary" disabled={!!dateError} onclick={handleAdd}>Add Lens</Button>
 		</div>
 	</div>
 </Dialog>
@@ -426,7 +429,7 @@
 			{/if}
 			<div class="flex justify-end gap-2 pt-2">
 				<Button variant="ghost" onclick={() => { editingLens = null; resetForm(); }}>Cancel</Button>
-				<Button variant="primary" onclick={handleEdit}>Save</Button>
+				<Button variant="primary" disabled={!!dateError} onclick={handleEdit}>Save</Button>
 			</div>
 		</div>
 	</Dialog>
