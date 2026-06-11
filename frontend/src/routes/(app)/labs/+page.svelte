@@ -89,10 +89,13 @@
 
 	async function confirmDelete() {
 		if (!deletingLab) return;
+		const lab = deletingLab;
+		// Close the dialog before the request — a failure is reported via the
+		// page error banner, and the dialog stays re-openable.
+		deletingLab = null;
 		error = '';
 		try {
-			await deleteLab(deletingLab.id);
-			deletingLab = null;
+			await deleteLab(lab.id);
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);

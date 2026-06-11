@@ -44,6 +44,7 @@
 	let showSelfDevDialog = $state(false);
 	let showDevDeleteConfirm = $state(false);
 	let devDeleteType: 'lab' | 'self' = $state('lab');
+	let devDeleteError = $state('');
 
 	// Lab dev form
 	let devLabId = $state('');
@@ -220,16 +221,19 @@
 	}
 
 	async function confirmDeleteDev() {
+		// Close the dialog before the request — a failure is reported via the
+		// section error banner, and the dialog stays re-openable.
+		showDevDeleteConfirm = false;
+		devDeleteError = '';
 		try {
 			if (devDeleteType === 'lab' && labDev) {
 				await deleteLabDev(labDev.id);
 			} else if (devDeleteType === 'self' && selfDev) {
 				await deleteSelfDev(selfDev.id);
 			}
-			showDevDeleteConfirm = false;
 			await onchange();
 		} catch (err) {
-			throw err;
+			devDeleteError = err instanceof Error ? err.message : String(err);
 		}
 	}
 
@@ -263,13 +267,17 @@
 		<div class="flex-1 border-b border-border-subtle"></div>
 	</h2>
 
+	{#if devDeleteError}
+		<div class="mb-3 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{devDeleteError}</div>
+	{/if}
+
 	{#if labDev}
 		<div class="group rounded-lg border border-border bg-surface-raised p-4">
 			<div class="mb-2 flex items-center justify-between">
 				<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Lab Development</span>
 				<div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
 					<Button size="sm" variant="ghost" onclick={openLabDevDialog}>Edit</Button>
-					<Button size="sm" variant="ghost" onclick={() => { devDeleteType = 'lab'; showDevDeleteConfirm = true; }}>&times;</Button>
+					<Button size="sm" variant="ghost" onclick={() => { devDeleteType = 'lab'; devDeleteError = ''; showDevDeleteConfirm = true; }}>&times;</Button>
 				</div>
 			</div>
 			<div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -296,7 +304,7 @@
 				<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Self Developed</span>
 				<div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
 					<Button size="sm" variant="ghost" onclick={openSelfDevDialog}>Edit</Button>
-					<Button size="sm" variant="ghost" onclick={() => { devDeleteType = 'self'; showDevDeleteConfirm = true; }}>&times;</Button>
+					<Button size="sm" variant="ghost" onclick={() => { devDeleteType = 'self'; devDeleteError = ''; showDevDeleteConfirm = true; }}>&times;</Button>
 				</div>
 			</div>
 			<div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">

@@ -445,10 +445,13 @@
 
 	async function confirmDeleteShot() {
 		if (deletingShotId === null) return;
+		const shotId = deletingShotId;
+		// Close the dialog before the request — a failure is reported via the
+		// page error banner, and the dialog stays re-openable.
+		deletingShotId = null;
 		error = '';
 		try {
-			await deleteShot(deletingShotId);
-			deletingShotId = null;
+			await deleteShot(shotId);
 			await loadRollData();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -639,6 +642,9 @@
 	}
 
 	async function confirmDelete() {
+		// ConfirmDialog no longer closes itself on confirm — the parent owns
+		// closing, so reset the bound state before the request.
+		showDeleteConfirm = false;
 		error = '';
 		try {
 			await deleteRoll(id);
