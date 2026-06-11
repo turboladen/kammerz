@@ -614,14 +614,30 @@
 		editingRoll = true;
 	}
 
+	// Re-seed the default lens when the camera changes in edit mode (mirrors the
+	// auto-populate effect in rolls/new). Without this, switching cameras would
+	// silently keep a lens that can't mount on the new camera (kammerz-8hg).
+	function handleEditCameraChange() {
+		if (roll && editCameraId === (roll.camera_id?.toString() ?? '')) {
+			// Back to the saved camera — restore the roll's saved lens
+			editLensId = roll.lens_id?.toString() ?? '';
+		} else {
+			editLensId = editSelectedCamera?.default_lens_id?.toString() ?? '';
+		}
+	}
+
 	async function saveEditRoll() {
 		error = '';
 		try {
+			// For fixed-lens cameras the lens Select is hidden and replaced by a
+			// read-only display of the built-in lens — persist that lens, never a
+			// stale editLensId left over from a previous camera (kammerz-8hg).
+			const lensId = editIsFixedLens ? editFixedLens?.id ?? null : editLensId ? Number(editLensId) : null;
 			await updateRoll(id, {
 				roll_id: editRollId,
 				camera_id: editCameraId ? Number(editCameraId) : null,
 				film_stock_id: editFilmStockId ? Number(editFilmStockId) : null,
-				lens_id: editLensId ? Number(editLensId) : null,
+				lens_id: lensId,
 				frame_count: editFrameCount ? parseInt(editFrameCount) : null,
 				date_fuzzy: editDateFuzzy || null,
 				push_pull: (editPushPull || null) as PushPull | null,
@@ -688,7 +704,7 @@
 						<Input label="Roll ID" bind:value={editRollId} />
 						<Input label="Frame Count" bind:value={editFrameCount} type="number" placeholder="36" hint={editFrameCountHint} />
 					</div>
-					<Select label="Camera" bind:value={editCameraId} options={cameraOptions} />
+					<Select label="Camera" bind:value={editCameraId} options={cameraOptions} onchange={handleEditCameraChange} />
 					<Select label="Film Stock" bind:value={editFilmStockId} options={editFilmStockOptions} />
 					{#if editIsFixedLens && editFixedLens}
 						<div>
