@@ -1,7 +1,7 @@
 mod common;
 
 use axum::http::StatusCode;
-use common::{get, json_body, open_app, post_json, put_json};
+use common::{delete, get, json_body, open_app, post_json, put_json};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
@@ -195,4 +195,96 @@ async fn update_roll_with_malformed_date_is_rejected() {
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body: Value = json_body(res).await;
     assert_eq!(body["error"]["code"], "VALIDATION_ERROR");
+}
+
+// --- Update happy path + delete cascade (kammerz-6l5) ---
+
+#[tokio::test]
+async fn update_roll_applies_partial_patch() {
+    let app = open_app().await;
+    let id = create_roll(&app, "UPD-OK").await;
+
+    // Partial update: advance status, set finish date and notes;
+    // camera_id / date_loaded must survive untouched.
+    let payload = json!({
+        "status": "shot",
+        "date_finished": "2026-05-15",
+        "notes": "windy day"
+    });
+    let res = app
+        .clone()
+        .oneshot(put_json(&format!("/api/rolls/{id}"), &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    let res = app
+        .oneshot(get(&format!("/api/rolls/{id}")))
+        .await
+        .unwrap();
+    let roll: Value = json_body(res).await;
+    assert_eq!(roll["status"], "shot");
+    assert_eq!(roll["date_finished"], "2026-05-15");
+    assert_eq!(roll["notes"], "windy day");
+    assert_eq!(roll["date_loaded"], "2026-05-01", "untouched field survives");
+    assert!(
+        roll["camera_id"].as_i64().is_some(),
+        "camera association survives the patch"
+    );
+}
+
+#[tokio::test]
+async fn update_missing_roll_is_404() {
+    let app = open_app().await;
+    let res = app
+        .oneshot(put_json("/api/rolls/999999", &json!({ "notes": "ghost" })))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn delete_roll_cascades_shots() {
+    let app = open_app().await;
+    let roll_pk = create_roll(&app, "DEL-CASCADE").await;
+
+    // Add two shots so the FK cascade has something to clean up.
+    for frame in ["1", "2"] {
+        let res = app
+            .clone()
+            .oneshot(post_json(
+                "/api/shots",
+                &json!({ "roll_id": roll_pk, "frame_number": frame }),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+    }
+
+    // Delete the roll → 204.
+    let res = app
+        .clone()
+        .oneshot(delete(&format!("/api/rolls/{roll_pk}")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    // The roll is gone (get_one returns 200 + null body).
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let roll: Value = json_body(res).await;
+    assert!(roll.is_null(), "deleted roll reads back as null");
+
+    // …and its shots were cascade-deleted (shots.roll_id ON DELETE CASCADE).
+    let res = app
+        .oneshot(get(&format!("/api/shots/for-roll/{roll_pk}")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let shots: Vec<Value> = json_body(res).await;
+    assert!(shots.is_empty(), "shots are cascade-deleted with the roll");
 }
