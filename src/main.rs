@@ -72,7 +72,7 @@ async fn main() {
     )
     .await
     .expect("session store pool");
-    let session_store = SqliteStore::new(session_pool);
+    let session_store = SqliteStore::new(session_pool.clone());
     session_store.migrate().await.expect("session store migrate");
 
     let session_layer = SessionManagerLayer::new(session_store)
@@ -81,7 +81,7 @@ async fn main() {
         .with_http_only(true)
         .with_expiry(Expiry::OnInactivity(TimeDuration::days(30)));
 
-    let state = AppState { db, config };
+    let state = AppState { db: db.clone(), config };
 
     let app = routes::create_router(state)
         .fallback(serve_spa)
@@ -96,12 +96,55 @@ async fn main() {
     // `into_make_service_with_connect_info` installs `ConnectInfo<SocketAddr>` on
     // each request — the login rate-limiter's `PeerIpKeyExtractor` reads it to key
     // throttling by client IP.
+    //
+    // `with_graceful_shutdown` makes SIGTERM/SIGINT (e.g. `systemctl restart
+    // kammerz`) drain in-flight requests instead of hard-killing them mid-write.
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
+    .with_graceful_shutdown(shutdown_signal())
     .await
     .expect("server error");
+
+    // Post-drain cleanup: checkpoint the WAL back into kammerz.db so a copy of
+    // the main DB file taken while the service is stopped is complete (a live
+    // WAL would otherwise hold un-checkpointed writes), then close both pools.
+    use sea_orm::ConnectionTrait;
+    if let Err(e) = db.execute_unprepared("PRAGMA wal_checkpoint(TRUNCATE)").await {
+        tracing::warn!("WAL checkpoint on shutdown failed: {e}");
+    }
+    session_pool.close().await;
+    if let Err(e) = db.close().await {
+        tracing::warn!("closing database connection failed: {e}");
+    }
+    tracing::info!("shutdown complete");
+}
+
+/// Resolves when the process receives SIGINT (Ctrl-C) or, on unix, SIGTERM
+/// (systemd's default stop signal). Passed to `with_graceful_shutdown` so axum
+/// stops accepting new connections and drains in-flight requests first.
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c().await.expect("failed to install SIGINT handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+    tracing::info!("shutdown signal received — draining in-flight requests");
 }
 
 fn is_route_like(path: &str) -> bool {
