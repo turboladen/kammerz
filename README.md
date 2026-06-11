@@ -113,15 +113,22 @@ The output is a complete, WAL-free, single-file snapshot — drop it into a cron
 
 ### Cold copy
 
-A plain file copy is only safe with the service stopped:
+A plain file copy is only safe with the service stopped — **and the WAL sidecar must come along**. The server does not checkpoint the WAL on shutdown, so after `systemctl stop` recent writes (potentially the entire database, before the first autocheckpoint) still live in `kammerz.db-wal`. Copying only `kammerz.db` produces a stale or empty backup.
 
 ```bash
 sudo systemctl stop kammerz
-cp /opt/kammerz/data/kammerz.db /path/to/backups/
+cp /opt/kammerz/data/kammerz.db* /path/to/backups/   # .db + -wal + -shm together
 sudo systemctl start kammerz
 ```
 
-(A clean shutdown checkpoints the WAL, so copying just `kammerz.db` is sufficient.)
+If you want a single-file snapshot instead, fold the WAL into the main file first (this also removes the sidecars):
+
+```bash
+sudo systemctl stop kammerz
+sudo sqlite3 /opt/kammerz/data/kammerz.db "PRAGMA wal_checkpoint(TRUNCATE);"
+cp /opt/kammerz/data/kammerz.db /path/to/backups/
+sudo systemctl start kammerz
+```
 
 ### Restoring
 
@@ -134,7 +141,7 @@ sudo rm -f /opt/kammerz/data/kammerz.db-wal /opt/kammerz/data/kammerz.db-shm
 sudo systemctl start kammerz
 ```
 
-Snapshots from `/api/backup` or `VACUUM INTO` have no sidecar files of their own — they restore as-is.
+Snapshots from `/api/backup` or `VACUUM INTO` have no sidecar files of their own — they restore as-is. If you are restoring a cold-copy *set* (`kammerz.db` + `-wal` + `-shm` copied together), restore all three files in place of the `rm` step — the WAL sidecar holds the most recent writes and must not be dropped.
 
 ## Field access over VPN
 
