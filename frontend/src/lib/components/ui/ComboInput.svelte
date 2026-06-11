@@ -64,8 +64,12 @@
 				}
 				break;
 			case 'Escape':
-				showDropdown = false;
-				highlightIndex = -1;
+				if (showDropdown) {
+					// Only close the dropdown — don't let the containing dialog see this Escape.
+					e.stopPropagation();
+					showDropdown = false;
+					highlightIndex = -1;
+				}
 				break;
 		}
 	}
