@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
@@ -203,21 +204,33 @@
 		}
 	}
 
-	// When roll changes, reload data and auto-populate lens
+	// When roll changes, reload data and auto-populate lens.
+	// Only selectedRollId is tracked — rolls/cameras reads are untracked so the
+	// rolls refetch in handleSave doesn't re-run this effect and clobber a
+	// manually selected lens or duplicate loadRollData fetches (kammerz-cpp).
 	$effect(() => {
 		if (selectedRollId) {
 			rollFullDismissed = false;
 			loadRollData(Number(selectedRollId));
-			// Auto-populate lens from roll default or camera fixed/default lens
-			const roll = rolls.find((r) => String(r.id) === selectedRollId);
-			if (roll?.lens_id) {
-				selectedLensId = String(roll.lens_id);
-			} else if (selectedCamera?.default_lens_id) {
-				selectedLensId = String(selectedCamera.default_lens_id);
-			}
+			untrack(() => {
+				const roll = rolls.find((r) => String(r.id) === selectedRollId);
+				const camera = roll?.camera_id
+					? cameras.find((c) => c.id === roll.camera_id) ?? null
+					: null;
+				if (roll?.lens_id) {
+					selectedLensId = String(roll.lens_id);
+				} else if (camera?.default_lens_id) {
+					selectedLensId = String(camera.default_lens_id);
+				} else {
+					// No applicable default — clear so a lens from a previous
+					// roll (possibly a different camera system) can't carry over
+					selectedLensId = '';
+				}
+			});
 		} else {
 			shots = [];
 			frameNumber = '';
+			selectedLensId = '';
 		}
 	});
 
