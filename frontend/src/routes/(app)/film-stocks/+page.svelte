@@ -270,15 +270,15 @@
 
 <Dialog bind:open={showAddDialog} title="Add Film Stock">
 	<div class="space-y-4">
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<ComboInput label="Brand" bind:value={brand} placeholder="Kodak" options={filmBrandOptions} />
 			<Input label="Name" bind:value={name} placeholder="Portra 400" />
 		</div>
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<Select label="Format" bind:value={format} options={formatOptions} />
 			<Select label="Type" bind:value={stockType} options={typeOptions} />
 		</div>
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<Input label="ISO" bind:value={iso} type="number" placeholder="400" />
 			<Input label="Exposure Count" bind:value={exposureCount} type="number" placeholder="36" hint="Leave empty for variable (120 film)" />
 		</div>

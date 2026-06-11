@@ -490,7 +490,7 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 					Roll Info
 					<div class="flex-1 border-b border-border-subtle"></div>
 				</h3>
-				<div class="grid grid-cols-2 gap-4">
+				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 					<Input label="Roll ID" bind:value={rollId} />
 					<Select
 						label="Status"

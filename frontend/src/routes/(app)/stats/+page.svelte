@@ -51,7 +51,7 @@
 	{:else if stats}
 		<!-- Summary Cards -->
 		<FadeIn>
-			<div class="mb-8 grid grid-cols-4 gap-4">
+			<div class="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
 				<div class="rounded-lg border border-border bg-surface-raised p-4">
 					<p class="font-mono text-2xl font-semibold">{stats.total_rolls}</p>
 					<p class="text-xs text-text-faint">Total Rolls</p>

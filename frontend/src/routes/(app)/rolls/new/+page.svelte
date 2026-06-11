@@ -248,7 +248,7 @@
 				<Select label="Default Lens" bind:value={lensId} options={lensOptions} />
 			{/if}
 
-			<div class="grid grid-cols-3 gap-4">
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
 				<Input label="Frame Count" bind:value={frameCount} type="number" placeholder="36" hint={frameCountHint} oninput={() => (frameCountAutoFilledFrom = null)} />
 				<DateInput label="Date Loaded" bind:value={dateLoaded} />
 				<Select label="Push/Pull" bind:value={pushPull} options={pushPullOptions} />

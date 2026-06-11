@@ -348,11 +348,11 @@
 	</PageHeader>
 	<div class="max-w-2xl p-6">
 		<div class="space-y-4">
-			<div class="grid grid-cols-2 gap-4">
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<ComboInput label="Brand" bind:value={editBrand} options={brandOptions} />
 				<Input label="Model" bind:value={editModel} required spellcheck="false" />
 			</div>
-			<div class="grid grid-cols-3 gap-4">
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
 				<Select label="Format" bind:value={editFormat} options={formatOptions} />
 				{#if isFixedLens}
 					<div>
@@ -364,11 +364,11 @@
 				{/if}
 				<Select label="Type" bind:value={editCameraType} options={typeOptions} />
 			</div>
-			<div class="grid grid-cols-2 gap-4">
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<Input label="Prefix (Legacy ID)" bind:value={editPrefix} />
 				<Input label="Serial Number" bind:value={editSerialNumber} />
 			</div>
-			<div class="grid grid-cols-2 gap-4">
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<DateInput label="Date Purchased" bind:value={editDatePurchased} />
 				<ComboInput label="Purchased From" bind:value={editPurchasedFrom} options={vendorOptions} />
 			</div>
@@ -392,7 +392,7 @@
 
 		<!-- Camera Details -->
 		<FadeIn delay={0}>
-		<div class="mb-8 grid grid-cols-2 gap-x-8 gap-y-3 rounded-lg border border-border bg-surface-raised p-5">
+		<div class="mb-8 grid grid-cols-1 gap-x-8 gap-y-3 rounded-lg border border-border bg-surface-raised p-5 sm:grid-cols-2">
 			<div>
 				<span class="text-xs text-text-muted">Format</span>
 				<p class="text-sm">{camera.format}</p>
@@ -578,7 +578,7 @@
 	<div class="space-y-4">
 		<Select label="Type" bind:value={maintType} options={maintTypeOptions} />
 		<ComboInput label="Done By" bind:value={maintDoneBy} placeholder="Garry's Camera Repair" options={maintProviderOptions} />
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<DateInput label="Date" bind:value={maintDateDone} />
 			<Input label="Cost ($)" bind:value={maintCost} type="number" step="0.01" placeholder="0.00" />
 		</div>
