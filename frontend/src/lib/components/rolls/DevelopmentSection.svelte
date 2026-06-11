@@ -267,7 +267,7 @@
 		<div class="group rounded-lg border border-border bg-surface-raised p-4">
 			<div class="mb-2 flex items-center justify-between">
 				<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Lab Development</span>
-				<div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+				<div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
 					<Button size="sm" variant="ghost" onclick={openLabDevDialog}>Edit</Button>
 					<Button size="sm" variant="ghost" onclick={() => { devDeleteType = 'lab'; showDevDeleteConfirm = true; }}>&times;</Button>
 				</div>
@@ -294,7 +294,7 @@
 		<div class="group rounded-lg border border-border bg-surface-raised p-4">
 			<div class="mb-2 flex items-center justify-between">
 				<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Self Developed</span>
-				<div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+				<div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
 					<Button size="sm" variant="ghost" onclick={openSelfDevDialog}>Edit</Button>
 					<Button size="sm" variant="ghost" onclick={() => { devDeleteType = 'self'; showDevDeleteConfirm = true; }}>&times;</Button>
 				</div>

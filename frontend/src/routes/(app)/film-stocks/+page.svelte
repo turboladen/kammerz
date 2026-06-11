@@ -256,7 +256,7 @@
 									<span class="text-xs text-text-faint">{stock.exposure_count} exp</span>
 								{/if}
 							</div>
-							<Button size="sm" variant="ghost" class="opacity-0 group-hover:opacity-100" onclick={() => handleDelete(stock)}>&times;</Button>
+							<Button size="sm" variant="ghost" class="opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 pointer-coarse:opacity-100" onclick={() => handleDelete(stock)}>&times;</Button>
 						</div>
 					</FadeIn>
 				{/each}
