@@ -3,6 +3,7 @@
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import { searchCatalog } from '$lib/api/search';
+	import { lensDisplayName } from '$lib/utils/lens';
 	import type { SearchResults } from '$lib/types';
 	import { Camera, Aperture, Package, Film, Focus, FlaskConical, Search } from 'lucide-svelte';
 
@@ -128,11 +129,11 @@
 						<div class="grid gap-1.5">
 							{#each results.lenses as lens}
 								<a
-									href="/lenses/{lens.id}"
+									href="/lenses?q={encodeURIComponent(lensDisplayName(lens))}"
 									class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 								>
 									<div class="flex items-center gap-3">
-										<span class="text-sm font-medium">{lens.model ? (lens.model.toLowerCase().startsWith(lens.brand.toLowerCase()) ? lens.model : `${lens.brand} ${lens.model}`) : lens.brand}</span>
+										<span class="text-sm font-medium">{lensDisplayName(lens)}</span>
 										{#if lens.focal_length}
 											<span class="text-xs text-text-faint">{lens.focal_length}</span>
 										{/if}
@@ -161,7 +162,7 @@
 						<div class="grid gap-1.5">
 							{#each results.film_stocks as fs}
 								<a
-									href="/film-stocks/{fs.id}"
+									href="/film-stocks?q={encodeURIComponent(`${fs.brand} ${fs.name}`)}"
 									class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 								>
 									<div class="flex items-center gap-3">
@@ -263,7 +264,7 @@
 						<div class="grid gap-1.5">
 							{#each results.labs as lab}
 								<a
-									href="/labs/{lab.id}"
+									href="/labs"
 									class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 								>
 									<div class="flex items-center gap-3">
