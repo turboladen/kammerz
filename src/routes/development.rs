@@ -157,6 +157,24 @@ async fn create_lab_dev(
     let result_id = db
         .transaction::<_, i32, DbErr>(|txn| {
             Box::pin(async move {
+                // Lab and self dev are mutually exclusive (core lifecycle
+                // invariant). The UI hides the "+ Lab" button once a self dev
+                // exists, but a stale tab on another device (or a raw API call)
+                // can still POST — enforce inside the transaction so the check
+                // and insert are atomic. DbErr::Custom carries the friendly
+                // message through friendly_txn_err verbatim as a 422.
+                let has_self_dev = development_self::Entity::find()
+                    .filter(development_self::Column::RollId.eq(data.roll_id))
+                    .count(txn)
+                    .await?
+                    > 0;
+                if has_self_dev {
+                    return Err(DbErr::Custom(
+                        "This roll already has a self development record — delete it first."
+                            .to_string(),
+                    ));
+                }
+
                 let model = development_lab::ActiveModel {
                     roll_id: Set(data.roll_id),
                     lab_id: Set(data.lab_id),
@@ -181,7 +199,7 @@ async fn create_lab_dev(
             })
         })
         .await
-        .map_err(|e| AppError::UnprocessableEntity(friendly_err("lab development", e)))?;
+        .map_err(|e| friendly_txn_err("lab development", e))?;
 
     Ok((StatusCode::CREATED, Json(result_id)))
 }
@@ -265,7 +283,10 @@ async fn delete_lab_dev(
             development_lab::Entity::delete_by_id(id).exec(txn).await?;
 
             // Auto-revert: at-lab/lab-done → shot when lab dev is removed
-            // (only if no self-dev record exists — sibling dev takes priority)
+            // (only if no self-dev record exists — sibling dev takes priority).
+            // The create-side mutual-exclusion guard makes a sibling impossible
+            // for new data; this check remains as defense-in-depth for rolls
+            // that acquired both records before the guard existed (kammerz-ysw).
             let has_self_dev = development_self::Entity::find()
                 .filter(development_self::Column::RollId.eq(roll_id))
                 .count(txn)
@@ -313,6 +334,21 @@ async fn create_self_dev(
     let result_id = db
         .transaction::<_, i32, DbErr>(|txn| {
             Box::pin(async move {
+                // Mirror of the create_lab_dev guard: lab and self dev are
+                // mutually exclusive, and the UI-only enforcement can be bypassed
+                // by a stale tab on another device or a raw API call.
+                let has_lab_dev = development_lab::Entity::find()
+                    .filter(development_lab::Column::RollId.eq(data.roll_id))
+                    .count(txn)
+                    .await?
+                    > 0;
+                if has_lab_dev {
+                    return Err(DbErr::Custom(
+                        "This roll already has a lab development record — delete it first."
+                            .to_string(),
+                    ));
+                }
+
                 let model = development_self::ActiveModel {
                     roll_id: Set(data.roll_id),
                     date_processed: trim_opt(data.date_processed),
@@ -352,7 +388,7 @@ async fn create_self_dev(
             })
         })
         .await
-        .map_err(|e| AppError::UnprocessableEntity(friendly_err("self development", e)))?;
+        .map_err(|e| friendly_txn_err("self development", e))?;
 
     Ok((StatusCode::CREATED, Json(result_id)))
 }
@@ -454,7 +490,10 @@ async fn delete_self_dev(
             development_self::Entity::delete_by_id(id).exec(txn).await?;
 
             // Auto-revert: developing/developed → shot when self dev is removed
-            // (only if no lab-dev record exists — sibling dev takes priority)
+            // (only if no lab-dev record exists — sibling dev takes priority).
+            // The create-side mutual-exclusion guard makes a sibling impossible
+            // for new data; this check remains as defense-in-depth for rolls
+            // that acquired both records before the guard existed (kammerz-ysw).
             let has_lab_dev = development_lab::Entity::find()
                 .filter(development_lab::Column::RollId.eq(roll_id))
                 .count(txn)
