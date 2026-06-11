@@ -106,12 +106,20 @@ impl StatsService {
         let total_cost = total_lab_dev_cost + total_maintenance_cost;
 
         // --- Rolls per month (last 12 months) ---
+        // date_loaded may be a partial date — validate.rs accepts YYYY and
+        // YYYY-MM alongside YYYY-MM-DD. STRFTIME('%Y-%m', …) returns NULL for
+        // 'YYYY-MM' (failing the non-Option `month` and 500ing the endpoint)
+        // and misparses bare 'YYYY' as a Julian day number, so bucket by
+        // SUBSTR instead: anything with at least a year+month prefix lands in
+        // its month, year-only dates are skipped (no month to bucket by), and
+        // the 12-month window compares at month precision.
         let rolls_per_month = MonthCount::find_by_statement(Statement::from_string(
             backend,
-            "SELECT STRFTIME('%Y-%m', date_loaded) AS month, COUNT(*) AS count \
+            "SELECT SUBSTR(date_loaded, 1, 7) AS month, COUNT(*) AS count \
              FROM rolls \
              WHERE date_loaded IS NOT NULL \
-               AND date_loaded >= DATE('now', '-12 months') \
+               AND LENGTH(date_loaded) >= 7 \
+               AND SUBSTR(date_loaded, 1, 7) >= STRFTIME('%Y-%m', 'now', '-12 months') \
              GROUP BY month \
              ORDER BY month"
                 .to_owned(),
