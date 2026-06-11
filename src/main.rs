@@ -52,11 +52,27 @@ async fn main() {
     let db = db::init(&db_url).await.expect("database init failed");
 
     let config = AppConfig::from_env();
-    if config.password_hash.is_none() {
-        tracing::warn!(
-            "KAMMERZ_PASSWORD_HASH is not set — running in OPEN (no-auth) mode. \
-             Set it for any network-reachable deployment."
-        );
+    match &config.password_hash {
+        None => {
+            tracing::warn!(
+                "KAMMERZ_PASSWORD_HASH is not set — running in OPEN (no-auth) mode. \
+                 Set it for any network-reachable deployment."
+            );
+        }
+        Some(hash) if !kammerz::auth::password::is_valid_hash(hash) => {
+            // Fail fast: a hash that doesn't parse means every login would fail
+            // with "incorrect password" and zero diagnostics. The usual culprit is
+            // dotenvy's $-substitution mangling an UNQUOTED argon2 hash in .env
+            // ('$argon2id$v=19$...' → '=19=19456,t=2,p=1').
+            eprintln!(
+                "error: KAMMERZ_PASSWORD_HASH is not a valid argon2 hash — did $-substitution \
+                 in your .env mangle it? Single-quote the value, e.g.:\n\
+                 \tKAMMERZ_PASSWORD_HASH='$argon2id$v=19$...'\n\
+                 Generate a fresh hash with: echo -n <pw> | kammerz hash-password"
+            );
+            std::process::exit(1);
+        }
+        Some(_) => {}
     }
 
     // Session store: a separate sqlx pool against the same SQLite file (path
