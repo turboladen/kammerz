@@ -79,6 +79,63 @@ sudo systemctl enable --now kammerz
 
 The provided `deploy/kammerz.service` is hardened (`ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `NoNewPrivileges`) and only grants write access to `/opt/kammerz/data`, where the SQLite catalog lives.
 
+## Backups
+
+The database runs in **WAL mode**, so the most recent writes live in `kammerz.db-wal` next to the main file. **Do not back up a running instance with a plain `cp kammerz.db`** — the copy misses everything still in the WAL and can be torn mid-checkpoint. Use one of the safe methods below.
+
+### One-tap: download from the browser (works over the VPN)
+
+While logged in, visit:
+
+```
+http://<server>:3002/api/backup
+```
+
+The server takes a consistent `VACUUM INTO` snapshot of the live database and downloads it as `kammerz-backup-YYYY-MM-DD.db`. No shell access to the server needed — this works from a phone in the field over the VPN. The endpoint requires authentication like every other API route.
+
+Scripted (e.g. from another machine that pulls backups):
+
+```bash
+curl -s -c /tmp/kz-cookies -H 'content-type: application/json' \
+    -d '{"password":"your-password"}' http://<server>:3002/api/auth/login
+curl -s -b /tmp/kz-cookies -o "kammerz-backup-$(date +%F).db" http://<server>:3002/api/backup
+```
+
+### On the server: `sqlite3` while the service runs
+
+`VACUUM INTO` (or `.backup`) is the only safe way to copy the file online:
+
+```bash
+sqlite3 /opt/kammerz/data/kammerz.db "VACUUM INTO '/path/to/backups/kammerz-$(date +%F).db'"
+```
+
+The output is a complete, WAL-free, single-file snapshot — drop it into a cron job. Note: `VACUUM INTO` refuses to overwrite an existing file, so date-stamp the target.
+
+### Cold copy
+
+A plain file copy is only safe with the service stopped:
+
+```bash
+sudo systemctl stop kammerz
+cp /opt/kammerz/data/kammerz.db /path/to/backups/
+sudo systemctl start kammerz
+```
+
+(A clean shutdown checkpoints the WAL, so copying just `kammerz.db` is sufficient.)
+
+### Restoring
+
+Stop the service, replace the database, and remove any stale WAL/SHM sidecar files before starting again:
+
+```bash
+sudo systemctl stop kammerz
+sudo install -o kammerz -g kammerz backup.db /opt/kammerz/data/kammerz.db
+sudo rm -f /opt/kammerz/data/kammerz.db-wal /opt/kammerz/data/kammerz.db-shm
+sudo systemctl start kammerz
+```
+
+Snapshots from `/api/backup` or `VACUUM INTO` have no sidecar files of their own — they restore as-is.
+
 ## Field access over VPN
 
 The app stays **LAN-bound** — it binds `0.0.0.0:$PORT` and is not exposed to the public internet. To reach it away from home, connect your phone/laptop to your home network's VPN at the gateway, then browse to the server's LAN address.
