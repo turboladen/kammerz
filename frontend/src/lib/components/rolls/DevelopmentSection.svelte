@@ -17,6 +17,7 @@
 	} from '$lib/api/development';
 	import { secondsToMmSs, mmSsToSeconds } from '$lib/utils/duration';
 	import { dateFieldError, todayLocal } from '$lib/utils/date';
+	import { labFlow, selfFlow, getStatusLabel } from '$lib/utils/status';
 	import type { DevAutoPrompt } from '$lib/utils/status';
 	import type { Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus } from '$lib/types';
 
@@ -27,6 +28,7 @@
 		selfDev = $bindable(),
 		devStages = $bindable(),
 		autoPrompt = $bindable(null),
+		currentStatus = null,
 		defaultDate = '',
 		onchange,
 		onpromptcancel
@@ -37,6 +39,10 @@
 		selfDev: DevelopmentSelf | null;
 		devStages: DevStage[];
 		autoPrompt: DevAutoPrompt | null;
+		/** The roll's current status — lets the dialog notes tell the truth when the
+		 * backend's forward-only sync won't actually move the roll (e.g. retroactively
+		 * recording dev info on a scanned roll). */
+		currentStatus?: RollStatus | null;
 		defaultDate?: string;
 		onchange: () => Promise<void>;
 		/** Fired when a dialog opened via autoPrompt is dismissed without saving. */
@@ -105,17 +111,33 @@
 	// Contextual status notes — the backend syncs roll status from the dev record's
 	// date fields (date_received → Lab Done, date_processed → Developed), which is
 	// invisible from the form alone. These react to the live field values so the
-	// dialog always tells the truth about where Save will land the roll.
-	const labStatusNote = $derived(
-		devDateReceived
+	// dialog always tells the truth about where Save will land the roll — including
+	// when it won't move at all: the backend's advance_status_along is forward-only,
+	// so a roll already at/past the target (e.g. retroactively recording dev info on
+	// a scanned roll) keeps its status, and the note must not claim otherwise.
+	function saveWillMoveTo(flow: RollStatus[], target: RollStatus): boolean {
+		if (!currentStatus) return true; // status unknown — assume the normal forward case
+		const cur = flow.indexOf(currentStatus);
+		return cur !== -1 && cur < flow.indexOf(target);
+	}
+	const labStatusNote = $derived.by(() => {
+		const target: RollStatus = devDateReceived ? 'lab-done' : 'at-lab';
+		if (currentStatus && !saveWillMoveTo(labFlow, target)) {
+			return `Saving will record the development info — this roll stays at ${getStatusLabel(currentStatus)}.`;
+		}
+		return devDateReceived
 			? 'Saving will move this roll to Lab Done (Date Received is set).'
-			: 'Saving will move this roll to At Lab — set Date Received to mark it Lab Done.'
-	);
-	const selfStatusNote = $derived(
-		devDateProcessed
+			: 'Saving will move this roll to At Lab — set Date Received to mark it Lab Done.';
+	});
+	const selfStatusNote = $derived.by(() => {
+		const target: RollStatus = devDateProcessed ? 'developed' : 'developing';
+		if (currentStatus && !saveWillMoveTo(selfFlow, target)) {
+			return `Saving will record the development info — this roll stays at ${getStatusLabel(currentStatus)}.`;
+		}
+		return devDateProcessed
 			? 'Saving will move this roll to Developed (Date Processed is set).'
-			: 'Saving will move this roll to Developing — set Date Processed to mark it Developed.'
-	);
+			: 'Saving will move this roll to Developing — set Date Processed to mark it Developed.';
+	});
 
 	// --- Form helpers ---
 
