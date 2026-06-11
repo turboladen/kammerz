@@ -65,9 +65,24 @@ async fn up_to_date_db_takes_no_snapshot() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
+/// `SELECT COUNT(*) FROM seaql_migrations` against a SQLite file.
+async fn applied_migration_count(db_file: &std::path::Path) -> i64 {
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect(&format!("sqlite:{}", db_file.display()))
+        .await
+        .unwrap();
+    let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM seaql_migrations")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    pool.close().await;
+    count
+}
+
 #[tokio::test]
 async fn pending_migration_on_existing_db_takes_snapshot() {
-    let (dir, _db_path, url) = temp_db("pending");
+    let (dir, db_path, url) = temp_db("pending");
 
     // First boot: apply all migrations, then roll the last one back so the
     // next boot sees an existing catalog with a genuinely pending migration —
@@ -82,24 +97,17 @@ async fn pending_migration_on_existing_db_takes_snapshot() {
     let snaps = snapshots_in(&dir);
     assert_eq!(snaps.len(), 1, "expected exactly one pre-migration snapshot");
 
-    // The snapshot must be a valid SQLite DB capturing PRE-migration state:
-    // migration 021 adds rolls.date_scanned, which the rolled-back snapshot
-    // must not have, while the live (re-migrated) DB must.
-    let snap_pool = sqlx::sqlite::SqlitePoolOptions::new()
-        .max_connections(1)
-        .connect(&format!("sqlite:{}", snaps[0].display()))
-        .await
-        .unwrap();
-    let snap_cols: Vec<(String,)> =
-        sqlx::query_as("SELECT name FROM pragma_table_info('rolls')")
-            .fetch_all(&snap_pool)
-            .await
-            .unwrap();
-    assert!(
-        !snap_cols.iter().any(|(n,)| n == "date_scanned"),
-        "snapshot must reflect the pre-migration schema"
+    // The snapshot must be a valid SQLite DB capturing PRE-migration state.
+    // Assert generically (no hard-coded knowledge of the latest migration):
+    // the snapshot's seaql_migrations count is exactly one less than the live
+    // re-migrated DB's — holds for any future migration appended to the chain.
+    let snap_count = applied_migration_count(&snaps[0]).await;
+    let live_count = applied_migration_count(&db_path).await;
+    assert_eq!(
+        snap_count + 1,
+        live_count,
+        "snapshot must reflect the pre-migration state (one fewer applied migration)"
     );
-    snap_pool.close().await;
 
     // A subsequent up-to-date boot must not add another snapshot.
     let db = kammerz::db::init(&url).await.unwrap();

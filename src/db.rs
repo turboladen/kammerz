@@ -54,6 +54,14 @@ pub async fn init(db_url: &str) -> Result<DatabaseConnection, DbErr> {
     db.execute_unprepared("PRAGMA foreign_keys=OFF").await?; // critical during migrations
     Migrator::up(&db, None).await?;
     db.execute_unprepared("PRAGMA foreign_keys=ON").await?; // enforce at runtime
+    // Prune only AFTER the migration succeeded. If a migration crashes midway
+    // under a restart-on-failure supervisor, every restart sees it still
+    // pending and takes a fresh snapshot of the now-corrupted DB — pruning
+    // before `Migrator::up` would rotate out the one pristine pre-failure
+    // snapshot after a few restarts.
+    if !base.contains(":memory:") {
+        prune_old_snapshots(base);
+    }
     Ok(db)
 }
 
@@ -96,13 +104,13 @@ async fn snapshot_before_migrations(db: &DatabaseConnection, path: &str) -> Resu
         "{} pending migration(s) — snapshotted database to {snapshot}",
         pending.len()
     );
-    prune_old_snapshots(path);
     Ok(())
 }
 
 /// Best-effort: keep only the newest `SNAPSHOTS_TO_KEEP` pre-migration
 /// snapshots next to the DB file. The timestamp suffix sorts lexicographically,
-/// so a plain sort orders snapshots oldest-first.
+/// so a plain sort orders snapshots oldest-first. Must only be called after
+/// `Migrator::up` succeeds — see the comment in `init()`.
 fn prune_old_snapshots(db_path: &str) {
     let path = std::path::Path::new(db_path);
     let Some(file_name) = path.file_name().and_then(|n| n.to_str()) else {
