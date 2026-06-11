@@ -1,59 +1,58 @@
-import { test, expect, type Page } from '@playwright/test';
-
-const BASE = process.env.E2E_BASE ?? 'http://localhost:3002';
-const PASSWORD = process.env.E2E_PASSWORD ?? 'secret';
+import { test, expect } from '@playwright/test';
+import { BASE, PASSWORD } from './shared';
 
 /**
- * Log in via the real login form, leaving the page on the post-login target.
- * Visiting an (app) route unauthenticated bounces to /login?next=…; we fill
- * the password, click "Sign in", and the guard admits us to `next`.
+ * Login-flow tests exercise the real login form, so they must start
+ * UNauthenticated — opt out of the project's shared storageState (set by the
+ * `setup` project, see auth.setup.ts) back to a clean state.
+ *
+ * RATE-LIMIT BUDGET: each test here does one real POST /api/auth/login, plus one
+ * from the setup project. The backend throttles login per IP and the whole suite
+ * shares one IP (LOGIN_BURST_SIZE = 5 in src/auth/rate_limit.rs). We currently
+ * use 4 of that budget — keep new real-login tests rare, or they'll re-trip the
+ * 429 throttle this storageState setup exists to avoid.
  */
-async function login(page: Page, next = '/cameras') {
-	await page.goto(`${BASE}${next}`);
-	await expect(page).toHaveURL(/\/login/);
-	await page.fill('input[type=password]', PASSWORD);
-	await page.click('button:has-text("Sign in")');
-	// We should land back on the requested route — assert the exact pathname so a
-	// strand on /login (or a wrong redirect) fails instead of matching loosely.
-	await expect(page).toHaveURL((url) => url.pathname === next);
-}
+test.describe('login flow', () => {
+	test.use({ storageState: { cookies: [], origins: [] } });
 
-test('login ignores a cross-origin next and stays same-origin', async ({ page }) => {
-	// safeNext() must reject a protocol-relative ?next: a successful login may not
-	// navigate off-origin. It should fall back to '/' on this origin.
-	await page.goto(`${BASE}/login?next=${encodeURIComponent('//attacker.test/')}`);
-	await page.fill('input[type=password]', PASSWORD);
-	await page.click('button:has-text("Sign in")');
-	await page.waitForLoadState('networkidle');
-	const url = new URL(page.url());
-	expect(url.origin).toBe(new URL(BASE).origin);
-	expect(url.pathname).toBe('/');
-});
+	test('login ignores a cross-origin next and stays same-origin', async ({ page }) => {
+		// safeNext() must reject a protocol-relative ?next: a successful login may not
+		// navigate off-origin. It should fall back to '/' on this origin.
+		await page.goto(`${BASE}/login?next=${encodeURIComponent('//attacker.test/')}`);
+		await page.fill('input[type=password]', PASSWORD);
+		await page.click('button:has-text("Sign in")');
+		await page.waitForLoadState('networkidle');
+		const url = new URL(page.url());
+		expect(url.origin).toBe(new URL(BASE).origin);
+		expect(url.pathname).toBe('/');
+	});
 
-test('login gate redirects then admits with correct password', async ({ page }) => {
-	await page.goto(`${BASE}/cameras`);
-	await expect(page).toHaveURL(/\/login/);
-	await page.fill('input[type=password]', PASSWORD);
-	await page.click('button:has-text("Sign in")');
-	await expect(page).toHaveURL(/\/cameras/);
-	await expect(page.locator('body')).toContainText(/camera/i);
-});
+	test('login gate redirects then admits with correct password', async ({ page }) => {
+		await page.goto(`${BASE}/cameras`);
+		await expect(page).toHaveURL(/\/login/);
+		await page.fill('input[type=password]', PASSWORD);
+		await page.click('button:has-text("Sign in")');
+		await expect(page).toHaveURL(/\/cameras/);
+		await expect(page.locator('body')).toContainText(/camera/i);
+	});
 
-test('login is rejected with a wrong password', async ({ page }) => {
-	await page.goto(`${BASE}/cameras`);
-	await expect(page).toHaveURL(/\/login/);
-	await page.fill('input[type=password]', 'definitely-not-the-password');
-	await page.click('button:has-text("Sign in")');
-	await expect(page.locator('body')).toContainText(/incorrect password/i);
-	await expect(page).toHaveURL(/\/login/);
+	test('login is rejected with a wrong password', async ({ page }) => {
+		await page.goto(`${BASE}/cameras`);
+		await expect(page).toHaveURL(/\/login/);
+		await page.fill('input[type=password]', 'definitely-not-the-password');
+		await page.click('button:has-text("Sign in")');
+		await expect(page.locator('body')).toContainText(/incorrect password/i);
+		await expect(page).toHaveURL(/\/login/);
+	});
 });
 
 /**
- * Parity smoke: after logging in, navigate to every main section and assert it
- * renders its expected heading without (a) uncaught client errors / console
- * errors and (b) any failed (>=400) /api request. These are the real route dirs
- * under frontend/src/routes/(app)/. There is no standalone /settings or
- * /lens-mounts page — settings (API key) lives inside /import.
+ * Parity smoke: navigate to every main section (already authenticated via the
+ * shared storageState) and assert it renders its expected heading without
+ * (a) uncaught client errors / console errors and (b) any failed (>=400) /api
+ * request. These are the real route dirs under frontend/src/routes/(app)/.
+ * There is no standalone /settings or /lens-mounts page — settings (API key)
+ * lives inside /import.
  */
 const sections: { path: string; heading: RegExp }[] = [
 	{ path: '/', heading: /dashboard/i },
@@ -86,7 +85,9 @@ for (const { path, heading } of sections) {
 			}
 		});
 
-		await login(page, path);
+		// Already authenticated via storageState, so this loads the section
+		// directly instead of bouncing through /login.
+		await page.goto(`${BASE}${path}`);
 
 		// Heading from PageHeader (<h1 class="font-display">) or dashboard hero.
 		await expect(page.locator('h1').first()).toContainText(heading);
