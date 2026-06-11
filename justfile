@@ -1,3 +1,5 @@
+linux_target := "aarch64-unknown-linux-gnu"
+
 # Show available recipes
 default:
     @just --list
@@ -23,6 +25,40 @@ build:
     # adapter-static wipes frontend/build; restore the tracked placeholder so a
     # clean checkout still has the dir rust-embed's #[folder] points at.
     touch frontend/build/.gitkeep
+
+# Cross-compile a release binary for the Linux server (DietPi, ARM64).
+# One-time toolchain setup (see README "Deployment"): rustup target add +
+# brew install messense/macos-cross-toolchains/aarch64-unknown-linux-gnu;
+# the linker is wired up in .cargo/config.toml. Depends on ci-frontend so
+# the embedded SPA is always freshly built — a stale frontend/build means
+# a stale binary.
+build-linux: ci-frontend
+    cargo build --release --locked --target {{linux_target}}
+
+# Deploy to the server (e.g. just deploy dietpi@192.168.8.50). Release =
+# deploy: streams the cross-compiled binary, installs the systemd unit (so
+# unit-file edits always propagate — skipping that caused a regression in
+# fewd), restarts, and verifies via GET /api/health, which is public by
+# design and reports the running version.
+deploy host: build-linux
+    #!/usr/bin/env bash
+    set -euo pipefail
+    host="{{host}}"
+    ssh "$host" "sudo systemctl stop kammerz || true"
+    cat target/{{linux_target}}/release/kammerz | ssh "$host" "sudo tee /opt/kammerz/kammerz > /dev/null && sudo chmod +x /opt/kammerz/kammerz && sudo chown kammerz:kammerz /opt/kammerz/kammerz"
+    cat deploy/kammerz.service | ssh "$host" "sudo tee /etc/systemd/system/kammerz.service > /dev/null"
+    ssh "$host" "sudo systemctl daemon-reload && sudo systemctl start kammerz"
+    addr="${host#*@}"
+    echo "waiting for http://$addr:3002/api/health ..."
+    for i in $(seq 1 60); do
+        if out=$(curl -fs "http://$addr:3002/api/health" 2>/dev/null); then
+            echo "✅ deployed: $out"
+            exit 0
+        fi
+        sleep 0.5
+    done
+    echo "❌ no answer from /api/health within 30s — check: ssh $host 'journalctl -u kammerz -n 50'" >&2
+    exit 1
 
 # Quality gates — all hard gates, matching what CI enforces on every PR and
 # push to main (.github/workflows/ci.yml). Delegates to the ci-* recipes so the

@@ -48,6 +48,11 @@ async fn main() {
 
     tracing_subscriber::fmt::init();
 
+    // Surface the build version first thing so any deployed binary (NAS or dev)
+    // identifies itself in the log even if boot fails later. Also reported by
+    // GET /api/health for remote checks.
+    tracing::info!("kammerz v{} starting", env!("CARGO_PKG_VERSION"));
+
     let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| db::default_db_url());
     let db = db::init(&db_url).await.expect("database init failed");
 

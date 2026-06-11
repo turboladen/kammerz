@@ -62,7 +62,9 @@ pub fn create_router(state: AppState) -> Router {
 }
 
 async fn health() -> Json<Value> {
-    Json(json!({ "ok": true }))
+    // `version` identifies which build a deployment is running (the binary is
+    // installed on a remote NAS, so the log line alone isn't always reachable).
+    Json(json!({ "ok": true, "version": env!("CARGO_PKG_VERSION") }))
 }
 
 /// Map a DB error to a user-friendly message. Recognizes common SQLite constraint

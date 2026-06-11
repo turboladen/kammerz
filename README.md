@@ -36,6 +36,8 @@ just build
 
 This builds the SvelteKit app into `frontend/build`, then `cargo build --release` embeds it into the binary at `target/release/kammerz`. The release binary serves the SPA and the API itself — no separate web server or Node runtime needed.
 
+Note that `just build` targets the **host** you run it on (on a Mac it produces a macOS binary). Deploying to the Linux server is handled by `just deploy`, which cross-compiles automatically (see [Deployment](#deployment-systemd)).
+
 ## Authentication
 
 Access is protected by a single shared password, stored as an argon2 hash in the `KAMMERZ_PASSWORD_HASH` environment variable.
@@ -66,16 +68,27 @@ ANTHROPIC_API_KEY=     # optional; overrides the claude_api_key settings row for
 
 ## Deployment (systemd)
 
-On the server (Linux), as a dedicated `kammerz` user:
+Releases are deployed straight from this repo with `just deploy` — there are no GitHub release artifacts. One-time toolchain setup on the Mac (cross-compiler for the aarch64 DietPi server; the linker is wired up in `.cargo/config.toml`):
+
+```bash
+rustup target add aarch64-unknown-linux-gnu
+brew install messense/macos-cross-toolchains/aarch64-unknown-linux-gnu
+```
+
+First-time setup on the server, as a dedicated `kammerz` user:
 
 ```bash
 sudo install -d -o kammerz -g kammerz /opt/kammerz /opt/kammerz/data
-sudo install -o kammerz -g kammerz target/release/kammerz /opt/kammerz/kammerz
 sudo install -o kammerz -g kammerz .env /opt/kammerz/.env       # your filled-in .env
-sudo cp deploy/kammerz.service /etc/systemd/system/kammerz.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now kammerz
 ```
+
+Then every release is one command from the Mac:
+
+```bash
+just deploy <user>@<server>
+```
+
+This cross-compiles the binary (frontend embedded via rust-embed — a fresh SPA build is part of the recipe), streams it to `/opt/kammerz/kammerz`, installs `deploy/kammerz.service` into `/etc/systemd/system/` (so unit-file edits always propagate), restarts the service, and verifies the deploy by polling `GET /api/health` until it answers with the running version (also logged at startup: `kammerz vX.Y.Z starting`). After the first deploy, enable boot startup once: `ssh <user>@<server> 'sudo systemctl enable kammerz'`.
 
 The provided `deploy/kammerz.service` is hardened (`ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `NoNewPrivileges`) and only grants write access to `/opt/kammerz/data`, where the SQLite catalog lives.
 
