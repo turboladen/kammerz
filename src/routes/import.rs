@@ -13,6 +13,7 @@ use crate::routes::friendly_err;
 use crate::services::import_service::{ImportService, ModelInfo, ParsedRoll};
 use crate::services::roll_service::{ImportShotEntry, RollService};
 use crate::services::settings_service::SettingsService;
+use crate::validate::validate_date_opt;
 use crate::AppState;
 use entity::roll::{self, PushPull, RollStatus};
 
@@ -118,6 +119,12 @@ async fn import_parsed_roll(
     State(state): State<AppState>,
     Json(data): Json<ImportRollDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
+    validate_date_opt("date_loaded", &data.date_loaded)?;
+    validate_date_opt("date_finished", &data.date_finished)?;
+    for (i, s) in data.shots.iter().enumerate() {
+        validate_date_opt(&format!("shots[{i}].date"), &s.date)?;
+    }
+
     let now = now_string();
 
     let roll_model = roll::ActiveModel {

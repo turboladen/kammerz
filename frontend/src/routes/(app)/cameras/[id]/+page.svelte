@@ -17,6 +17,7 @@
 	import { listRollsForCamera } from '$lib/api/rolls';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import { lensDisplayName, buildMountOptions } from '$lib/utils/lens';
+	import { dateFieldError } from '$lib/utils/date';
 	import type { Camera, CameraFormat, CameraType, MaintenanceType, CameraMaintenance, CameraMaintenanceInsert, Lens, LensMount, RollWithDetails } from '$lib/types';
 	import { Trash2 } from 'lucide-svelte';
 
@@ -60,6 +61,7 @@
 	let editPurchasedFrom = $state('');
 	let editDateSold = $state('');
 	let editNotes = $state('');
+	const editDateError = $derived(dateFieldError(editDatePurchased) || dateFieldError(editDateSold));
 
 	// Maintenance form state
 	let maintType = $state('CLA');
@@ -67,6 +69,7 @@
 	let maintDateDone = $state('');
 	let maintCost = $state('');
 	let maintNotes = $state('');
+	const maintDateError = $derived(dateFieldError(maintDateDone));
 	let error = $state('');
 
 	const lensMountOptions = $derived(buildMountOptions(lensMounts));
@@ -335,7 +338,7 @@
 {:else if editing}
 	<PageHeader title="Edit {camera.brand} {camera.model}" backHref={cameraBackNav.href} backLabel={cameraBackNav.label}>
 		<Button variant="ghost" onclick={() => (editing = false)}>Cancel</Button>
-		<Button variant="primary" onclick={saveEdit}>Save</Button>
+		<Button variant="primary" disabled={!!editDateError} onclick={saveEdit}>Save</Button>
 	</PageHeader>
 	<div class="max-w-2xl p-6">
 		<div class="space-y-4">
@@ -576,7 +579,7 @@
 		<Textarea label="Notes" bind:value={maintNotes} placeholder="What was done..." />
 		<div class="flex justify-end gap-2 pt-2">
 			<Button variant="ghost" onclick={() => (showMaintenanceDialog = false)}>Cancel</Button>
-			<Button variant="primary" onclick={addMaintenance}>Add Record</Button>
+			<Button variant="primary" disabled={!!maintDateError} onclick={addMaintenance}>Add Record</Button>
 		</div>
 	</div>
 </Dialog>

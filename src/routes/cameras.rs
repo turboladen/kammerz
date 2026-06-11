@@ -11,6 +11,7 @@ use crate::patch::{double_option, now_string, trim, trim_opt};
 use crate::routes::friendly_err;
 use crate::services::camera_service::CameraService;
 use crate::services::lens_service::LensService;
+use crate::validate::validate_date_opt;
 use crate::AppState;
 use entity::camera::{self, CameraFormat, CameraType};
 use entity::camera_maintenance::{self, MaintenanceType};
@@ -135,6 +136,9 @@ async fn create(
     State(db): State<DatabaseConnection>,
     Json(data): Json<CreateCameraDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
+    validate_date_opt("date_purchased", &data.date_purchased)?;
+    validate_date_opt("date_sold", &data.date_sold)?;
+
     let now = now_string();
     let model = camera::ActiveModel {
         brand: trim(data.brand),
@@ -166,6 +170,12 @@ async fn update(
     Json(data): Json<UpdateCameraDto>,
 ) -> AppResult<StatusCode> {
     let existing = CameraService::get_by_id(&db, id).await?.or_404("Camera", id)?;
+    if let Some(v) = &data.date_purchased {
+        validate_date_opt("date_purchased", v)?;
+    }
+    if let Some(v) = &data.date_sold {
+        validate_date_opt("date_sold", v)?;
+    }
     let now = now_string();
     let mut model: camera::ActiveModel = existing.into();
     if let Some(v) = data.brand {
@@ -229,6 +239,9 @@ async fn create_with_lens(
     State(db): State<DatabaseConnection>,
     Json(data): Json<CreateCameraWithLensDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
+    validate_date_opt("date_purchased", &data.camera.date_purchased)?;
+    validate_date_opt("date_sold", &data.camera.date_sold)?;
+
     let now = now_string();
 
     let camera_id = db
@@ -372,6 +385,8 @@ async fn create_maintenance(
     State(db): State<DatabaseConnection>,
     Json(data): Json<CreateMaintenanceDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
+    validate_date_opt("date_done", &data.date_done)?;
+
     let now = now_string();
     let model = camera_maintenance::ActiveModel {
         camera_id: Set(data.camera_id),
@@ -400,6 +415,9 @@ async fn update_maintenance(
         .one(&db)
         .await?
         .or_404("Maintenance record", id)?;
+    if let Some(v) = &data.date_done {
+        validate_date_opt("date_done", v)?;
+    }
     let now = now_string();
     let mut model: camera_maintenance::ActiveModel = existing.into();
     if let Some(v) = data.camera_id {

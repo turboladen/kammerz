@@ -12,6 +12,7 @@ use crate::routes::friendly_err;
 use crate::services::development_service::DevelopmentService;
 use crate::services::roll_service::{RollService, RollWithDetails};
 use crate::services::shot_service::ShotService;
+use crate::validate::validate_date_opt;
 use crate::AppState;
 use entity::roll::{self, PushPull, RollStatus};
 use entity::{dev_stage, development_lab, development_self, shot};
@@ -112,6 +113,12 @@ async fn create(
     State(db): State<DatabaseConnection>,
     Json(data): Json<CreateRollDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
+    validate_date_opt("date_loaded", &data.date_loaded)?;
+    validate_date_opt("date_finished", &data.date_finished)?;
+    validate_date_opt("date_scanned", &data.date_scanned)?;
+    validate_date_opt("date_post_processed", &data.date_post_processed)?;
+    validate_date_opt("date_archived", &data.date_archived)?;
+
     let now = now_string();
     let model = roll::ActiveModel {
         roll_id: trim(data.roll_id),
@@ -148,6 +155,22 @@ async fn update(
         .one(&db)
         .await?
         .or_404("Roll", id)?;
+
+    if let Some(v) = &data.date_loaded {
+        validate_date_opt("date_loaded", v)?;
+    }
+    if let Some(v) = &data.date_finished {
+        validate_date_opt("date_finished", v)?;
+    }
+    if let Some(v) = &data.date_scanned {
+        validate_date_opt("date_scanned", v)?;
+    }
+    if let Some(v) = &data.date_post_processed {
+        validate_date_opt("date_post_processed", v)?;
+    }
+    if let Some(v) = &data.date_archived {
+        validate_date_opt("date_archived", v)?;
+    }
 
     let now = now_string();
     let mut model: roll::ActiveModel = existing.into();

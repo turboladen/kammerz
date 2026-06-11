@@ -14,7 +14,7 @@
 	import { listLenses } from '$lib/api/lenses';
 	import { buildLensOptions, lensDisplayName } from '$lib/utils/lens';
 	import { listLensMounts } from '$lib/api/lens-mounts';
-	import { todayLocal } from '$lib/utils/date';
+	import { todayLocal, dateFieldError } from '$lib/utils/date';
 	import type { Camera, FilmStock, Lens, LensMount, PushPull, RollInsert } from '$lib/types';
 
 	let cameras: Camera[] = $state([]);
@@ -31,6 +31,7 @@
 	let frameCountAutoFilledFrom = $state<string | null>(null); // tracks which stock auto-filled the frame count
 	let dateLoaded = $state(todayLocal());
 	let dateFuzzy = $state('');
+	const dateLoadedError = $derived(dateFieldError(dateLoaded));
 	let pushPull = $state('');
 	let notes = $state('');
 	let error = $state('');
@@ -268,7 +269,7 @@
 
 			<div class="flex justify-end gap-2 pt-4">
 				<Button variant="ghost" href="/rolls">Cancel</Button>
-				<Button variant="primary" onclick={handleSubmit}>Create Roll</Button>
+				<Button variant="primary" disabled={!!dateLoadedError} onclick={handleSubmit}>Create Roll</Button>
 			</div>
 		</div>
 		</FadeIn>

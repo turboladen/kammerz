@@ -18,6 +18,7 @@ use crate::services::development_service::{
     DevelopmentService, SelfDevWithStages, StageInput,
 };
 use crate::services::roll_service::RollService;
+use crate::validate::validate_date_opt;
 use crate::AppState;
 use entity::roll::RollStatus;
 use entity::{dev_stage, development_lab, development_self};
@@ -148,6 +149,9 @@ async fn create_lab_dev(
     State(db): State<DatabaseConnection>,
     Json(data): Json<CreateLabDevDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
+    validate_date_opt("date_dropped_off", &data.date_dropped_off)?;
+    validate_date_opt("date_received", &data.date_received)?;
+
     let now = now_string();
 
     let result_id = db
@@ -191,6 +195,13 @@ async fn update_lab_dev(
     let existing = DevelopmentService::get_lab_dev_by_id(&db, id)
         .await?
         .or_404("Lab development", id)?;
+
+    if let Some(v) = &data.date_dropped_off {
+        validate_date_opt("date_dropped_off", v)?;
+    }
+    if let Some(v) = &data.date_received {
+        validate_date_opt("date_received", v)?;
+    }
 
     let now = now_string();
 
@@ -295,6 +306,8 @@ async fn create_self_dev(
     State(db): State<DatabaseConnection>,
     Json(data): Json<CreateSelfDevDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
+    validate_date_opt("date_processed", &data.date_processed)?;
+
     let now = now_string();
 
     let result_id = db
@@ -353,6 +366,10 @@ async fn update_self_dev(
     let existing = DevelopmentService::get_self_dev_by_id(&db, id)
         .await?
         .or_404("Self development", id)?;
+
+    if let Some(v) = &data.date_processed {
+        validate_date_opt("date_processed", v)?;
+    }
 
     let now = now_string();
 

@@ -29,7 +29,7 @@
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder, devKindForStatus } from '$lib/utils/status';
 	import { buildRollTimeline, readDateTarget, STATUS_DATE_TARGET } from '$lib/utils/timeline';
-	import { todayLocal } from '$lib/utils/date';
+	import { todayLocal, dateFieldError } from '$lib/utils/date';
 	import type { RollWithDetails, RollInsert, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
 	import { Trash2 } from 'lucide-svelte';
 
@@ -80,6 +80,7 @@
 	let shotNotes = $state('');
 	let shotLensId = $state('');
 	let shotError = $state('');
+	const shotDateError = $derived(dateFieldError(shotDate));
 
 	// Development state (shared with DevelopmentSection component)
 	let labs: Lab[] = $state([]);
@@ -132,6 +133,7 @@
 	// edit while still re-seeding on navigation to a different roll.
 	let finishDate = $state(todayLocal());
 	let finishDateSeededFor: number | null = $state(null);
+	const finishDateError = $derived(dateFieldError(finishDate));
 	const showRollFullNudge = $derived(
 		roll?.status === 'shooting' &&
 		frameProgress !== null &&
@@ -905,7 +907,7 @@
 						</div>
 					</div>
 					<div class="flex items-center gap-2">
-						<Button size="sm" variant="primary" disabled={!finishDate.trim()} onclick={() => updateStatus('shot', finishDate)}>Mark as Shot</Button>
+						<Button size="sm" variant="primary" disabled={!finishDate.trim() || !!finishDateError} onclick={() => updateStatus('shot', finishDate)}>Mark as Shot</Button>
 						<button
 							onclick={() => { rollFullDismissed = true; }}
 							class="text-accent/60 hover:text-accent transition-colors text-lg leading-none px-1"
@@ -1005,9 +1007,9 @@
 			<div class="flex justify-end gap-2 pt-2">
 				<Button variant="ghost" onclick={() => { showShotDialog = false; resetShotForm(); }}>Cancel</Button>
 				{#if !editingShotId}
-					<Button variant="ghost" onclick={handleSaveShotAndNext}>Save & Next</Button>
+					<Button variant="ghost" disabled={!!shotDateError} onclick={handleSaveShotAndNext}>Save & Next</Button>
 				{/if}
-				<Button variant="primary" onclick={handleSaveShot}>
+				<Button variant="primary" disabled={!!shotDateError} onclick={handleSaveShot}>
 					{editingShotId ? 'Save' : 'Add Shot'}
 				</Button>
 			</div>

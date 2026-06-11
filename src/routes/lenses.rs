@@ -10,6 +10,7 @@ use crate::error::{AppError, AppResult, OptionExt};
 use crate::patch::{double_option, now_string, trim, trim_opt};
 use crate::routes::friendly_err;
 use crate::services::lens_service::LensService;
+use crate::validate::validate_date_opt;
 use crate::AppState;
 use entity::lens;
 
@@ -97,6 +98,9 @@ async fn create(
     State(db): State<sea_orm::DatabaseConnection>,
     Json(data): Json<CreateLensDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
+    validate_date_opt("date_purchased", &data.date_purchased)?;
+    validate_date_opt("date_sold", &data.date_sold)?;
+
     let now = now_string();
     let model = lens::ActiveModel {
         brand: trim(data.brand),
@@ -130,6 +134,12 @@ async fn update(
     Json(data): Json<UpdateLensDto>,
 ) -> AppResult<StatusCode> {
     let existing = LensService::get_by_id(&db, id).await?.or_404("Lens", id)?;
+    if let Some(v) = &data.date_purchased {
+        validate_date_opt("date_purchased", v)?;
+    }
+    if let Some(v) = &data.date_sold {
+        validate_date_opt("date_sold", v)?;
+    }
     let now = now_string();
     let mut model: lens::ActiveModel = existing.into();
     if let Some(v) = data.brand {

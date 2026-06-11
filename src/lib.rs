@@ -5,6 +5,7 @@ pub mod error;
 pub mod patch;
 pub mod routes;
 pub mod services;
+pub mod validate;
 
 use axum::extract::FromRef;
 use sea_orm::DatabaseConnection;

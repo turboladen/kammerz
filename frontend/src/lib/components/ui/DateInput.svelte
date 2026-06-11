@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Calendar } from 'lucide-svelte';
+	import { dateFieldError } from '$lib/utils/date';
 
 	interface Props {
 		label?: string;
@@ -9,50 +10,14 @@
 
 	let { label, hint, value = $bindable('') }: Props = $props();
 
-	// Validate a complete date value (YYYY, YYYY-MM, or YYYY-MM-DD) with range checks
-	function validateDate(v: string): string {
-		// YYYY
-		const yearOnly = v.match(/^(\d{4})$/);
-		if (yearOnly) {
-			const y = parseInt(yearOnly[1]);
-			if (y < 1800 || y > 2100) return 'Year out of range';
-			return '';
-		}
-		// YYYY-MM
-		const yearMonth = v.match(/^(\d{4})-(\d{2})$/);
-		if (yearMonth) {
-			const y = parseInt(yearMonth[1]);
-			const m = parseInt(yearMonth[2]);
-			if (y < 1800 || y > 2100) return 'Year out of range';
-			if (m < 1 || m > 12) return 'Month must be 01–12';
-			return '';
-		}
-		// YYYY-MM-DD — validate that the day actually exists
-		const full = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-		if (full) {
-			const y = parseInt(full[1]);
-			const m = parseInt(full[2]);
-			const d = parseInt(full[3]);
-			if (y < 1800 || y > 2100) return 'Year out of range';
-			if (m < 1 || m > 12) return 'Month must be 01–12';
-			// Use Date constructor rollover trick: if the day is invalid,
-			// the resulting month won't match what we asked for
-			const test = new Date(y, m - 1, d);
-			if (test.getFullYear() !== y || test.getMonth() !== m - 1 || test.getDate() !== d) {
-				return 'Invalid day for this month';
-			}
-			return '';
-		}
-		return 'Use YYYY, YYYY-MM, or YYYY-MM-DD';
-	}
-
 	// Still-typing patterns — don't show errors for partial input in progress
 	const typingPattern = /^(\d{0,4}|\d{4}-\d{0,2}|\d{4}-\d{2}-\d{0,2})$/;
 
 	const validationError = $derived.by(() => {
 		if (!value) return '';
-		// If it matches a complete pattern, do full validation
-		if (/^(\d{4})(-\d{2}(-\d{2})?)?$/.test(value)) return validateDate(value);
+		// Complete pattern → defer to the shared validator (same rule the
+		// Save/Confirm gates and the backend enforce).
+		if (/^(\d{4})(-\d{2}(-\d{2})?)?$/.test(value)) return dateFieldError(value);
 		// If they're still typing, don't nag yet
 		if (typingPattern.test(value)) return '';
 		return 'Use YYYY, YYYY-MM, or YYYY-MM-DD';
