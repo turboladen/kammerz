@@ -99,6 +99,14 @@
 	const maintDateError = $derived(dateFieldError(maintDateDone));
 	let error = $state('');
 
+	function resetMaint() {
+		maintType = 'CLA';
+		maintDoneBy = '';
+		maintDateDone = '';
+		maintCost = '';
+		maintNotes = '';
+	}
+
 	const lensMountOptions = $derived(buildMountOptions(lensMounts));
 
 	const mountNameById = $derived(Object.fromEntries(lensMounts.map((m) => [m.id, m.name])));
@@ -271,11 +279,7 @@
 			};
 			await createMaintenance(record);
 			showMaintenanceDialog = false;
-			maintType = 'CLA';
-			maintDoneBy = '';
-			maintDateDone = '';
-			maintCost = '';
-			maintNotes = '';
+			resetMaint();
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -620,7 +624,7 @@
 {/if}
 
 <!-- Add Maintenance Dialog -->
-<Dialog bind:open={showMaintenanceDialog} title="Add Maintenance Record">
+<Dialog bind:open={showMaintenanceDialog} title="Add Maintenance Record" onclose={resetMaint}>
 	<div class="space-y-4">
 		<Select label="Type" bind:value={maintType} options={maintTypeOptions} />
 		<ComboInput
@@ -635,7 +639,13 @@
 		</div>
 		<Textarea label="Notes" bind:value={maintNotes} placeholder="What was done..." />
 		<div class="flex justify-end gap-2 pt-2">
-			<Button variant="ghost" onclick={() => (showMaintenanceDialog = false)}>Cancel</Button>
+			<Button
+				variant="ghost"
+				onclick={() => {
+					showMaintenanceDialog = false;
+					resetMaint();
+				}}>Cancel</Button
+			>
 			<Button variant="primary" disabled={!!maintDateError} onclick={addMaintenance}>Add Record</Button>
 		</div>
 	</div>
@@ -654,7 +664,7 @@
 />
 
 <!-- Link Lens Dialog -->
-<Dialog bind:open={showLinkLensDialog} title="Link Lens to Camera">
+<Dialog bind:open={showLinkLensDialog} title="Link Lens to Camera" onclose={() => (linkLensId = '')}>
 	<div class="space-y-4">
 		{#if unlinkedLenses.length === 0}
 			<p class="text-sm text-text-muted">All your lenses are already linked to this camera.</p>
@@ -662,7 +672,13 @@
 			<Select label="Lens" bind:value={linkLensId} options={linkLensOptions} />
 		{/if}
 		<div class="flex justify-end gap-2 pt-2">
-			<Button variant="ghost" onclick={() => (showLinkLensDialog = false)}>Cancel</Button>
+			<Button
+				variant="ghost"
+				onclick={() => {
+					showLinkLensDialog = false;
+					linkLensId = '';
+				}}>Cancel</Button
+			>
 			{#if unlinkedLenses.length > 0}
 				<Button variant="primary" onclick={handleLinkLens} disabled={!linkLensId}>Link Lens</Button>
 			{/if}

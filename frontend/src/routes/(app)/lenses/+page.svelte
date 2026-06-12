@@ -179,6 +179,7 @@
 		purchasedFrom = '';
 		dateSold = '';
 		notes = '';
+		error = '';
 	}
 
 	function buildInsert(): LensInsert {
@@ -394,7 +395,7 @@
 </div>
 
 <!-- Add Lens Dialog -->
-<Dialog bind:open={showAddDialog} title="Add Lens">
+<Dialog bind:open={showAddDialog} title="Add Lens" onclose={resetForm}>
 	<div class="space-y-4">
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<ComboInput label="Brand/Manufacturer" bind:value={brand} placeholder="Minolta" options={brandOptions} />
@@ -423,7 +424,13 @@
 			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 		{/if}
 		<div class="flex justify-end gap-2 pt-2">
-			<Button variant="ghost" onclick={() => (showAddDialog = false)}>Cancel</Button>
+			<Button
+				variant="ghost"
+				onclick={() => {
+					showAddDialog = false;
+					resetForm();
+				}}>Cancel</Button
+			>
 			<Button variant="primary" disabled={!!dateError} onclick={handleAdd}>Add Lens</Button>
 		</div>
 	</div>

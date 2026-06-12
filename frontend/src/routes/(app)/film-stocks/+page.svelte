@@ -153,6 +153,7 @@
 		stockType = 'color-negative';
 		iso = '';
 		notes = '';
+		error = '';
 	}
 
 	function buildInsert(): FilmStockInsert {
@@ -357,7 +358,7 @@
 	{/if}
 </div>
 
-<Dialog bind:open={showAddDialog} title="Add Film Stock">
+<Dialog bind:open={showAddDialog} title="Add Film Stock" onclose={resetForm}>
 	<div class="space-y-4">
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<ComboInput label="Brand" bind:value={brand} placeholder="Kodak" options={filmBrandOptions} />

@@ -37,6 +37,7 @@
 		location = '';
 		website = '';
 		notes = '';
+		error = '';
 	}
 
 	async function handleAdd() {
@@ -161,7 +162,7 @@
 	{/if}
 </div>
 
-<Dialog bind:open={showAddDialog} title="Add Lab">
+<Dialog bind:open={showAddDialog} title="Add Lab" onclose={resetForm}>
 	<div class="space-y-4">
 		<Input label="Lab Name" bind:value={name} placeholder="The Darkroom" />
 		<Input label="Location" bind:value={location} placeholder="San Clemente, CA" />
@@ -171,7 +172,13 @@
 			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 		{/if}
 		<div class="flex justify-end gap-2 pt-2">
-			<Button variant="ghost" onclick={() => (showAddDialog = false)}>Cancel</Button>
+			<Button
+				variant="ghost"
+				onclick={() => {
+					showAddDialog = false;
+					resetForm();
+				}}>Cancel</Button
+			>
 			<Button variant="primary" onclick={handleAdd}>Add Lab</Button>
 		</div>
 	</div>
