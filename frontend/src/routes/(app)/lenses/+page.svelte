@@ -16,10 +16,10 @@
 	import { Aperture } from 'lucide-svelte';
 	import { listLenses, createLens, updateLens, deleteLens, listDistinctLensBrands } from '$lib/api/lenses';
 	import { listCameras, listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
-	import { listLensMounts } from '$lib/api/lens-mounts';
+	import { listLensMounts, createLensMount } from '$lib/api/lens-mounts';
 	import { filterBySearch, groupItems, sortByString, sortByNumber, sortByDate } from '$lib/utils/list';
 	import type { Camera, Lens, LensInsert, LensMount } from '$lib/types';
-	import { lensDisplayName, buildMountOptions } from '$lib/utils/lens';
+	import { lensDisplayName, buildMountOptions, NEW_MOUNT_OPTION } from '$lib/utils/lens';
 	import { dateFieldError } from '$lib/utils/date';
 
 	let lenses: Lens[] = $state([]);
@@ -143,6 +143,29 @@
 	// Both the Add and Edit dialogs bind these same vars, so one gate covers both.
 	const dateError = $derived(dateFieldError(datePurchased) || dateFieldError(dateSold));
 
+	// Inline mount creation (revealed when the mount Select picks "+ New mount…").
+	// Both dialogs bind lensMountId, so this state is shared across add and edit.
+	let newMountName = $state('');
+	let newMountError = $state('');
+	const creatingMount = $derived(lensMountId === NEW_MOUNT_OPTION);
+
+	async function createMount() {
+		newMountError = '';
+		const name = newMountName.trim();
+		if (!name) {
+			newMountError = 'Mount name is required.';
+			return;
+		}
+		try {
+			const id = await createLensMount(name);
+			lensMounts = await listLensMounts();
+			lensMountId = String(id);
+			newMountName = '';
+		} catch (err) {
+			newMountError = err instanceof Error ? err.message : String(err);
+		}
+	}
+
 	async function load() {
 		try {
 			const [l, lensBrands, camBrands, mounts, vendors, cams] = await Promise.all([
@@ -179,6 +202,8 @@
 		purchasedFrom = '';
 		dateSold = '';
 		notes = '';
+		newMountName = '';
+		newMountError = '';
 	}
 
 	function openAddDialog() {
@@ -401,6 +426,27 @@
 			<ComboInput label="Brand/Manufacturer" bind:value={brand} placeholder="Minolta" options={brandOptions} />
 			<Select label="Lens Mount" bind:value={lensMountId} options={lensMountOptions} />
 		</div>
+		{#if creatingMount}
+			<div class="rounded-lg border border-border-subtle bg-surface px-3 py-3">
+				<div class="flex items-end gap-2">
+					<div class="flex-1">
+						<Input label="New Mount Name" bind:value={newMountName} placeholder="Nikon F" spellcheck="false" />
+					</div>
+					<Button variant="primary" onclick={createMount}>Create</Button>
+					<Button
+						variant="ghost"
+						onclick={() => {
+							lensMountId = '';
+							newMountName = '';
+							newMountError = '';
+						}}>Cancel</Button
+					>
+				</div>
+				{#if newMountError}
+					<div class="mt-2 text-sm text-red-400">{newMountError}</div>
+				{/if}
+			</div>
+		{/if}
 		<Input label="Model" bind:value={lensModel} placeholder="MD Rokkor 50mm f/1.4" hint="Don't include the brand" />
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<Input label="Focal Length (mm)" bind:value={focalLength} placeholder="50 or 28-85" />
@@ -431,7 +477,7 @@
 					resetForm();
 				}}>Cancel</Button
 			>
-			<Button variant="primary" disabled={!!dateError} onclick={handleAdd}>Add Lens</Button>
+			<Button variant="primary" disabled={!!dateError || creatingMount} onclick={handleAdd}>Add Lens</Button>
 		</div>
 	</div>
 </Dialog>
@@ -457,6 +503,27 @@
 				<ComboInput label="Brand/Manufacturer" bind:value={brand} options={brandOptions} />
 				<Select label="Lens Mount" bind:value={lensMountId} options={lensMountOptions} />
 			</div>
+			{#if creatingMount}
+				<div class="rounded-lg border border-border-subtle bg-surface px-3 py-3">
+					<div class="flex items-end gap-2">
+						<div class="flex-1">
+							<Input label="New Mount Name" bind:value={newMountName} placeholder="Nikon F" spellcheck="false" />
+						</div>
+						<Button variant="primary" onclick={createMount}>Create</Button>
+						<Button
+							variant="ghost"
+							onclick={() => {
+								lensMountId = '';
+								newMountName = '';
+								newMountError = '';
+							}}>Cancel</Button
+						>
+					</div>
+					{#if newMountError}
+						<div class="mt-2 text-sm text-red-400">{newMountError}</div>
+					{/if}
+				</div>
+			{/if}
 			<Input label="Model" bind:value={lensModel} hint="Don't include the brand" />
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<Input label="Focal Length (mm)" bind:value={focalLength} />
@@ -487,7 +554,7 @@
 						resetForm();
 					}}>Cancel</Button
 				>
-				<Button variant="primary" disabled={!!dateError} onclick={handleEdit}>Save</Button>
+				<Button variant="primary" disabled={!!dateError || creatingMount} onclick={handleEdit}>Save</Button>
 			</div>
 		</div>
 	</Dialog>
