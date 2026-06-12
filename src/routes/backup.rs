@@ -14,7 +14,7 @@ use axum::http::header;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Router;
-use sea_orm::{ConnectionTrait, DatabaseConnection};
+use sea_orm::DatabaseConnection;
 
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult};
@@ -48,11 +48,8 @@ async fn download_backup(
         .to_str()
         .ok_or_else(|| AppError::Internal("temp dir path is not valid UTF-8".to_string()))?;
 
-    // The target path can't be a bind parameter for VACUUM INTO; embed it as a
-    // single-quoted SQL literal (we generate the path, but escape defensively).
-    let sql = format!("VACUUM INTO '{}'", path_str.replace('\'', "''"));
-    let snapshot = match db.execute_unprepared(&sql).await {
-        Ok(_) => tokio::fs::read(&path)
+    let snapshot = match crate::db::vacuum_into(&db, path_str).await {
+        Ok(()) => tokio::fs::read(&path)
             .await
             .map_err(|e| AppError::Internal(format!("read backup snapshot: {e}"))),
         Err(e) => Err(AppError::Internal(format!("VACUUM INTO failed: {e}"))),
@@ -67,10 +64,7 @@ async fn download_backup(
     );
     Ok((
         [
-            (
-                header::CONTENT_TYPE,
-                "application/octet-stream".to_string(),
-            ),
+            (header::CONTENT_TYPE, "application/octet-stream".to_string()),
             (
                 header::CONTENT_DISPOSITION,
                 format!("attachment; filename=\"{filename}\""),
