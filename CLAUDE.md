@@ -19,6 +19,7 @@ Film photography catalog — a self-hosted web app built with axum + SvelteKit +
 - `just dev-backend` / `just dev-frontend` — Run either half alone
 - `just build` — Production build: `frontend/build` (Vite) then `cargo build --release` (embeds it). Binary at `target/release/kammerz`
 - `just fmt` — Format everything: `dprint fmt` (Markdown/JSON/TOML/YAML, config in `dprint.jsonc`) + Prettier via `bun run format` in `frontend/` (Svelte/TS/CSS, `prettier-plugin-svelte`, config in `frontend/.prettierrc`) + `cargo fmt --all`. **Run before committing.** `just fmt-check` is the read-only variant.
+- rustfmt on a single root file follows its `mod` tree (`rustfmt src/main.rs` reformats every declared module) — use `just fmt`, or revert collateral files before committing.
 - `just check` — Delegates to `fmt-check` + `ci-backend` + `ci-frontend` (formatting, cargo build/test `--locked`, frozen bun install, svelte-check, frontend build). All are hard gates. **Run this and ensure it passes before opening a PR.**
 - `cargo test -p kammerz` — Backend integration tests (in-memory SQLite, real migrations + seed)
 - **CI** (`.github/workflows/ci.yml`) runs on every PR and push to `main`: a `format` job (`dprint check` + Prettier `format:check` + `cargo fmt --all --check`), a `backend` job (`cargo test`), a `frontend` job (`bun run check` + `bun run build`), and an `e2e` job (Playwright `smoke.spec.ts` against the release binary on :3002). The first three are required gates; mirror them locally with `just check`.
@@ -178,6 +179,9 @@ Every former Tauri command maps to one route: reads `GET`, creates `POST` (→ `
 ### Git / Branch Hygiene
 
 - **PRs are squash-merged.** `git branch --merged origin/main` therefore _lies_ — squash breaks ancestry, so merged branches show as unmerged. Verify with `gh pr list --state merged --json headRefName` before deleting. GitHub doesn't auto-delete branches on merge, so remote branches accumulate; prune with `git push origin --delete <branch>`.
+- **Re-gate `main` after every merge in a PR train.** Squash merges can collide semantically with zero textual conflict (PRs #35 + #48 each added a different `open_app_with_db` to `tests/common/mod.rs`; `main` stopped compiling — hotfixed in #54). After each merge, run `just ci` (or at minimum `cargo test`) on updated `main` before merging the next PR; GitHub's `mergeable` only checks text.
+- Mechanical/formatting PRs conflict with everything: merge them **last** in a train, regenerating the `just fmt` commit against final `main` right before merge.
+- `gh pr view --json mergeable` returns `UNKNOWN` while GitHub recomputes after a push/merge — poll until it settles before trusting it.
 
 ## Reference
 
