@@ -21,21 +21,12 @@ use axum::routing::get as get_route;
 use axum::Router;
 use common::{get, open_app};
 use http_body_util::BodyExt;
+use kammerz::compression::compression_layer;
 use tower::ServiceExt;
-use tower_http::compression::predicate::{NotForContentType, Predicate};
-use tower_http::compression::{CompressionLayer, DefaultPredicate};
-
-/// The exact compression layer `main.rs` mounts: the default predicate with
-/// `font/woff2` additionally excluded. Kept in sync with the server by mirroring
-/// its `compress_when` argument.
-fn compression_layer(
-) -> CompressionLayer<tower_http::compression::predicate::And<DefaultPredicate, NotForContentType>>
-{
-    CompressionLayer::new()
-        .compress_when(DefaultPredicate::new().and(NotForContentType::const_new("font/woff2")))
-}
 
 /// Mirror of `main.rs`: the shared router with the outermost compression layer.
+/// Uses the same `kammerz::compression::compression_layer()` the server mounts,
+/// so these assertions track the production predicate rather than a hand copy.
 async fn compressed_app() -> Router {
     open_app().await.layer(compression_layer())
 }
