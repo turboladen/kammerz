@@ -55,8 +55,7 @@ fn is_valid_date(v: &str) -> bool {
             else {
                 return false;
             };
-            in_year_range(year)
-                && chrono::NaiveDate::parse_from_str(v, "%Y-%m-%d").is_ok()
+            in_year_range(year) && chrono::NaiveDate::parse_from_str(v, "%Y-%m-%d").is_ok()
         }
         _ => false,
     }

@@ -1,10 +1,10 @@
 use sea_orm::*;
 use serde::Serialize;
 
-use ::entity::roll::{self, Entity as Roll, PushPull, RollStatus};
-use ::entity::shot;
 use crate::patch::now_string;
 use crate::services::shot_service::ShotService;
+use ::entity::roll::{self, Entity as Roll, PushPull, RollStatus};
+use ::entity::shot;
 
 /// Convert `TransactionError<DbErr>` to `DbErr`.
 fn transaction_err(e: TransactionError<DbErr>) -> DbErr {
@@ -110,12 +110,9 @@ impl RollService {
         db: &DatabaseConnection,
     ) -> Result<Vec<RollWithDetails>, DbErr> {
         let sql = format!("{ROLLS_WITH_DETAILS_SQL} ORDER BY r.created_at DESC");
-        RollWithDetails::find_by_statement(Statement::from_string(
-            db.get_database_backend(),
-            sql,
-        ))
-        .all(db)
-        .await
+        RollWithDetails::find_by_statement(Statement::from_string(db.get_database_backend(), sql))
+            .all(db)
+            .await
     }
 
     pub async fn get_with_details(
@@ -155,9 +152,8 @@ impl RollService {
         db: &DatabaseConnection,
         camera_id: i32,
     ) -> Result<Vec<RollWithDetails>, DbErr> {
-        let sql = format!(
-            "{ROLLS_WITH_DETAILS_SQL} WHERE r.camera_id = $1 ORDER BY r.created_at DESC"
-        );
+        let sql =
+            format!("{ROLLS_WITH_DETAILS_SQL} WHERE r.camera_id = $1 ORDER BY r.created_at DESC");
         RollWithDetails::find_by_statement(Statement::from_sql_and_values(
             db.get_database_backend(),
             &sql,

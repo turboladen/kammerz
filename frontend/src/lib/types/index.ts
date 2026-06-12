@@ -23,14 +23,7 @@ export type CameraFormat =
 	| '8x10'
 	| 'instant';
 
-export type CameraType =
-	| 'SLR'
-	| 'rangefinder'
-	| 'TLR'
-	| 'point-and-shoot'
-	| 'box'
-	| 'view'
-	| 'instant';
+export type CameraType = 'SLR' | 'rangefinder' | 'TLR' | 'point-and-shoot' | 'box' | 'view' | 'instant';
 
 export type MaintenanceType = 'CLA' | 'repair' | 'cleaning' | 'modification' | 'other';
 

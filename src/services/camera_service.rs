@@ -15,15 +15,24 @@ impl CameraService {
             .await
     }
 
-    pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<camera::Model>, DbErr> {
+    pub async fn get_by_id(
+        db: &DatabaseConnection,
+        id: i32,
+    ) -> Result<Option<camera::Model>, DbErr> {
         Camera::find_by_id(id).one(db).await
     }
 
-    pub async fn create(db: &impl ConnectionTrait, model: camera::ActiveModel) -> Result<camera::Model, DbErr> {
+    pub async fn create(
+        db: &impl ConnectionTrait,
+        model: camera::ActiveModel,
+    ) -> Result<camera::Model, DbErr> {
         model.insert(db).await
     }
 
-    pub async fn update(db: &impl ConnectionTrait, model: camera::ActiveModel) -> Result<camera::Model, DbErr> {
+    pub async fn update(
+        db: &impl ConnectionTrait,
+        model: camera::ActiveModel,
+    ) -> Result<camera::Model, DbErr> {
         model.update(db).await
     }
 

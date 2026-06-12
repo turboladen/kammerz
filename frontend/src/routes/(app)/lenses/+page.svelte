@@ -43,20 +43,14 @@
 
 	const lensMountOptions = $derived(buildMountOptions(lensMounts));
 
-	const mountNameById = $derived(
-		Object.fromEntries(lensMounts.map((m) => [m.id, m.name]))
-	);
+	const mountNameById = $derived(Object.fromEntries(lensMounts.map((m) => [m.id, m.name])));
 
-	const fixedMountIds = $derived(
-		new Set(lensMounts.filter((m) => m.name === 'Fixed Lens').map((m) => m.id))
-	);
+	const fixedMountIds = $derived(new Set(lensMounts.filter((m) => m.name === 'Fixed Lens').map((m) => m.id)));
 
 	/** Maps lens ID → camera display name for lenses that are a camera's default (i.e. fixed) lens. */
 	const fixedOnCamera = $derived(
 		Object.fromEntries(
-			cameras
-				.filter((c) => c.default_lens_id != null)
-				.map((c) => [c.default_lens_id!, `${c.brand} ${c.model}`])
+			cameras.filter((c) => c.default_lens_id != null).map((c) => [c.default_lens_id!, `${c.brand} ${c.model}`])
 		) as Record<number, string>
 	);
 
@@ -77,13 +71,34 @@
 
 	const afterSort = $derived.by(() => {
 		switch (sortBy) {
-			case 'brand-desc': return sortByString(afterSearch, (l) => lensDisplayName(l), 'desc');
-			case 'focal-length-asc': return sortByNumber(afterSearch, (l) => { const n = parseFloat(l.focal_length ?? ''); return isNaN(n) ? null : n; }, 'asc');
-			case 'focal-length-desc': return sortByNumber(afterSearch, (l) => { const n = parseFloat(l.focal_length ?? ''); return isNaN(n) ? null : n; }, 'desc');
-			case 'date-purchased-desc': return sortByDate(afterSearch, (l) => l.date_purchased, 'desc');
-			case 'date-purchased-asc': return sortByDate(afterSearch, (l) => l.date_purchased, 'asc');
-			case 'date-added-desc': return sortByDate(afterSearch, (l) => l.created_at, 'desc');
-			default: return sortByString(afterSearch, (l) => lensDisplayName(l), 'asc');
+			case 'brand-desc':
+				return sortByString(afterSearch, (l) => lensDisplayName(l), 'desc');
+			case 'focal-length-asc':
+				return sortByNumber(
+					afterSearch,
+					(l) => {
+						const n = parseFloat(l.focal_length ?? '');
+						return isNaN(n) ? null : n;
+					},
+					'asc'
+				);
+			case 'focal-length-desc':
+				return sortByNumber(
+					afterSearch,
+					(l) => {
+						const n = parseFloat(l.focal_length ?? '');
+						return isNaN(n) ? null : n;
+					},
+					'desc'
+				);
+			case 'date-purchased-desc':
+				return sortByDate(afterSearch, (l) => l.date_purchased, 'desc');
+			case 'date-purchased-asc':
+				return sortByDate(afterSearch, (l) => l.date_purchased, 'asc');
+			case 'date-added-desc':
+				return sortByDate(afterSearch, (l) => l.created_at, 'desc');
+			default:
+				return sortByString(afterSearch, (l) => lensDisplayName(l), 'asc');
 		}
 	});
 
@@ -187,8 +202,14 @@
 
 	async function handleAdd() {
 		error = '';
-		if (!brand.trim()) { error = 'Brand is required.'; return; }
-		if (!lensMountId) { error = 'Lens mount is required.'; return; }
+		if (!brand.trim()) {
+			error = 'Brand is required.';
+			return;
+		}
+		if (!lensMountId) {
+			error = 'Lens mount is required.';
+			return;
+		}
 		try {
 			await createLens(buildInsert());
 			showAddDialog = false;
@@ -219,8 +240,14 @@
 	async function handleEdit() {
 		if (!editingLens) return;
 		error = '';
-		if (!brand.trim()) { error = 'Brand is required.'; return; }
-		if (!lensMountId) { error = 'Lens mount is required.'; return; }
+		if (!brand.trim()) {
+			error = 'Brand is required.';
+			return;
+		}
+		if (!lensMountId) {
+			error = 'Lens mount is required.';
+			return;
+		}
 		try {
 			await updateLens(editingLens.id, buildInsert());
 			editingLens = null;
@@ -253,11 +280,16 @@
 	$effect(() => {
 		load();
 	});
-
 </script>
 
 <PageHeader title="Lenses" description="Your lens collection">
-	<Button variant="primary" onclick={() => { resetForm(); showAddDialog = true; }}>+ Add Lens</Button>
+	<Button
+		variant="primary"
+		onclick={() => {
+			resetForm();
+			showAddDialog = true;
+		}}>+ Add Lens</Button
+	>
 </PageHeader>
 
 <div class="p-6">
@@ -278,21 +310,15 @@
 	/>
 
 	<div class="mb-4 flex gap-2">
-		<Button
-			variant={filterOwned === 'all' ? 'primary' : 'ghost'}
-			size="sm"
-			onclick={() => (filterOwned = 'all')}
-		>All</Button>
-		<Button
-			variant={filterOwned === 'owned' ? 'primary' : 'ghost'}
-			size="sm"
-			onclick={() => (filterOwned = 'owned')}
-		>Owned</Button>
-		<Button
-			variant={filterOwned === 'sold' ? 'primary' : 'ghost'}
-			size="sm"
-			onclick={() => (filterOwned = 'sold')}
-		>Sold</Button>
+		<Button variant={filterOwned === 'all' ? 'primary' : 'ghost'} size="sm" onclick={() => (filterOwned = 'all')}
+			>All</Button
+		>
+		<Button variant={filterOwned === 'owned' ? 'primary' : 'ghost'} size="sm" onclick={() => (filterOwned = 'owned')}
+			>Owned</Button
+		>
+		<Button variant={filterOwned === 'sold' ? 'primary' : 'ghost'} size="sm" onclick={() => (filterOwned = 'sold')}
+			>Sold</Button
+		>
 	</div>
 
 	{#if loading}
@@ -312,46 +338,54 @@
 			<div class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5">
 				{#each groupLenses as lens, i}
 					<FadeIn delay={Math.min(i, 10) * 30}>
-					<div class="group flex h-full flex-col rounded-lg border border-border bg-surface-raised px-3.5 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px">
-						<div class="flex items-start justify-between gap-2">
-							<div class="min-w-0 flex-1">
-								<div class="flex items-center gap-2">
-									<span class="truncate text-sm font-semibold leading-snug">{lensDisplayName(lens)}</span>
-									{#if lens.date_sold}
-										<span class="shrink-0 rounded bg-red-500/15 px-1 py-0.5 text-[10px] text-red-400">Sold</span>
-									{/if}
-								</div>
-								<div class="mt-1 text-xs text-text-muted">
-									{#if fixedMountIds.has(lens.lens_mount_id)}
-										<span class="text-accent/70">Fixed{#if fixedOnCamera[lens.id]}{' '}on {fixedOnCamera[lens.id]}{/if}</span>
-									{:else if mountNameById[lens.lens_mount_id]}
-										<span>{mountNameById[lens.lens_mount_id]}</span>
-									{/if}
-									{#if lens.focal_length}
-										<span class="mx-1 text-text-faint/60">·</span><span>{lens.focal_length}mm</span>
-									{/if}
-									{#if lens.max_aperture}
-										<span class="mx-1 text-text-faint/60">·</span><span>f/{lens.max_aperture}{lens.min_aperture ? `–${lens.min_aperture}` : ''}</span>
-									{/if}
-								</div>
-								{#if lens.filter_thread_front_mm || lens.serial_number}
-									<div class="mt-1 text-[11px] text-text-faint">
-										{#if lens.filter_thread_front_mm}
-											<span>⌀{lens.filter_thread_front_mm}mm</span>
-										{/if}
-										{#if lens.serial_number}
-											{#if lens.filter_thread_front_mm}<span class="mx-1 text-text-faint/40">·</span>{/if}
-											<span class="font-mono">S/N {lens.serial_number}</span>
+						<div
+							class="group flex h-full flex-col rounded-lg border border-border bg-surface-raised px-3.5 py-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+						>
+							<div class="flex items-start justify-between gap-2">
+								<div class="min-w-0 flex-1">
+									<div class="flex items-center gap-2">
+										<span class="truncate text-sm font-semibold leading-snug">{lensDisplayName(lens)}</span>
+										{#if lens.date_sold}
+											<span class="shrink-0 rounded bg-red-500/15 px-1 py-0.5 text-[10px] text-red-400">Sold</span>
 										{/if}
 									</div>
-								{/if}
-							</div>
-							<div class="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
-								<Button size="sm" variant="ghost" onclick={() => startEdit(lens)}>Edit</Button>
-								<Button size="sm" variant="ghost" onclick={() => handleDelete(lens)}>&times;</Button>
+									<div class="mt-1 text-xs text-text-muted">
+										{#if fixedMountIds.has(lens.lens_mount_id)}
+											<span class="text-accent/70"
+												>Fixed{#if fixedOnCamera[lens.id]}{' '}on {fixedOnCamera[lens.id]}{/if}</span
+											>
+										{:else if mountNameById[lens.lens_mount_id]}
+											<span>{mountNameById[lens.lens_mount_id]}</span>
+										{/if}
+										{#if lens.focal_length}
+											<span class="mx-1 text-text-faint/60">·</span><span>{lens.focal_length}mm</span>
+										{/if}
+										{#if lens.max_aperture}
+											<span class="mx-1 text-text-faint/60">·</span><span
+												>f/{lens.max_aperture}{lens.min_aperture ? `–${lens.min_aperture}` : ''}</span
+											>
+										{/if}
+									</div>
+									{#if lens.filter_thread_front_mm || lens.serial_number}
+										<div class="mt-1 text-[11px] text-text-faint">
+											{#if lens.filter_thread_front_mm}
+												<span>⌀{lens.filter_thread_front_mm}mm</span>
+											{/if}
+											{#if lens.serial_number}
+												{#if lens.filter_thread_front_mm}<span class="mx-1 text-text-faint/40">·</span>{/if}
+												<span class="font-mono">S/N {lens.serial_number}</span>
+											{/if}
+										</div>
+									{/if}
+								</div>
+								<div
+									class="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
+								>
+									<Button size="sm" variant="ghost" onclick={() => startEdit(lens)}>Edit</Button>
+									<Button size="sm" variant="ghost" onclick={() => handleDelete(lens)}>&times;</Button>
+								</div>
 							</div>
 						</div>
-					</div>
 					</FadeIn>
 				{/each}
 			</div>
@@ -397,7 +431,14 @@
 
 <!-- Edit Lens Dialog (reuses same form fields) -->
 {#if editingLens}
-	<Dialog open={true} title="Edit Lens" onclose={() => { editingLens = null; resetForm(); }}>
+	<Dialog
+		open={true}
+		title="Edit Lens"
+		onclose={() => {
+			editingLens = null;
+			resetForm();
+		}}
+	>
 		<div class="space-y-4">
 			{#if fixedMountIds.has(editingLens.lens_mount_id)}
 				{@const cameraName = fixedOnCamera[editingLens.id]}
@@ -432,7 +473,13 @@
 				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 			{/if}
 			<div class="flex justify-end gap-2 pt-2">
-				<Button variant="ghost" onclick={() => { editingLens = null; resetForm(); }}>Cancel</Button>
+				<Button
+					variant="ghost"
+					onclick={() => {
+						editingLens = null;
+						resetForm();
+					}}>Cancel</Button
+				>
 				<Button variant="primary" disabled={!!dateError} onclick={handleEdit}>Save</Button>
 			</div>
 		</div>
@@ -446,6 +493,8 @@
 		message={`Permanently delete ${lensDisplayName(deletingLens)}?`}
 		confirmLabel="Delete Lens"
 		onconfirm={confirmDelete}
-		oncancel={() => { deletingLens = null; }}
+		oncancel={() => {
+			deletingLens = null;
+		}}
 	/>
 {/if}

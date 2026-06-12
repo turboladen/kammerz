@@ -97,7 +97,9 @@ async fn update(
     Path(id): Path<i32>,
     Json(data): Json<UpdateFilmStockDto>,
 ) -> AppResult<StatusCode> {
-    let existing = FilmStockService::get_by_id(&db, id).await?.or_404("Film stock", id)?;
+    let existing = FilmStockService::get_by_id(&db, id)
+        .await?
+        .or_404("Film stock", id)?;
     let now = now_string();
     let mut model: film_stock::ActiveModel = existing.into();
     if let Some(v) = data.brand {

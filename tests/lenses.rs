@@ -97,7 +97,10 @@ async fn update_lens_applies_partial_patch() {
         lens["focal_length"].is_null(),
         "explicit null clears the field via double_option"
     );
-    assert_eq!(lens["brand"], "Testar", "untouched field survives the patch");
+    assert_eq!(
+        lens["brand"], "Testar",
+        "untouched field survives the patch"
+    );
     assert_eq!(lens["max_aperture"], "f/2");
 }
 

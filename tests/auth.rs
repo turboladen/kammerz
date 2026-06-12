@@ -68,10 +68,7 @@ async fn me_reports_unauthed_when_password_set() {
 #[tokio::test]
 async fn login_with_wrong_password_is_401() {
     let app = test_app(Some(kammerz::auth::password::hash_password("pw").unwrap())).await;
-    let res = app
-        .oneshot(login_req("127.0.0.1", "nope"))
-        .await
-        .unwrap();
+    let res = app.oneshot(login_req("127.0.0.1", "nope")).await.unwrap();
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
 
@@ -81,13 +78,21 @@ async fn login_rate_limited_after_burst() {
 
     // The burst quota of wrong-password attempts all reach the handler → 401.
     for _ in 0..LOGIN_BURST_SIZE {
-        let res = app.clone().oneshot(login_req("10.0.0.1", "nope")).await.unwrap();
+        let res = app
+            .clone()
+            .oneshot(login_req("10.0.0.1", "nope"))
+            .await
+            .unwrap();
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
     }
 
     // The next attempt (within the replenish window) is throttled → 429, returned
     // through the standard error envelope with a Retry-After header.
-    let res = app.clone().oneshot(login_req("10.0.0.1", "nope")).await.unwrap();
+    let res = app
+        .clone()
+        .oneshot(login_req("10.0.0.1", "nope"))
+        .await
+        .unwrap();
     assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
     assert!(
         res.headers().contains_key("retry-after"),
@@ -106,7 +111,11 @@ async fn login_with_correct_password_succeeds_within_burst() {
     // user out: the correct password on a later within-burst attempt still reaches
     // the handler and succeeds.
     for _ in 0..2 {
-        let res = app.clone().oneshot(login_req("10.0.0.2", "nope")).await.unwrap();
+        let res = app
+            .clone()
+            .oneshot(login_req("10.0.0.2", "nope"))
+            .await
+            .unwrap();
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
     }
     let res = app.oneshot(login_req("10.0.0.2", "pw")).await.unwrap();
@@ -123,13 +132,25 @@ async fn rate_limit_is_per_ip() {
     // Exhaust the burst for one IP — each priming request still reaches the
     // handler (401), which also guards against a mis-sized burst masking the test.
     for _ in 0..LOGIN_BURST_SIZE {
-        let res = app.clone().oneshot(login_req("10.0.0.3", "nope")).await.unwrap();
+        let res = app
+            .clone()
+            .oneshot(login_req("10.0.0.3", "nope"))
+            .await
+            .unwrap();
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
     }
-    let blocked = app.clone().oneshot(login_req("10.0.0.3", "nope")).await.unwrap();
+    let blocked = app
+        .clone()
+        .oneshot(login_req("10.0.0.3", "nope"))
+        .await
+        .unwrap();
     assert_eq!(blocked.status(), StatusCode::TOO_MANY_REQUESTS);
 
     // A different IP still has its own fresh quota.
-    let other = app.clone().oneshot(login_req("10.0.0.4", "nope")).await.unwrap();
+    let other = app
+        .clone()
+        .oneshot(login_req("10.0.0.4", "nope"))
+        .await
+        .unwrap();
     assert_eq!(other.status(), StatusCode::UNAUTHORIZED);
 }

@@ -15,11 +15,11 @@
 	const totalResults = $derived(
 		results
 			? results.cameras.length +
-				results.lenses.length +
-				results.film_stocks.length +
-				results.rolls.length +
-				results.shots.length +
-				results.labs.length
+					results.lenses.length +
+					results.film_stocks.length +
+					results.rolls.length +
+					results.shots.length +
+					results.labs.length
 			: 0
 	);
 
@@ -107,7 +107,9 @@
 									</div>
 									<div class="flex items-center gap-2">
 										<span class="text-xs text-text-faint">in {cam.match_field}</span>
-										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100"
+											>&rarr;</span
+										>
 									</div>
 								</a>
 							{/each}
@@ -140,7 +142,9 @@
 									</div>
 									<div class="flex items-center gap-2">
 										<span class="text-xs text-text-faint">in {lens.match_field}</span>
-										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100"
+											>&rarr;</span
+										>
 									</div>
 								</a>
 							{/each}
@@ -171,7 +175,9 @@
 									</div>
 									<div class="flex items-center gap-2">
 										<span class="text-xs text-text-faint">in {fs.match_field}</span>
-										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100"
+											>&rarr;</span
+										>
 									</div>
 								</a>
 							{/each}
@@ -208,7 +214,9 @@
 											<span class="text-xs text-text-faint">{roll.film_stock_brand} {roll.film_stock_name}</span>
 										{/if}
 										<span class="text-xs text-text-faint">· in {roll.match_field}</span>
-										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100"
+											>&rarr;</span
+										>
 									</div>
 								</a>
 							{/each}
@@ -242,7 +250,9 @@
 									</div>
 									<div class="flex items-center gap-2">
 										<span class="text-xs text-text-faint">in {shot.match_field}: {shot.match_snippet}</span>
-										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100"
+											>&rarr;</span
+										>
 									</div>
 								</a>
 							{/each}
@@ -275,7 +285,9 @@
 									</div>
 									<div class="flex items-center gap-2">
 										<span class="text-xs text-text-faint">in {lab.match_field}</span>
-										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+										<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100"
+											>&rarr;</span
+										>
 									</div>
 								</a>
 							{/each}

@@ -38,13 +38,9 @@ function focusables(node: HTMLElement): HTMLElement[] {
  * Stacked dialogs (e.g. a ConfirmDialog over a Dialog) are handled via a module-level
  * stack — only the topmost dialog responds to Escape/Tab.
  */
-export function dialogFocus(
-	node: HTMLElement,
-	options: DialogFocusOptions
-): ActionReturn<DialogFocusOptions> {
+export function dialogFocus(node: HTMLElement, options: DialogFocusOptions): ActionReturn<DialogFocusOptions> {
 	let { onEscape } = options;
-	const previouslyFocused =
-		document.activeElement instanceof HTMLElement ? document.activeElement : null;
+	const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
 	stack.push(node);
 	if (stack.length === 1) {

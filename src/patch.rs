@@ -34,6 +34,10 @@ pub fn trim(s: String) -> ActiveValue<String> {
 pub fn trim_opt(s: Option<String>) -> ActiveValue<Option<String>> {
     ActiveValue::Set(s.and_then(|v| {
         let trimmed = v.trim();
-        if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
     }))
 }

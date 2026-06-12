@@ -32,12 +32,18 @@
 	);
 
 	// Rolls currently in cameras (loaded or shooting)
-	const activeRolls = $derived(
-		rolls.filter((r) => r.status === 'loaded' || r.status === 'shooting')
-	);
+	const activeRolls = $derived(rolls.filter((r) => r.status === 'loaded' || r.status === 'shooting'));
 
 	// Rolls in post-shooting processing (shot through post-processed)
-	const processingStatuses: RollStatus[] = ['shot', 'at-lab', 'lab-done', 'developing', 'developed', 'scanned', 'post-processed'];
+	const processingStatuses: RollStatus[] = [
+		'shot',
+		'at-lab',
+		'lab-done',
+		'developing',
+		'developed',
+		'scanned',
+		'post-processed'
+	];
 	const processingRolls = $derived.by(() => {
 		return rolls
 			.filter((r) => processingStatuses.includes(r.status))
@@ -48,9 +54,7 @@
 			});
 	});
 
-	const needsAttention = $derived(
-		rolls.filter((r) => !r.camera_id && r.status !== 'archived')
-	);
+	const needsAttention = $derived(rolls.filter((r) => !r.camera_id && r.status !== 'archived'));
 
 	// Status distribution for the progress bar (uses shared allStatusOrder + statusConfig)
 	const statusSegments = $derived(
@@ -68,11 +72,11 @@
 	async function load() {
 		try {
 			[rolls, cameras, lenses, filmStocks] = await Promise.all([
-			listRolls(),
-			listCameras(),
-			listLenses(),
-			listFilmStocks()
-		]);
+				listRolls(),
+				listCameras(),
+				listLenses(),
+				listFilmStocks()
+			]);
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -125,7 +129,9 @@
 				<FilmLeader />
 				<div>
 					<h2 class="font-display text-2xl text-text">Start your log</h2>
-					<p class="mt-2 max-w-sm text-sm text-text-muted">Add your cameras, pick your film stocks, and create your first roll to begin tracking your film photography.</p>
+					<p class="mt-2 max-w-sm text-sm text-text-muted">
+						Add your cameras, pick your film stocks, and create your first roll to begin tracking your film photography.
+					</p>
 				</div>
 				<div class="flex gap-3">
 					<Button href="/cameras">Add Cameras</Button>
@@ -269,9 +275,7 @@
 									<span class="font-mono text-sm">{roll.roll_id}</span>
 									<Badge status={roll.status} />
 								</div>
-								<div class="text-xs text-text-muted">
-									No camera assigned
-								</div>
+								<div class="text-xs text-text-muted">No camera assigned</div>
 							</a>
 						{/each}
 					</div>

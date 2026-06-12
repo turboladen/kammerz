@@ -76,7 +76,7 @@
 			<p class="mt-2 text-sm text-text-muted">{message}</p>
 			<div class="mt-5 flex justify-end gap-2">
 				<Button variant="ghost" onclick={handleCancel}>{cancelLabel}</Button>
-				<Button variant={variant} onclick={handleConfirm}>
+				<Button {variant} onclick={handleConfirm}>
 					{#if variant === 'danger'}<Trash2 size={16} strokeWidth={2} aria-hidden="true" />{/if}
 					{confirmLabel}
 				</Button>

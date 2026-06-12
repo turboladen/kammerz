@@ -14,8 +14,7 @@ import { request } from './client';
 export const getLabDevForRoll = (rollId: number) =>
 	request<DevelopmentLab | null>('GET', `/api/development/lab/for-roll/${rollId}`);
 
-export const createLabDev = (data: DevelopmentLabInsert) =>
-	request<number>('POST', '/api/development/lab', data);
+export const createLabDev = (data: DevelopmentLabInsert) => request<number>('POST', '/api/development/lab', data);
 
 export const updateLabDev = (id: number, data: Partial<DevelopmentLabInsert>) =>
 	request<void>('PUT', `/api/development/lab/${id}`, data);
@@ -35,10 +34,8 @@ type NestedStageInsert = Omit<DevStageInsert, 'development_self_id'>;
 export const createSelfDev = (data: DevelopmentSelfInsert & { stages?: NestedStageInsert[] }) =>
 	request<number>('POST', '/api/development/self', data);
 
-export const updateSelfDev = (
-	id: number,
-	data: Partial<DevelopmentSelfInsert> & { stages?: NestedStageInsert[] }
-) => request<void>('PUT', `/api/development/self/${id}`, data);
+export const updateSelfDev = (id: number, data: Partial<DevelopmentSelfInsert> & { stages?: NestedStageInsert[] }) =>
+	request<void>('PUT', `/api/development/self/${id}`, data);
 
 export const deleteSelfDev = (id: number) => request<void>('DELETE', `/api/development/self/${id}`);
 
@@ -49,5 +46,4 @@ export const listDevStages = (developmentSelfId: number) =>
 
 // --- List all self-developments ---
 
-export const listAllSelfDevelopments = () =>
-	request<SelfDevListItem[]>('GET', '/api/development/self');
+export const listAllSelfDevelopments = () => request<SelfDevListItem[]>('GET', '/api/development/self');

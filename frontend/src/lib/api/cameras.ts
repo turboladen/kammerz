@@ -12,8 +12,7 @@ export const deleteCamera = (id: number) => request<void>('DELETE', `/api/camera
 
 export const listMaintenanceForCamera = (cameraId: number) =>
 	request<CameraMaintenance[]>('GET', `/api/cameras/${cameraId}/maintenance`);
-export const createMaintenance = (data: CameraMaintenanceInsert) =>
-	request<number>('POST', '/api/maintenance', data);
+export const createMaintenance = (data: CameraMaintenanceInsert) => request<number>('POST', '/api/maintenance', data);
 export const updateMaintenance = (id: number, data: Partial<CameraMaintenanceInsert>) =>
 	request<void>('PUT', `/api/maintenance/${id}`, data);
 export const deleteMaintenance = (id: number) => request<void>('DELETE', `/api/maintenance/${id}`);
@@ -31,8 +30,7 @@ export const createCameraWithLens = (data: CreateCameraWithLensData) =>
 
 // --- Camera-Lens Associations ---
 
-export const getLensesForCamera = (cameraId: number) =>
-	request<number[]>('GET', `/api/cameras/${cameraId}/lenses`);
+export const getLensesForCamera = (cameraId: number) => request<number[]>('GET', `/api/cameras/${cameraId}/lenses`);
 export const linkLensToCamera = (cameraId: number, lensId: number) =>
 	request<void>('POST', `/api/cameras/${cameraId}/lenses/${lensId}`);
 export const unlinkLensFromCamera = (cameraId: number, lensId: number) =>
@@ -42,5 +40,4 @@ export const unlinkLensFromCamera = (cameraId: number, lensId: number) =>
 
 export const listDistinctCameraBrands = () => request<string[]>('GET', '/api/cameras/distinct/brands');
 export const listDistinctVendors = () => request<string[]>('GET', '/api/cameras/distinct/vendors');
-export const listDistinctMaintProviders = () =>
-	request<string[]>('GET', '/api/cameras/distinct/maint-providers');
+export const listDistinctMaintProviders = () => request<string[]>('GET', '/api/cameras/distinct/maint-providers');

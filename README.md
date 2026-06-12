@@ -158,7 +158,7 @@ sudo rm -f /opt/kammerz/data/kammerz.db-wal /opt/kammerz/data/kammerz.db-shm
 sudo systemctl start kammerz
 ```
 
-Snapshots from `/api/backup` or `VACUUM INTO` have no sidecar files of their own — they restore as-is. If you are restoring a cold-copy *set* (`kammerz.db` + `-wal` + `-shm` copied together), restore all three files in place of the `rm` step — the WAL sidecar holds the most recent writes and must not be dropped.
+Snapshots from `/api/backup` or `VACUUM INTO` have no sidecar files of their own — they restore as-is. If you are restoring a cold-copy _set_ (`kammerz.db` + `-wal` + `-shm` copied together), restore all three files in place of the `rm` step — the WAL sidecar holds the most recent writes and must not be dropped.
 
 ## Field access over VPN
 

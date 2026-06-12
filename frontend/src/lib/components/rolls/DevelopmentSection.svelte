@@ -363,9 +363,19 @@
 		<div class="group rounded-lg border border-border bg-surface-raised p-4">
 			<div class="mb-2 flex items-center justify-between">
 				<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Lab Development</span>
-				<div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
+				<div
+					class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
+				>
 					<Button size="sm" variant="ghost" onclick={openLabDevDialog}>Edit</Button>
-					<Button size="sm" variant="ghost" onclick={() => { devDeleteType = 'lab'; devDeleteError = ''; showDevDeleteConfirm = true; }}>&times;</Button>
+					<Button
+						size="sm"
+						variant="ghost"
+						onclick={() => {
+							devDeleteType = 'lab';
+							devDeleteError = '';
+							showDevDeleteConfirm = true;
+						}}>&times;</Button
+					>
 				</div>
 			</div>
 			<div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -390,9 +400,19 @@
 		<div class="group rounded-lg border border-border bg-surface-raised p-4">
 			<div class="mb-2 flex items-center justify-between">
 				<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Self Developed</span>
-				<div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
+				<div
+					class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
+				>
 					<Button size="sm" variant="ghost" onclick={openSelfDevDialog}>Edit</Button>
-					<Button size="sm" variant="ghost" onclick={() => { devDeleteType = 'self'; devDeleteError = ''; showDevDeleteConfirm = true; }}>&times;</Button>
+					<Button
+						size="sm"
+						variant="ghost"
+						onclick={() => {
+							devDeleteType = 'self';
+							devDeleteError = '';
+							showDevDeleteConfirm = true;
+						}}>&times;</Button
+					>
 				</div>
 			</div>
 			<div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -500,7 +520,11 @@
 				</div>
 			</div>
 
-			<Textarea label="Agitation" bind:value={devAgitationNotes} placeholder="e.g., Continuous first 30s, then 3 inversions every 30s" />
+			<Textarea
+				label="Agitation"
+				bind:value={devAgitationNotes}
+				placeholder="e.g., Continuous first 30s, then 3 inversions every 30s"
+			/>
 
 			<div>
 				<div class="mb-2 flex items-center justify-between">
@@ -528,9 +552,23 @@
 									class="w-24 rounded border border-border bg-surface px-2 py-1 text-sm text-text-muted focus:border-accent focus:ring-1 focus:ring-accent/50 focus:outline-none"
 								/>
 								<div class="flex gap-0.5">
-									<button onclick={() => moveStage(i, -1)} disabled={i === 0} class="rounded p-0.5 text-text-faint transition-colors hover:bg-surface-overlay hover:text-text disabled:opacity-30"><ChevronUp size={12} /></button>
-									<button onclick={() => moveStage(i, 1)} disabled={i === devFormStages.length - 1} class="rounded p-0.5 text-text-faint transition-colors hover:bg-surface-overlay hover:text-text disabled:opacity-30"><ChevronDown size={12} /></button>
-									<button onclick={() => removeStage(i)} class="rounded p-0.5 text-text-faint transition-colors hover:bg-red-500/15 hover:text-red-400"><X size={12} /></button>
+									<button
+										onclick={() => moveStage(i, -1)}
+										disabled={i === 0}
+										class="rounded p-0.5 text-text-faint transition-colors hover:bg-surface-overlay hover:text-text disabled:opacity-30"
+										><ChevronUp size={12} /></button
+									>
+									<button
+										onclick={() => moveStage(i, 1)}
+										disabled={i === devFormStages.length - 1}
+										class="rounded p-0.5 text-text-faint transition-colors hover:bg-surface-overlay hover:text-text disabled:opacity-30"
+										><ChevronDown size={12} /></button
+									>
+									<button
+										onclick={() => removeStage(i)}
+										class="rounded p-0.5 text-text-faint transition-colors hover:bg-red-500/15 hover:text-red-400"
+										><X size={12} /></button
+									>
 								</div>
 							</div>
 						{/each}
@@ -561,6 +599,8 @@
 		message="Permanently delete this development record? This cannot be undone."
 		confirmLabel="Delete"
 		onconfirm={confirmDeleteDev}
-		oncancel={() => { showDevDeleteConfirm = false; }}
+		oncancel={() => {
+			showDevDeleteConfirm = false;
+		}}
 	/>
 {/if}

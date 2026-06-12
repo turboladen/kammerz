@@ -96,7 +96,10 @@ async fn create_shot_transaction_links_lens_and_syncs_status() {
         .await
         .unwrap();
     let roll: Value = json_body(res).await;
-    assert_eq!(roll["status"], "shooting", "auto_sync_status advanced the roll");
+    assert_eq!(
+        roll["status"], "shooting",
+        "auto_sync_status advanced the roll"
+    );
 }
 
 #[tokio::test]
@@ -128,7 +131,10 @@ async fn delete_last_shot_reverts_status() {
         .await
         .unwrap();
     let roll: Value = json_body(res).await;
-    assert_eq!(roll["status"], "loaded", "auto_sync_status reverted the roll");
+    assert_eq!(
+        roll["status"], "loaded",
+        "auto_sync_status reverted the roll"
+    );
 }
 
 // kammerz-8rh no-regression: the delete-last-shot revert is scoped to

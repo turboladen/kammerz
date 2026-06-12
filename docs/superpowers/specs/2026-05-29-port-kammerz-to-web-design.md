@@ -22,7 +22,7 @@ the upside lands directly on stated needs:
   `src/lib/api/` and nowhere else in the frontend. Components and routes import
   typed functions (`listCameras()`), so the frontend port is confined to
   rewriting those 12 wrappers to use `fetch`.
-- **No binary assets.** Kammerz is a *metadata* catalog (rolls, shots, gear, dev
+- **No binary assets.** Kammerz is a _metadata_ catalog (rolls, shots, gear, dev
   recipes). It stores no scans or images, removing the hardest part of porting a
   desktop app to web (upload/blob storage, asset serving).
 - **Frontend already web-shaped.** SvelteKit is on `adapter-static` with
@@ -38,6 +38,7 @@ the author's other apps.
 ## Target architecture
 
 ### Backend (axum)
+
 - axum HTTP server; SvelteKit `build/` embedded via `rust-embed` with an SPA
   fallback to `index.html`.
 - SeaORM + SQLite reused as-is; `Migrator::up()` runs on startup (unchanged
@@ -47,6 +48,7 @@ the author's other apps.
   request/response bodies.
 
 ### Auth
+
 - **Single shared password.** Argon2 hash supplied via env / `.env` at deploy
   time.
 - `tower-sessions` with a SQLite-backed store; cookie is `HttpOnly`,
@@ -55,6 +57,7 @@ the author's other apps.
   unauthenticated route. Mirror chorez's tested session middleware.
 
 ### Frontend (SvelteKit)
+
 - Stays on `adapter-static`, `ssr=false`.
 - Rewrite the **12 `src/lib/api/*` wrappers** from `invoke(name, args)` to a
   typed `fetch` client modeled on chorez's `api.ts`: sends credentials, handles
@@ -62,11 +65,13 @@ the author's other apps.
 - Components, routes, and `types/index.ts` are unchanged.
 
 ### AI import
+
 - `import_service.rs` keeps calling the Anthropic API via `reqwest`, now
   server-side. The API key moves to server config (an improvement: no key shipped
   in a desktop bundle, no CORS).
 
 ### Deployment
+
 - systemd unit on the home NAS, same pattern as chorez/financier: unprivileged
   user, data dir, `.env` for `DATABASE_URL` / `PORT` / session secret / password
   hash / Anthropic key, restart-on-failure.
@@ -76,11 +81,11 @@ the author's other apps.
 
 ## What moves vs. what is new
 
-| Category | Items |
-|---|---|
-| **Reuse ~verbatim** | All 14 entities, all services, the migration crate, all routes/components, `src/lib/types/index.ts` |
-| **Rewrite** | Command layer → axum handlers; 12 api wrappers → fetch client; new `main.rs` (router, app state, rust-embed, sessions, auth middleware); config/env handling |
-| **Remove** | Tauri deps, `lib.rs` builder / AppState / invoke registry, `capabilities/`, `@tauri-apps/*` JS deps, `tauri.conf.json` |
+| Category            | Items                                                                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Reuse ~verbatim** | All 14 entities, all services, the migration crate, all routes/components, `src/lib/types/index.ts`                                                          |
+| **Rewrite**         | Command layer → axum handlers; 12 api wrappers → fetch client; new `main.rs` (router, app state, rust-embed, sessions, auth middleware); config/env handling |
+| **Remove**          | Tauri deps, `lib.rs` builder / AppState / invoke registry, `capabilities/`, `@tauri-apps/*` JS deps, `tauri.conf.json`                                       |
 
 ## Access staging
 
@@ -130,5 +135,5 @@ once the port lands.
 
 1. **Mobile/field UX** — responsive shell + thumb-optimized quick-entry; depends
    on this port.
-2. *(Possible later)* **L3 offline PWA** — only if field usage demonstrates the
+2. _(Possible later)_ **L3 offline PWA** — only if field usage demonstrates the
    need.

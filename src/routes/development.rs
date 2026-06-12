@@ -14,9 +14,7 @@ use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, DbOptionExt, OptionExt};
 use crate::patch::{double_option, now_string, trim_opt};
 use crate::routes::{friendly_err, friendly_txn_err};
-use crate::services::development_service::{
-    DevelopmentService, SelfDevWithStages, StageInput,
-};
+use crate::services::development_service::{DevelopmentService, SelfDevWithStages, StageInput};
 use crate::services::roll_service::RollService;
 use crate::validate::validate_date_opt;
 use crate::AppState;
@@ -125,7 +123,10 @@ pub fn router() -> Router<AppState> {
             "/lab/{id}",
             axum::routing::put(update_lab_dev).delete(delete_lab_dev),
         )
-        .route("/self", get(list_all_self_developments).post(create_self_dev))
+        .route(
+            "/self",
+            get(list_all_self_developments).post(create_self_dev),
+        )
         .route("/self/for-roll/{roll_id}", get(get_self_dev_for_roll))
         .route("/self/{id}/stages", get(list_dev_stages))
         .route(
@@ -141,7 +142,9 @@ async fn get_lab_dev_for_roll(
     State(db): State<DatabaseConnection>,
     Path(roll_id): Path<i32>,
 ) -> AppResult<Json<Option<development_lab::Model>>> {
-    Ok(Json(DevelopmentService::get_lab_dev_for_roll(&db, roll_id).await?))
+    Ok(Json(
+        DevelopmentService::get_lab_dev_for_roll(&db, roll_id).await?,
+    ))
 }
 
 async fn create_lab_dev(
@@ -249,12 +252,8 @@ async fn update_lab_dev(
             // Data-driven status reconcile (kammerz-42u): adding a received date
             // advances → lab-done, clearing it reverts lab-done → at-lab. Derive
             // the signal from the persisted value, matching the create path.
-            RollService::resync_lab_dev_status(
-                txn,
-                result.roll_id,
-                result.date_received.is_some(),
-            )
-            .await?;
+            RollService::resync_lab_dev_status(txn, result.roll_id, result.date_received.is_some())
+                .await?;
 
             Ok(())
         })
@@ -319,7 +318,9 @@ async fn get_self_dev_for_roll(
     State(db): State<DatabaseConnection>,
     Path(roll_id): Path<i32>,
 ) -> AppResult<Json<Option<development_self::Model>>> {
-    Ok(Json(DevelopmentService::get_self_dev_for_roll(&db, roll_id).await?))
+    Ok(Json(
+        DevelopmentService::get_self_dev_for_roll(&db, roll_id).await?,
+    ))
 }
 
 async fn create_self_dev(
@@ -526,7 +527,9 @@ async fn list_dev_stages(
     State(db): State<DatabaseConnection>,
     Path(development_self_id): Path<i32>,
 ) -> AppResult<Json<Vec<dev_stage::Model>>> {
-    Ok(Json(DevelopmentService::list_stages(&db, development_self_id).await?))
+    Ok(Json(
+        DevelopmentService::list_stages(&db, development_self_id).await?,
+    ))
 }
 
 // --- List all self-developments (composite: parents + batched stages) ---

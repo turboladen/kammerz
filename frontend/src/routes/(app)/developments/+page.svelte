@@ -55,8 +55,7 @@
 	});
 
 	const grouped = $derived.by(() => {
-		if (groupBy === 'developer')
-			return groupItems(afterSort, (d) => d.developer ?? 'Unknown Developer');
+		if (groupBy === 'developer') return groupItems(afterSort, (d) => d.developer ?? 'Unknown Developer');
 		if (groupBy === 'film-stock')
 			return groupItems(afterSort, (d) =>
 				d.film_stock_brand ? `${d.film_stock_brand} ${d.film_stock_name}` : 'No Film Stock'
@@ -146,7 +145,9 @@
 									<div class="flex items-center gap-2">
 										{#if d.developer}
 											<span class="text-sm font-semibold text-text">
-												{d.developer}{#if d.developer_dilution}<span class="font-normal text-text-muted"> ({d.developer_dilution})</span>{/if}
+												{d.developer}{#if d.developer_dilution}<span class="font-normal text-text-muted">
+														({d.developer_dilution})</span
+													>{/if}
 											</span>
 										{:else}
 											<span class="text-sm italic text-text-faint">No developer recorded</span>
@@ -158,7 +159,10 @@
 									{#if d.fixer || d.stop_bath}
 										<div class="mt-0.5 flex flex-wrap gap-x-3 text-xs text-text-muted">
 											{#if d.fixer}
-												<span>Fixer: {d.fixer}{#if d.fixer_dilution} ({d.fixer_dilution}){/if}</span>
+												<span
+													>Fixer: {d.fixer}{#if d.fixer_dilution}
+														({d.fixer_dilution}){/if}</span
+												>
 											{/if}
 											{#if d.stop_bath}
 												<span>Stop: {d.stop_bath}</span>
@@ -175,7 +179,9 @@
 									{#if d.date_processed}
 										<span class="text-xs text-text-faint">{d.date_processed}</span>
 									{/if}
-									<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+									<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100"
+										>&rarr;</span
+									>
 								</div>
 							</div>
 

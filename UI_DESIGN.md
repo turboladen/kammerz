@@ -17,36 +17,36 @@ All colors are defined as CSS custom properties in `frontend/src/app.css` via Ta
 
 Near-neutral with only a whisper of warmth. Dark enough to hold contrast; the warmth is mood, the brightness lives in the text.
 
-| Token | Hex | Usage |
-|---|---|---|
-| `--color-surface` | `#0d0d0c` | Page background, input backgrounds |
-| `--color-surface-raised` | `#161615` | Cards, sidebar, dialog panels |
+| Token                     | Hex       | Usage                               |
+| ------------------------- | --------- | ----------------------------------- |
+| `--color-surface`         | `#0d0d0c` | Page background, input backgrounds  |
+| `--color-surface-raised`  | `#161615` | Cards, sidebar, dialog panels       |
 | `--color-surface-overlay` | `#211f1e` | Dropdown menus, hover states, chips |
 
 ### Borders (graphite grays)
 
-| Token | Hex | Usage |
-|---|---|---|
-| `--color-border` | `#2f2d2a` | Card borders, input borders, dividers |
-| `--color-border-subtle` | `#242220` | Sidebar border, softer dividers |
+| Token                   | Hex       | Usage                                 |
+| ----------------------- | --------- | ------------------------------------- |
+| `--color-border`        | `#2f2d2a` | Card borders, input borders, dividers |
+| `--color-border-subtle` | `#242220` | Sidebar border, softer dividers       |
 
 ### Text (brushed silver — bright, faint warm lean)
 
-| Token | Hex | Usage |
-|---|---|---|
-| `--color-text` | `#eeebe7` | Primary text, headings (~16:1 on surface) |
-| `--color-text-muted` | `#bab4ad` | Secondary text, labels, descriptions (~9:1) |
+| Token                | Hex       | Usage                                                               |
+| -------------------- | --------- | ------------------------------------------------------------------- |
+| `--color-text`       | `#eeebe7` | Primary text, headings (~16:1 on surface)                           |
+| `--color-text-muted` | `#bab4ad` | Secondary text, labels, descriptions (~9:1)                         |
 | `--color-text-faint` | `#8f8981` | Tertiary text, hints, timestamps (~5.6:1 — all tiers clear WCAG AA) |
 
 ### Accent (amber/gold — the single warm "safelight" spark)
 
 The one warm element against the neutral field. Used deliberately for primary actions, active states, and the brand — not as a pervasive wash.
 
-| Token | Hex | Usage |
-|---|---|---|
-| `--color-accent` | `#e2a45e` | Primary buttons, active states, brand |
-| `--color-accent-hover` | `#eeb878` | Button hover states |
-| `--color-accent-muted` | `#7d5a32` | Subtle accent backgrounds |
+| Token                  | Hex       | Usage                                 |
+| ---------------------- | --------- | ------------------------------------- |
+| `--color-accent`       | `#e2a45e` | Primary buttons, active states, brand |
+| `--color-accent-hover` | `#eeb878` | Button hover states                   |
+| `--color-accent-muted` | `#7d5a32` | Subtle accent backgrounds             |
 
 ### Status Colors (red/green-safe, grouped by lifecycle phase)
 
@@ -55,23 +55,23 @@ color vision reads reliably) plus lightness, grouped by phase: shooting = cool b
 development = warm ambers, finished = neutral (cool `scanned` vs warm `archived`). The
 status label text is always shown alongside the color, so color is never the sole signal.
 
-| Status | Hex | Phase |
-|---|---|---|
-| Loaded | `#6fbcff` | Shooting — vivid azure |
-| Shooting | `#93c4ec` | Shooting — sky blue |
-| Shot | `#afb3ea` | Shooting — blue-violet |
-| At Lab | `#e3a347` | Development — amber |
-| Lab Done | `#f0cf57` | Development — yellow |
-| Developing | `#dd8b44` | Development — orange |
-| Developed | `#ecc185` | Development — light tan |
-| Scanned | `#a8cdd8` | Finished — cool slate |
-| Archived | `#b3a99c` | Finished — warm taupe |
+| Status     | Hex       | Phase                   |
+| ---------- | --------- | ----------------------- |
+| Loaded     | `#6fbcff` | Shooting — vivid azure  |
+| Shooting   | `#93c4ec` | Shooting — sky blue     |
+| Shot       | `#afb3ea` | Shooting — blue-violet  |
+| At Lab     | `#e3a347` | Development — amber     |
+| Lab Done   | `#f0cf57` | Development — yellow    |
+| Developing | `#dd8b44` | Development — orange    |
+| Developed  | `#ecc185` | Development — light tan |
+| Scanned    | `#a8cdd8` | Finished — cool slate   |
+| Archived   | `#b3a99c` | Finished — warm taupe   |
 
 ### Danger
 
 Destructive actions must read as dangerous without relying on red hue (the app
 supports red/green color vision). Tokens: `--color-danger` (`#c0473a`, solid fill,
-white text ~5:1), `--color-danger-hover` (`#b03f33`, a *darker* hover so white text
+white text ~5:1), `--color-danger-hover` (`#b03f33`, a _darker_ hover so white text
 stays ≥4.5:1 — a lighter hover would drop below AA), `--color-danger-fg` (`#e88c80`,
 danger icons/text on the dark surface). The `danger` Button variant is a solid fill,
 and destructive commits carry a `Trash2` line icon; `ConfirmDialog` adds an
@@ -89,11 +89,11 @@ Fonts are self-hosted in `frontend/static/fonts/` and loaded via `@font-face` de
 
 ### Font Stack
 
-| Role | Font | Weights | CSS Variable |
-|---|---|---|---|
-| **UI (sans)** | DM Sans | 400, 500, 600 | `--font-sans` |
-| **Data (mono)** | IBM Plex Mono | 400, 500 | `--font-mono` |
-| **Display (serif)** | Instrument Serif | 400 | `--font-display` |
+| Role                | Font             | Weights       | CSS Variable     |
+| ------------------- | ---------------- | ------------- | ---------------- |
+| **UI (sans)**       | DM Sans          | 400, 500, 600 | `--font-sans`    |
+| **Data (mono)**     | IBM Plex Mono    | 400, 500      | `--font-mono`    |
+| **Display (serif)** | Instrument Serif | 400           | `--font-display` |
 
 ### Usage Guidelines
 
@@ -114,18 +114,19 @@ Fonts are self-hosted in `frontend/static/fonts/` and loaded via `@font-face` de
 
 Four variants, two sizes:
 
-| Variant | Appearance |
-|---|---|
-| `primary` | Solid amber accent background |
-| `secondary` | Bordered, overlay background |
-| `ghost` | Text-only, overlay on hover |
-| `danger` | Solid red fill, white text (high-emphasis destructive); pair with a `Trash2` icon |
+| Variant     | Appearance                                                                        |
+| ----------- | --------------------------------------------------------------------------------- |
+| `primary`   | Solid amber accent background                                                     |
+| `secondary` | Bordered, overlay background                                                      |
+| `ghost`     | Text-only, overlay on hover                                                       |
+| `danger`    | Solid red fill, white text (high-emphasis destructive); pair with a `Trash2` icon |
 
 Sizes: `md` (default, px-4 py-2) and `sm` (px-2.5 py-1.5).
 
 ### Badge (`frontend/src/lib/components/ui/Badge.svelte`)
 
 Roll status pills with a small color dot indicator:
+
 - 1.5px solid dot before the label text
 - Background at 10% opacity of the status color
 - Text in the status color
@@ -175,6 +176,7 @@ the single home for lifecycle dates — the roll Edit form has no date pickers.
 ### FadeIn (`frontend/src/lib/components/ui/FadeIn.svelte`)
 
 Wraps content in staggered `fade-in-up` animation (200ms, ease-out). Use on all page sections for sequential reveal:
+
 - `delay` prop for staggering (typically 50ms increments between sections)
 - Every page should wrap its main content sections in `FadeIn` for consistent entrance animations
 
@@ -224,22 +226,22 @@ Navigation is split into two groups with a subtle separator:
 
 **Core navigation** (data entities):
 
-| Route | Label | Icon |
-|---|---|---|
-| `/` | Dashboard | `LayoutDashboard` |
-| `/rolls` | Rolls | `Film` |
-| `/cameras` | Cameras | `Camera` |
-| `/lenses` | Lenses | `Aperture` |
-| `/film-stocks` | Film Stocks | `Package` |
-| `/labs` | Labs | `FlaskConical` |
-| `/developments` | Developing | `TestTube2` |
+| Route           | Label       | Icon              |
+| --------------- | ----------- | ----------------- |
+| `/`             | Dashboard   | `LayoutDashboard` |
+| `/rolls`        | Rolls       | `Film`            |
+| `/cameras`      | Cameras     | `Camera`          |
+| `/lenses`       | Lenses      | `Aperture`        |
+| `/film-stocks`  | Film Stocks | `Package`         |
+| `/labs`         | Labs        | `FlaskConical`    |
+| `/developments` | Developing  | `TestTube2`       |
 
 **Utility navigation** (separated by `border-t border-border-subtle`):
 
-| Route | Label | Icon |
-|---|---|---|
-| `/search` | Search | `Search` |
-| `/stats` | Stats | `BarChart3` |
+| Route     | Label  | Icon        |
+| --------- | ------ | ----------- |
+| `/search` | Search | `Search`    |
+| `/stats`  | Stats  | `BarChart3` |
 
 ### PageHeader (`frontend/src/lib/components/layout/PageHeader.svelte`)
 
@@ -260,6 +262,7 @@ text-xs font-semibold uppercase tracking-wider text-text-faint
 ```
 
 With an extending rule line:
+
 ```svelte
 <h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
     Section Title
@@ -268,6 +271,7 @@ With an extending rule line:
 ```
 
 When a section header has action buttons on the right (e.g., "+ Add"), use `justify-between` instead of the rule line:
+
 ```svelte
 <div class="mb-3 flex items-center justify-between">
     <h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Section Title</h2>
@@ -290,6 +294,7 @@ grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2.5
 ```
 
 Individual card:
+
 ```
 rounded-lg border border-border bg-surface-raised px-3.5 py-3
 transition-all duration-150
@@ -339,6 +344,7 @@ Warm amber tint to highlight actively shooting rolls.
 ### Compact Table Inputs (Import shots table)
 
 For dense data entry tables, use smaller inputs with `rounded` (4px) instead of `rounded-lg`:
+
 ```
 rounded border border-border bg-surface px-1.5 py-1 text-xs
 focus:border-accent focus:ring-1 focus:ring-accent/50 focus:outline-none
@@ -390,6 +396,7 @@ Multi-step flow: Input → Preview → Importing
 ### Quick Entry (`/quick-entry`)
 
 Rapid single-frame logging optimized for active shooting sessions:
+
 - Roll selector (active rolls prioritized, visual divider for other rolls)
 - Roll info bar (camera, film stock, ISO, frame progress indicator)
 - 4-column entry form (Frame, f/, Speed, Lens) in a raised card
@@ -405,12 +412,13 @@ Rapid single-frame logging optimized for active shooting sessions:
 Refinement comes from material and texture, layered so nothing sits behind text and contrast is preserved. All in `frontend/src/app.css`:
 
 - **Film grain** — SVG noise `body::after` at 5% opacity, `position: fixed`, `pointer-events: none`, `z-index: 9999`. Subliminal analog quality.
-- **Vignette** — a radial gradient painted into the root canvas (`html` `background-image`, darker toward the corners) so it sits *behind* all content. Opaque cards/sidebar cover it; the darkening shows only through the bare page-surface gaps and page edges. Because every glyph is light-on-dark, darkening the surface can only raise text contrast, so it runs strong (0.45 black at the corner) — `text-faint` on a darkened corner is ≈5.8:1, *higher* than on the lit center (≈5.6:1). (Earlier it was a `body::before` overlay at `z-index: 9998`, capped at 0.12 because painting over content could pull faint corner text below AA.)
+- **Vignette** — a radial gradient painted into the root canvas (`html` `background-image`, darker toward the corners) so it sits _behind_ all content. Opaque cards/sidebar cover it; the darkening shows only through the bare page-surface gaps and page edges. Because every glyph is light-on-dark, darkening the surface can only raise text contrast, so it runs strong (0.45 black at the corner) — `text-faint` on a darkened corner is ≈5.8:1, _higher_ than on the lit center (≈5.6:1). (Earlier it was a `body::before` overlay at `z-index: 9998`, capped at 0.12 because painting over content could pull faint corner text below AA.)
 - **Material cards** — raised rounded panels (`.bg-surface-raised.rounded-lg`) get a lit top "catch-light" edge (`border-top-color`) and a faint top-down sheen (`linear-gradient`); plain cards add a soft elevation shadow. A `:not(.shadow-xl):not(.shadow-2xl)` guard preserves dialogs'/menus' own shadows. This is the "silver/chrome" half of black & silver.
 
 ### Dialog Animations
 
 Defined as `@keyframes` in `frontend/src/app.css`:
+
 - `dialog-enter`: scale 0.95 → 1.0 + opacity 0 → 1 over 150ms ease-out
 - `backdrop-enter`: opacity 0 → 1 over 100ms ease-out
 
@@ -487,11 +495,12 @@ state and the rolls first-run empty state.
 
 ## Dependencies
 
-| Package | Version | Purpose |
-|---|---|---|
+| Package         | Version  | Purpose                            |
+| --------------- | -------- | ---------------------------------- |
 | `lucide-svelte` | ^0.564.0 | Tree-shakeable SVG icon components |
 
 Self-hosted fonts (in `frontend/static/fonts/`, loaded via `@font-face` in `frontend/src/app.css`):
+
 - [DM Sans](https://fonts.google.com/specimen/DM+Sans) — 400, 500, 600
 - [IBM Plex Mono](https://fonts.google.com/specimen/IBM+Plex+Mono) — 400, 500
 - [Instrument Serif](https://fonts.google.com/specimen/Instrument+Serif) — 400

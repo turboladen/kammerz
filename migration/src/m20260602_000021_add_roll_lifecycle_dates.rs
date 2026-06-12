@@ -12,7 +12,11 @@ impl MigrationTrait for Migration {
         // the matching status transition by the frontend, editable in the roll Edit
         // form. SQLite permits only one ADD COLUMN per ALTER TABLE, so each column
         // is added in its own statement.
-        for column in [Rolls::DateScanned, Rolls::DatePostProcessed, Rolls::DateArchived] {
+        for column in [
+            Rolls::DateScanned,
+            Rolls::DatePostProcessed,
+            Rolls::DateArchived,
+        ] {
             manager
                 .alter_table(
                     Table::alter()
@@ -27,7 +31,11 @@ impl MigrationTrait for Migration {
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        for column in [Rolls::DateScanned, Rolls::DatePostProcessed, Rolls::DateArchived] {
+        for column in [
+            Rolls::DateScanned,
+            Rolls::DatePostProcessed,
+            Rolls::DateArchived,
+        ] {
             manager
                 .alter_table(
                     Table::alter()

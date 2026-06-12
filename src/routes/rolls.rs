@@ -258,7 +258,9 @@ async fn get_detail(
     State(db): State<DatabaseConnection>,
     Path(id): Path<i32>,
 ) -> AppResult<Json<RollDetail>> {
-    let roll = RollService::get_with_details(&db, id).await?.or_404("Roll", id)?;
+    let roll = RollService::get_with_details(&db, id)
+        .await?
+        .or_404("Roll", id)?;
 
     let shots = ShotService::list_for_roll(&db, id).await?;
 

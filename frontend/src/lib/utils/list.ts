@@ -4,11 +4,7 @@
  */
 
 /** Filter items by full-text search. Returns all items when query is empty. */
-export function filterBySearch<T>(
-	items: T[],
-	query: string,
-	getSearchText: (item: T) => string
-): T[] {
+export function filterBySearch<T>(items: T[], query: string, getSearchText: (item: T) => string): T[] {
 	const q = query.trim().toLowerCase();
 	if (!q) return items;
 	return items.filter((item) => getSearchText(item).toLowerCase().includes(q));
@@ -18,10 +14,7 @@ export function filterBySearch<T>(
  * Group a pre-sorted array into an ordered Record<string, T[]>.
  * Key order reflects first-appearance in items (i.e. the sort order).
  */
-export function groupItems<T>(
-	items: T[],
-	getKey: (item: T) => string
-): Record<string, T[]> {
+export function groupItems<T>(items: T[], getKey: (item: T) => string): Record<string, T[]> {
 	const result: Record<string, T[]> = {};
 	for (const item of items) {
 		const key = getKey(item);

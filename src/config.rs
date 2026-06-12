@@ -13,8 +13,12 @@ pub struct AppConfig {
 impl AppConfig {
     pub fn from_env() -> Self {
         Self {
-            password_hash: std::env::var("KAMMERZ_PASSWORD_HASH").ok().filter(|s| !s.is_empty()),
-            anthropic_api_key: std::env::var("ANTHROPIC_API_KEY").ok().filter(|s| !s.is_empty()),
+            password_hash: std::env::var("KAMMERZ_PASSWORD_HASH")
+                .ok()
+                .filter(|s| !s.is_empty()),
+            anthropic_api_key: std::env::var("ANTHROPIC_API_KEY")
+                .ok()
+                .filter(|s| !s.is_empty()),
             secure_cookies: std::env::var("SECURE_COOKIES")
                 .map(|v| v == "true" || v == "1")
                 .unwrap_or(false),

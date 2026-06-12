@@ -1,6 +1,17 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { LayoutDashboard, Search, Film, Camera, Aperture, Package, FlaskConical, TestTube2, BarChart3, Plus } from 'lucide-svelte';
+	import {
+		LayoutDashboard,
+		Search,
+		Film,
+		Camera,
+		Aperture,
+		Package,
+		FlaskConical,
+		TestTube2,
+		BarChart3,
+		Plus
+	} from 'lucide-svelte';
 
 	// Core data entity navigation
 	const mainNavItems = [

@@ -20,10 +20,7 @@ impl ShotService {
         .await
     }
 
-    pub async fn get_by_id(
-        db: &DatabaseConnection,
-        id: i32,
-    ) -> Result<Option<shot::Model>, DbErr> {
+    pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<shot::Model>, DbErr> {
         Shot::find_by_id(id).one(db).await
     }
 

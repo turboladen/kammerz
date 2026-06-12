@@ -40,9 +40,7 @@
 	];
 
 	// Pipeline: status filter → search → sort → group
-	const afterStatusFilter = $derived(
-		filterStatus === 'all' ? rolls : rolls.filter((r) => r.status === filterStatus)
-	);
+	const afterStatusFilter = $derived(filterStatus === 'all' ? rolls : rolls.filter((r) => r.status === filterStatus));
 
 	const afterSearch = $derived(
 		filterBySearch(afterStatusFilter, searchQuery, (r) =>
@@ -61,23 +59,27 @@
 
 	const afterSort = $derived.by(() => {
 		switch (sortBy) {
-			case 'date-loaded-asc': return sortByDate(afterSearch, (r) => r.date_loaded, 'asc');
-			case 'date-finished-desc': return sortByDate(afterSearch, (r) => r.date_finished, 'desc');
-			case 'date-finished-asc': return sortByDate(afterSearch, (r) => r.date_finished, 'asc');
-			case 'roll-id-asc': return sortByString(afterSearch, (r) => r.roll_id, 'asc');
-			case 'roll-id-desc': return sortByString(afterSearch, (r) => r.roll_id, 'desc');
-			case 'date-added-desc': return sortByDate(afterSearch, (r) => r.created_at, 'desc');
-			default: return sortByDate(afterSearch, (r) => r.date_loaded, 'desc');
+			case 'date-loaded-asc':
+				return sortByDate(afterSearch, (r) => r.date_loaded, 'asc');
+			case 'date-finished-desc':
+				return sortByDate(afterSearch, (r) => r.date_finished, 'desc');
+			case 'date-finished-asc':
+				return sortByDate(afterSearch, (r) => r.date_finished, 'asc');
+			case 'roll-id-asc':
+				return sortByString(afterSearch, (r) => r.roll_id, 'asc');
+			case 'roll-id-desc':
+				return sortByString(afterSearch, (r) => r.roll_id, 'desc');
+			case 'date-added-desc':
+				return sortByDate(afterSearch, (r) => r.created_at, 'desc');
+			default:
+				return sortByDate(afterSearch, (r) => r.date_loaded, 'desc');
 		}
 	});
 
 	const grouped = $derived.by(() => {
-		if (groupBy === 'status')
-			return groupItems(afterSort, (r) => statusConfig[r.status]?.label ?? r.status);
+		if (groupBy === 'status') return groupItems(afterSort, (r) => statusConfig[r.status]?.label ?? r.status);
 		if (groupBy === 'camera')
-			return groupItems(afterSort, (r) =>
-				r.camera_brand ? `${r.camera_brand} ${r.camera_model}` : 'No Camera'
-			);
+			return groupItems(afterSort, (r) => (r.camera_brand ? `${r.camera_brand} ${r.camera_model}` : 'No Camera'));
 		if (groupBy === 'film-stock')
 			return groupItems(afterSort, (r) =>
 				r.film_stock_brand ? `${r.film_stock_brand} ${r.film_stock_name}` : 'No Film Stock'
@@ -149,25 +151,22 @@
 			<Button
 				size="sm"
 				variant={filterStatus === s.value ? 'primary' : 'ghost'}
-				onclick={() => (filterStatus = s.value)}
-			>{s.label}</Button>
+				onclick={() => (filterStatus = s.value)}>{s.label}</Button
+			>
 		{/each}
 	</div>
 
 	{#if loading}
 		<p class="text-sm text-text-muted">Loading...</p>
 	{:else if resultCount === 0 && rolls.length === 0}
-		<EmptyState
-			title="No Rolls"
-			message="Create your first roll to get started."
-		>
+		<EmptyState title="No Rolls" message="Create your first roll to get started.">
 			{#snippet art()}<FilmLeader />{/snippet}
 			<Button variant="primary" href="/rolls/new">+ New Roll</Button>
 		</EmptyState>
 	{:else if resultCount === 0}
 		{#if filterStatus !== 'all' && !searchQuery}
 			<EmptyState
-				title={`No ${statuses.find(s => s.value === filterStatus)?.label ?? filterStatus} Rolls`}
+				title={`No ${statuses.find((s) => s.value === filterStatus)?.label ?? filterStatus} Rolls`}
 				message="Try a different filter."
 			>
 				{#snippet icon()}<Film size={24} strokeWidth={1.5} />{/snippet}

@@ -146,10 +146,7 @@ impl ImportService {
                     err_resp.error.message
                 ));
             }
-            return Err(format!(
-                "Anthropic API returned HTTP {}.",
-                status.as_u16()
-            ));
+            return Err(format!("Anthropic API returned HTTP {}.", status.as_u16()));
         }
 
         let list: ModelsListResponse = response

@@ -5,22 +5,22 @@
 ## Context / problem
 
 On the roll-detail page, the **Timeline** shows "Received back" (the lab-done milestone)
-with no date, and lifecycle dates are otherwise either silently stamped to *today* on a
+with no date, and lifecycle dates are otherwise either silently stamped to _today_ on a
 status transition or edited in a separate form. But the day a milestone actually happened
 is frequently not the day the user clicks the status chevron (e.g. you mark a roll "Lab
 Done" days after it came back). Today's behavior is also **inconsistent** across transitions:
 
-| → Status | Current behavior |
-|---|---|
-| Shot | "roll full" nudge captures an editable finish date ✅ |
-| At Lab | auto-opens full Lab dialog (captures dropoff date) ✅ |
-| **Lab Done** | **nothing — `date_received` stays null** ❌ |
-| Developing | auto-opens full Self dialog (captures processed date) ✅ |
-| Developed | nothing |
-| Scanned / Post-processed / Archived | silently stamps **today**, no chance to adjust ⚠️ |
+| → Status                            | Current behavior                                         |
+| ----------------------------------- | -------------------------------------------------------- |
+| Shot                                | "roll full" nudge captures an editable finish date ✅    |
+| At Lab                              | auto-opens full Lab dialog (captures dropoff date) ✅    |
+| **Lab Done**                        | **nothing — `date_received` stays null** ❌              |
+| Developing                          | auto-opens full Self dialog (captures processed date) ✅ |
+| Developed                           | nothing                                                  |
+| Scanned / Post-processed / Archived | silently stamps **today**, no chance to adjust ⚠️         |
 
 The "Received back" gap and the click-day≠event-day pain are the same root issue: clicking a
-chevron should let you record the date the milestone *actually happened*, consistently.
+chevron should let you record the date the milestone _actually happened_, consistently.
 
 ## Goals
 
@@ -42,16 +42,16 @@ chevron should let you record the date the milestone *actually happened*, consis
 
 Every target date already exists with an existing update endpoint:
 
-| Milestone | Record · field | Update path |
-|---|---|---|
-| Loaded | `roll.date_loaded` | `PUT /api/rolls/:id` (`updateRoll`) |
-| Finished shooting | `roll.date_finished` | `updateRoll` |
-| Dropped off at lab | `development_lab.date_dropped_off` | lab-dev update |
-| **Received back** | `development_lab.date_received` | lab-dev update |
-| Developed | `development_self.date_processed` | self-dev update |
-| Scanned | `roll.date_scanned` | `updateRoll` |
-| Post-processed | `roll.date_post_processed` | `updateRoll` |
-| Archived | `roll.date_archived` | `updateRoll` |
+| Milestone          | Record · field                     | Update path                         |
+| ------------------ | ---------------------------------- | ----------------------------------- |
+| Loaded             | `roll.date_loaded`                 | `PUT /api/rolls/:id` (`updateRoll`) |
+| Finished shooting  | `roll.date_finished`               | `updateRoll`                        |
+| Dropped off at lab | `development_lab.date_dropped_off` | lab-dev update                      |
+| **Received back**  | `development_lab.date_received`    | lab-dev update                      |
+| Developed          | `development_self.date_processed`  | self-dev update                     |
+| Scanned            | `roll.date_scanned`                | `updateRoll`                        |
+| Post-processed     | `roll.date_post_processed`         | `updateRoll`                        |
+| Archived           | `roll.date_archived`               | `updateRoll`                        |
 
 ## Design
 
@@ -111,10 +111,11 @@ which already implements confirm-on-transition for `date_finished`; optionally r
 reuse `DateConfirm`, but no behavior change.)
 
 `handleStatusClick` flow:
+
 - **Backward** move → existing `ConfirmDialog` (unchanged; dates untouched).
 - **Forward** into a status with a `STATUS_DATE_TARGET` whose **target date is empty** → open
   `DateConfirm` (default today) instead of stamping. **Confirm(date)** → advance status
-  (`updateRoll {status}`) *and* write `date` to the target record (roll/lab/self). **Cancel** →
+  (`updateRoll {status}`) _and_ write `date` to the target record (roll/lab/self). **Cancel** →
   do nothing (status does not change; misclick is recoverable).
 - Forward into a status with no target, or whose target date is already set → advance directly
   (current behavior), including the `at-lab`/`developing` dev-dialog auto-prompt.
@@ -133,10 +134,12 @@ fields (roll ID, camera, film stock, lens, frame count, push/pull, notes).
 ## Files
 
 **New**
+
 - `frontend/src/lib/components/ui/DateConfirm.svelte`
 - `frontend/src/lib/components/rolls/RollTimeline.svelte`
 
 **Modified**
+
 - `frontend/src/lib/utils/timeline.ts` — `DateTarget` + `target`/`editable` on milestones.
 - `frontend/src/routes/(app)/rolls/[id]/+page.svelte` — `STATUS_DATE_TARGET`; `handleStatusClick`/
   `updateStatus` open `DateConfirm` on forward+empty; render `<RollTimeline onedit=…>`; route

@@ -551,7 +551,10 @@ async fn delete_missing_self_dev_returns_404() {
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
     let body: Value = json_body(res).await;
     assert_eq!(body["error"]["code"], "NOT_FOUND");
-    assert_eq!(body["error"]["message"], "Self development 999999 not found");
+    assert_eq!(
+        body["error"]["message"],
+        "Self development 999999 not found"
+    );
 }
 
 // --- kammerz-8rh: delete-side status reverts + sibling/no-regression branches ---
