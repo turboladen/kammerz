@@ -307,7 +307,7 @@
 			<!-- Entry Form -->
 			<FadeIn delay={50}>
 			<div class="mb-6 rounded-lg border border-border bg-surface-raised p-5">
-				<div class="grid grid-cols-4 gap-3">
+				<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
 					<Input label="Frame" bind:value={frameNumber} placeholder="1" required />
 					<Input label="f/" bind:value={aperture} placeholder="5.6" data-field="aperture" />
 					<Input label="Speed" bind:value={shutterSpeed} placeholder="1/125" />

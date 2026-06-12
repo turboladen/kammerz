@@ -325,11 +325,11 @@
 <!-- Add Camera Dialog -->
 <Dialog bind:open={showAddDialog} title="Add Camera">
 	<div class="space-y-4">
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<ComboInput label="Brand" bind:value={brand} placeholder="Minolta" options={brandOptions} />
 			<Input label="Model" bind:value={model} placeholder="XD-7" spellcheck="false" />
 		</div>
-		<div class="grid grid-cols-3 gap-4">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
 			<Select label="Format" bind:value={format} options={formatOptions} />
 			<Select label="Lens Mount" bind:value={lensMountId} options={lensMountOptions} />
 			<Select label="Type" bind:value={cameraType} options={typeOptions} />
@@ -342,18 +342,18 @@
 				</h3>
 				<div class="space-y-4">
 					<Input label="Model" bind:value={lensModel} placeholder="Rokkor 75mm f/3.5" hint="Brand, mount, and purchase info will match the camera" />
-					<div class="grid grid-cols-2 gap-4">
+					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<Input label="Focal Length (mm)" bind:value={lensFocalLength} placeholder="75" />
 						<Input label="Max Aperture (f/)" bind:value={lensMaxAperture} placeholder="3.5" />
 					</div>
 				</div>
 			</div>
 		{/if}
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<Input label="Prefix (Legacy ID)" bind:value={prefix} placeholder="MD7" hint="Optional, for legacy roll IDs" />
 			<Input label="Serial Number" bind:value={serialNumber} placeholder="1234567" />
 		</div>
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<DateInput label="Date Purchased" bind:value={datePurchased} />
 			<ComboInput label="Purchased From" bind:value={purchasedFrom} placeholder="eBay, KEH, etc." options={vendorOptions} />
 		</div>

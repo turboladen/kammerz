@@ -35,9 +35,9 @@
 	);
 </script>
 
-<div class="mb-3 flex items-center gap-3">
-	<!-- Search input -->
-	<div class="relative flex-1">
+<div class="mb-3 flex flex-wrap items-center gap-3">
+	<!-- Search input (full row on narrow screens, flexes inline on sm+) -->
+	<div class="relative basis-full sm:basis-0 sm:flex-1">
 		<div class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-faint">
 			<Search size={14} strokeWidth={1.75} />
 		</div>

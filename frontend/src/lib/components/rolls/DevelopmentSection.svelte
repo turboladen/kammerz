@@ -453,7 +453,7 @@
 				</div>
 			{/if}
 			<Select label="Lab" bind:value={devLabId} options={labOptions} />
-			<div class="grid grid-cols-2 gap-3">
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 				<DateInput label="Date Submitted" bind:value={devDateDroppedOff} />
 				<DateInput label="Date Received" bind:value={devDateReceived} />
 			</div>
@@ -480,14 +480,14 @@
 					{selfStatusNote}
 				</div>
 			{/if}
-			<div class="grid grid-cols-2 gap-3">
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 				<DateInput label="Date Processed" bind:value={devDateProcessed} />
 				<Input label="Temperature" bind:value={devTemperature} placeholder="20°C" />
 			</div>
 
 			<div>
 				<span class="mb-2 block text-xs font-semibold uppercase tracking-wider text-text-faint">Chemistry</span>
-				<div class="grid grid-cols-2 gap-3">
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 					<Input label="Developer" bind:value={devDeveloper} placeholder="Rodinal" />
 					<Input label="Dilution" bind:value={devDeveloperDilution} placeholder="1+25" />
 					<Input label="Fixer" bind:value={devFixer} placeholder="Ilford Rapid Fix" />

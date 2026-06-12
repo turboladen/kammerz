@@ -362,24 +362,24 @@
 <!-- Add Lens Dialog -->
 <Dialog bind:open={showAddDialog} title="Add Lens">
 	<div class="space-y-4">
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<ComboInput label="Brand/Manufacturer" bind:value={brand} placeholder="Minolta" options={brandOptions} />
 			<Select label="Lens Mount" bind:value={lensMountId} options={lensMountOptions} />
 		</div>
 		<Input label="Model" bind:value={lensModel} placeholder="MD Rokkor 50mm f/1.4" hint="Don't include the brand" />
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<Input label="Focal Length (mm)" bind:value={focalLength} placeholder="50 or 28-85" />
 			<Input label="Max Aperture (f/)" bind:value={maxAperture} placeholder="1.4" />
 		</div>
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<Input label="Min Aperture (f/)" bind:value={minAperture} placeholder="22" />
 			<Input label="Filter Thread Front (mm)" bind:value={filterFrontMm} type="number" placeholder="55" />
 		</div>
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<Input label="Filter Thread Rear (mm)" bind:value={filterRearMm} type="number" placeholder="" />
 			<Input label="Serial Number" bind:value={serialNumber} />
 		</div>
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<DateInput label="Date Purchased" bind:value={datePurchased} />
 			<ComboInput label="Purchased From" bind:value={purchasedFrom} options={vendorOptions} />
 		</div>
@@ -405,24 +405,24 @@
 					Fixed lens{#if cameraName}{' '}on <span class="font-semibold">{cameraName}</span>{/if}
 				</div>
 			{/if}
-			<div class="grid grid-cols-2 gap-4">
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<ComboInput label="Brand/Manufacturer" bind:value={brand} options={brandOptions} />
 				<Select label="Lens Mount" bind:value={lensMountId} options={lensMountOptions} />
 			</div>
 			<Input label="Model" bind:value={lensModel} hint="Don't include the brand" />
-			<div class="grid grid-cols-2 gap-4">
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<Input label="Focal Length (mm)" bind:value={focalLength} />
 				<Input label="Max Aperture (f/)" bind:value={maxAperture} />
 			</div>
-			<div class="grid grid-cols-2 gap-4">
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<Input label="Min Aperture (f/)" bind:value={minAperture} />
 				<Input label="Filter Thread Front (mm)" bind:value={filterFrontMm} type="number" />
 			</div>
-			<div class="grid grid-cols-2 gap-4">
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<Input label="Filter Thread Rear (mm)" bind:value={filterRearMm} type="number" />
 				<Input label="Serial Number" bind:value={serialNumber} />
 			</div>
-			<div class="grid grid-cols-2 gap-4">
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<DateInput label="Date Purchased" bind:value={datePurchased} />
 				<ComboInput label="Purchased From" bind:value={purchasedFrom} options={vendorOptions} />
 			</div>

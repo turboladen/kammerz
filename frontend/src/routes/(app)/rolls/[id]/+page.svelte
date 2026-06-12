@@ -717,7 +717,7 @@
 		<div class="relative mb-6 overflow-hidden rounded-lg border border-border bg-surface-raised p-5">
 			{#if editingRoll}
 				<div class="space-y-4">
-					<div class="grid grid-cols-2 gap-4">
+					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<Input label="Roll ID" bind:value={editRollId} />
 						<Input label="Frame Count" bind:value={editFrameCount} type="number" placeholder="36" hint={editFrameCountHint} />
 					</div>
@@ -733,7 +733,7 @@
 					{:else}
 						<Select label="Default Lens" bind:value={editLensId} options={editLensOptions} />
 					{/if}
-					<div class="grid grid-cols-2 gap-4">
+					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<Select label="Push/Pull" bind:value={editPushPull} options={pushPullOptions} />
 						<Input label="Fuzzy Date" bind:value={editDateFuzzy} placeholder="e.g. 'early October 2025'" />
 					</div>
@@ -809,7 +809,7 @@
 			{#if pathLabel}
 				<p class="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-text-faint/70">{pathLabel}</p>
 			{/if}
-			<div class="flex items-center gap-[2px]">
+			<div class="flex flex-wrap items-center gap-[2px] gap-y-1">
 				{#each statusFlow as status, idx}
 					{@const isFirst = idx === 0}
 					{@const isLast = idx === statusFlow.length - 1}
@@ -821,7 +821,7 @@
 					<button
 						onclick={() => handleStatusClick(status)}
 						style="clip-path: {clipPath}"
-						class="py-1.5 text-xs font-medium transition-colors
+						class="whitespace-nowrap py-1.5 text-xs font-medium transition-colors
 							{isFirst ? 'pl-3 pr-4' : isLast ? 'pl-4 pr-3' : 'px-4'}
 							{roll.status === status
 							? 'bg-accent text-surface'
@@ -1015,12 +1015,12 @@
 {#if showShotDialog}
 	<Dialog open={true} title={editingShotId ? 'Edit Shot' : 'Add Shot'} onclose={() => { showShotDialog = false; resetShotForm(); }}>
 		<div class="space-y-4">
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
 				<Input label="Frame #" bind:value={shotFrameNumber} placeholder="1" required />
 				<Input label="Aperture (f/)" bind:value={shotAperture} placeholder="5.6" />
 				<Input label="Shutter Speed" bind:value={shotShutterSpeed} placeholder="1/125" />
 			</div>
-			<div class="grid grid-cols-2 gap-3">
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 				<DateInput label="Date" bind:value={shotDate} />
 				<Input label="Location" bind:value={shotLocation} placeholder="Central Park" />
 			</div>

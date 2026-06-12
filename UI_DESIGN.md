@@ -197,7 +197,18 @@ Wraps content in staggered `fade-in-up` animation (200ms, ease-out). Use on all 
 ```
 
 - `flex h-screen overflow-hidden`
-- Sidebar is fixed width, main content scrolls independently
+- Sidebar is fixed width, main content scrolls independently (`min-w-0` on `main` so wide grids can't push past the viewport)
+
+### Responsive Layout (mobile / field use)
+
+The app is used in the field on a phone, so every layout must degrade below `md` (768px):
+
+- **Sidebar → drawer.** Below `md`, the sidebar becomes a slide-in drawer (`fixed inset-y-0 -translate-x-full`, `translate-x-0` when open) behind a `bg-black/50` backdrop; a mobile-only top bar (`md:hidden`) with a hamburger (`Menu` icon) and the brand opens it. The drawer closes on navigation (`afterNavigate`), backdrop tap, or Escape. On `md+` it's the persistent `w-56` column — unchanged.
+- **Stat-card grids** (Dashboard, Stats) use `grid-cols-2 md:grid-cols-4`.
+- **Form grids** (dialogs, edit panes, create pages) collapse to one column on phones: `grid-cols-1 sm:grid-cols-2` (or `sm:grid-cols-3`). Never a fixed multi-column form grid.
+- **Dialog backdrops** carry `p-4` so panels are never edge-to-edge on small screens.
+- **ListToolbar** wraps (`flex-wrap`); the search input takes its own full row below `sm` (`basis-full sm:basis-0 sm:flex-1`).
+- **Roll status chevron bar** wraps (`flex-wrap`) with `whitespace-nowrap` segments instead of crushing/clipping.
 
 ### Sidebar (`frontend/src/lib/components/layout/Sidebar.svelte`)
 
