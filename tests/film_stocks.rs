@@ -2,7 +2,7 @@ mod common;
 
 use axum::http::StatusCode;
 use common::{delete, get, json_body, open_app, post_json, put_json};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tower::ServiceExt;
 
 #[tokio::test]

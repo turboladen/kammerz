@@ -2,10 +2,10 @@ use axum::extract::State;
 use axum::routing::get;
 use axum::{Json, Router};
 
+use crate::AppState;
 use crate::auth::middleware::RequireAuth;
 use crate::error::AppResult;
 use crate::services::stats_service::{CatalogStats, StatsService};
-use crate::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/", get(get_stats))

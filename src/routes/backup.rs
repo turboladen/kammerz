@@ -9,16 +9,16 @@
 //! "Backups" section documents this endpoint plus the equivalent `sqlite3`
 //! CLI invocation for shell-based backup jobs.
 
+use axum::Router;
 use axum::extract::State;
 use axum::http::header;
 use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::Router;
 use sea_orm::DatabaseConnection;
 
+use crate::AppState;
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult};
-use crate::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/", get(download_backup))

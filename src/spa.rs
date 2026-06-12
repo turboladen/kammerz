@@ -25,7 +25,7 @@
 //! fresh tree.
 
 use axum::body::Body;
-use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
+use axum::http::{HeaderMap, HeaderValue, Response, StatusCode, header};
 
 /// `Cache-Control` for the content-hashed bundle under `_app/immutable/*`: the
 /// filename changes whenever the bytes do, so the browser may cache for a year

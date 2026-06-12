@@ -2,7 +2,7 @@ mod common;
 
 use axum::http::StatusCode;
 use common::{delete, get, json_body, open_app, post_json, put_json};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tower::ServiceExt;
 
 async fn first_camera_id(app: &axum::Router) -> i32 {
@@ -255,10 +255,12 @@ async fn create_shot_rejects_whitespace_frame_number() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body: Value = json_body(res).await;
-    assert!(body["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("frame_number"));
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("frame_number")
+    );
 }
 
 #[tokio::test]
@@ -274,10 +276,12 @@ async fn create_shot_rejects_out_of_range_latitude() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body: Value = json_body(res).await;
-    assert!(body["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("gps_lat"));
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("gps_lat")
+    );
 }
 
 #[tokio::test]

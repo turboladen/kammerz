@@ -1,10 +1,11 @@
+use axum::Router;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::{get, post};
-use axum::Router;
 use sea_orm::{DatabaseConnection, DbErr, EntityTrait, Set, TransactionTrait};
 use serde::Deserialize;
 
+use crate::AppState;
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, OptionExt};
 use crate::extract::{Json, Path};
@@ -13,7 +14,6 @@ use crate::routes::{friendly_delete_err, friendly_err};
 use crate::services::camera_service::CameraService;
 use crate::services::lens_service::LensService;
 use crate::validate::{require_nonempty, validate_date_opt, validate_non_negative_f64};
-use crate::AppState;
 use entity::camera::{self, CameraFormat, CameraType};
 use entity::camera_maintenance::{self, MaintenanceType};
 use entity::lens;

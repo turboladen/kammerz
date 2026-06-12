@@ -8,11 +8,11 @@ use axum::body::Body;
 use axum::http::Request;
 use axum::response::Response;
 use http_body_util::BodyExt;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
-use kammerz::config::AppConfig;
 use kammerz::AppState;
+use kammerz::config::AppConfig;
 
 /// Build an app in OPEN auth mode (no password) backed by a fresh in-memory DB.
 /// In open mode `RequireAuth` passes without a session, so no session layer is needed.

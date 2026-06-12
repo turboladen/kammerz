@@ -1,13 +1,13 @@
+use axum::Router;
 use axum::extract::State;
 use axum::routing::get;
-use axum::Router;
 use serde::Deserialize;
 
+use crate::AppState;
 use crate::auth::middleware::RequireAuth;
 use crate::error::AppResult;
 use crate::extract::{Json, Query};
 use crate::services::search_service::{SearchResults, SearchService};
-use crate::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct SearchQuery {

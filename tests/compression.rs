@@ -14,11 +14,11 @@
 
 mod common;
 
-use axum::http::header::{ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_TYPE};
+use axum::Router;
 use axum::http::StatusCode;
+use axum::http::header::{ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_TYPE};
 use axum::response::IntoResponse;
 use axum::routing::get as get_route;
-use axum::Router;
 use common::{get, open_app};
 use http_body_util::BodyExt;
 use kammerz::compression::compression_layer;

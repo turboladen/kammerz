@@ -1,10 +1,11 @@
+use axum::Router;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::get;
-use axum::Router;
 use sea_orm::Set;
 use serde::Deserialize;
 
+use crate::AppState;
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, OptionExt};
 use crate::extract::{Json, Path};
@@ -12,7 +13,6 @@ use crate::patch::{double_option, now_string, trim_opt};
 use crate::routes::{friendly_delete_err, friendly_err};
 use crate::services::lab_service::LabService;
 use crate::validate::require_nonempty;
-use crate::AppState;
 use entity::lab;
 
 // --- DTOs (moved verbatim from commands/labs.rs) ---

@@ -1,6 +1,6 @@
+use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use serde_json::json;
 
 pub type AppResult<T> = Result<T, AppError>;
@@ -142,9 +142,11 @@ mod tests {
             "The service is temporarily unavailable"
         );
         // The raw cause must not leak to unauthenticated callers.
-        assert!(!body["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("disk I/O"));
+        assert!(
+            !body["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("disk I/O")
+        );
     }
 }

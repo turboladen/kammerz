@@ -1,15 +1,15 @@
 use axum::extract::State;
-use axum::routing::{get, post, MethodRouter};
+use axum::routing::{MethodRouter, get, post};
 use axum::{Json, Router};
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, TransactionError};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
+use tower_governor::GovernorLayer;
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::{KeyExtractor, PeerIpKeyExtractor, SmartIpKeyExtractor};
-use tower_governor::GovernorLayer;
 
+use crate::AppState;
 use crate::auth::{handlers, rate_limit};
 use crate::error::{AppError, AppResult};
-use crate::AppState;
 
 pub mod backup;
 pub mod cameras;
