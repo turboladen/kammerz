@@ -27,7 +27,7 @@
 	import { lensDisplayName, buildLensOptions } from '$lib/utils/lens';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
-	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder, devKindForStatus } from '$lib/utils/status';
+	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder, devKindForStatus, type DevAutoPrompt } from '$lib/utils/status';
 	import { buildRollTimeline, readDateTarget, STATUS_DATE_TARGET } from '$lib/utils/timeline';
 	import { todayLocal, dateFieldError } from '$lib/utils/date';
 	import type { RollWithDetails, RollInsert, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
@@ -87,7 +87,10 @@
 	let labDev: DevelopmentLab | null = $state(null);
 	let selfDev: DevelopmentSelf | null = $state(null);
 	let devStages: DevStage[] = $state([]);
-	let devAutoPrompt: 'lab' | 'self' | null = $state(null);
+	let devAutoPrompt: DevAutoPrompt | null = $state(null);
+	// Inline notice under the chevron bar — set when a prompt-opened dev dialog is
+	// cancelled, so a dropped status click is acknowledged instead of silent.
+	let statusNotice = $state('');
 
 	// Path-aware status flow
 	const devPath = $derived(
@@ -266,8 +269,10 @@
 	async function loadRollData() {
 		// Clear any stale error: this component instance is reused across [id]
 		// changes (the $effect re-runs loadRollData()), so a prior failure must
-		// not leak into the next roll's view.
+		// not leak into the next roll's view. The cancel notice is transient for
+		// the same reason — any successful mutation reload supersedes it.
 		error = '';
+		statusNotice = '';
 		try {
 			// The composite /detail endpoint collapses the six roll-scoped
 			// round-trips (roll, shots, shot-lens pairs, lab/self dev, dev stages)
@@ -484,6 +489,7 @@
 	// status's target record. Backward moves never write a date.
 	async function updateStatus(status: RollStatus, date?: string) {
 		error = '';
+		statusNotice = '';
 		try {
 			const patch: Partial<RollInsert> = { status };
 			const target = STATUS_DATE_TARGET[status];
@@ -544,6 +550,7 @@
 
 	function handleStatusClick(status: RollStatus) {
 		if (!roll) return;
+		statusNotice = '';
 		const targetIdx = statusFlow.indexOf(status);
 		// Backward move — confirm, never touch dates.
 		if (currentStatusIdx !== -1 && targetIdx < currentStatusIdx) {
@@ -554,13 +561,16 @@
 		// dev dialog instead of advancing. Creating the record auto-syncs the status (backend),
 		// so a status is never stranded at at-lab/lab-done/developing/developed with no backing
 		// record (and no way to capture its dates). Mirrors the "Develop" menu (chooseDevPath).
+		// The clicked status rides along as `target` so the dialog can seed the date
+		// field that lands the roll there (e.g. a "Lab Done" click pre-fills Date
+		// Received — otherwise saving would stop one rung short at At Lab).
 		const devKind = devKindForStatus(status);
 		if (devKind === 'lab' && !labDev) {
-			devAutoPrompt = 'lab';
+			devAutoPrompt = { kind: 'lab', target: status };
 			return;
 		}
 		if (devKind === 'self' && !selfDev) {
-			devAutoPrompt = 'self';
+			devAutoPrompt = { kind: 'self', target: status };
 			return;
 		}
 		// Forward into a date-bearing status whose date isn't recorded yet → prompt. The dev
@@ -592,7 +602,8 @@
 	// this path, the backend auto-syncs status, and the chevron bar re-renders.
 	function chooseDevPath(path: 'lab' | 'self') {
 		showDevPathMenu = false;
-		devAutoPrompt = path;
+		statusNotice = '';
+		devAutoPrompt = { kind: path };
 	}
 
 	const pushPullOptions = [
@@ -862,6 +873,9 @@
 					{/if}
 				{/each}
 			</div>
+			{#if statusNotice}
+				<p class="mt-2 text-xs text-text-faint">{statusNotice}</p>
+			{/if}
 		</div>
 		</FadeIn>
 
@@ -885,8 +899,10 @@
 			bind:selfDev
 			bind:devStages
 			bind:autoPrompt={devAutoPrompt}
+			currentStatus={roll?.status ?? null}
 			defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
 			onchange={loadRollData}
+			onpromptcancel={() => { statusNotice = 'Status unchanged — no development record was saved.'; }}
 		/>
 
 		</FadeIn>

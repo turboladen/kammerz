@@ -16,8 +16,10 @@
 		deleteSelfDev
 	} from '$lib/api/development';
 	import { secondsToMmSs, mmSsToSeconds } from '$lib/utils/duration';
-	import { dateFieldError } from '$lib/utils/date';
-	import type { Lab, DevelopmentLab, DevelopmentSelf, DevStage } from '$lib/types';
+	import { dateFieldError, todayLocal } from '$lib/utils/date';
+	import { labFlow, selfFlow, getStatusLabel } from '$lib/utils/status';
+	import type { DevAutoPrompt } from '$lib/utils/status';
+	import type { Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus } from '$lib/types';
 
 	let {
 		rollId,
@@ -26,17 +28,25 @@
 		selfDev = $bindable(),
 		devStages = $bindable(),
 		autoPrompt = $bindable(null),
+		currentStatus = null,
 		defaultDate = '',
-		onchange
+		onchange,
+		onpromptcancel
 	}: {
 		rollId: number;
 		labs: Lab[];
 		labDev: DevelopmentLab | null;
 		selfDev: DevelopmentSelf | null;
 		devStages: DevStage[];
-		autoPrompt: 'lab' | 'self' | null;
+		autoPrompt: DevAutoPrompt | null;
+		/** The roll's current status — lets the dialog notes tell the truth when the
+		 * backend's forward-only sync won't actually move the roll (e.g. retroactively
+		 * recording dev info on a scanned roll). */
+		currentStatus?: RollStatus | null;
 		defaultDate?: string;
 		onchange: () => Promise<void>;
+		/** Fired when a dialog opened via autoPrompt is dismissed without saving. */
+		onpromptcancel?: () => void;
 	} = $props();
 
 	// Dialog visibility
@@ -45,6 +55,12 @@
 	let showDevDeleteConfirm = $state(false);
 	let devDeleteType: 'lab' | 'self' = $state('lab');
 	let devDeleteError = $state('');
+
+	// Auto-prompt bookkeeping: which status chevron opened the current dialog (null when
+	// opened via Edit or with no specific target), and whether the dialog was opened by a
+	// prompt at all (so Cancel can report "status unchanged" back to the parent).
+	let promptTarget: RollStatus | null = $state(null);
+	let promptOpen = $state(false);
 
 	// Lab dev form
 	let devLabId = $state('');
@@ -76,15 +92,52 @@
 		...labs.map((l) => ({ value: String(l.id), label: l.name }))
 	]);
 
-	// Auto-prompt: parent sets autoPrompt to trigger opening a dialog
+	// Auto-prompt: parent sets autoPrompt to trigger opening a dialog. The clicked
+	// status target (if any) is captured first so the open functions can seed the
+	// date field that actually lands the roll there (kammerz-zoo).
 	$effect(() => {
-		if (autoPrompt === 'lab') {
-			openLabDevDialog();
+		if (autoPrompt) {
+			const { kind, target } = autoPrompt;
 			autoPrompt = null;
-		} else if (autoPrompt === 'self') {
-			openSelfDevDialog();
-			autoPrompt = null;
+			promptTarget = target ?? null;
+			promptOpen = true;
+			if (kind === 'lab') {
+				openLabDevDialog();
+			} else {
+				openSelfDevDialog();
+			}
 		}
+	});
+
+	// Contextual status notes — the backend syncs roll status from the dev record's
+	// date fields (date_received → Lab Done, date_processed → Developed), which is
+	// invisible from the form alone. These react to the live field values so the
+	// dialog always tells the truth about where Save will land the roll — including
+	// when it won't move at all: the backend's advance_status_along is forward-only,
+	// so a roll already at/past the target (e.g. retroactively recording dev info on
+	// a scanned roll) keeps its status, and the note must not claim otherwise.
+	function saveWillMoveTo(flow: RollStatus[], target: RollStatus): boolean {
+		if (!currentStatus) return true; // status unknown — assume the normal forward case
+		const cur = flow.indexOf(currentStatus);
+		return cur !== -1 && cur < flow.indexOf(target);
+	}
+	const labStatusNote = $derived.by(() => {
+		const target: RollStatus = devDateReceived ? 'lab-done' : 'at-lab';
+		if (currentStatus && !saveWillMoveTo(labFlow, target)) {
+			return `Saving will record the development info — this roll stays at ${getStatusLabel(currentStatus)}.`;
+		}
+		return devDateReceived
+			? 'Saving will move this roll to Lab Done (Date Received is set).'
+			: 'Saving will move this roll to At Lab — set Date Received to mark it Lab Done.';
+	});
+	const selfStatusNote = $derived.by(() => {
+		const target: RollStatus = devDateProcessed ? 'developed' : 'developing';
+		if (currentStatus && !saveWillMoveTo(selfFlow, target)) {
+			return `Saving will record the development info — this roll stays at ${getStatusLabel(currentStatus)}.`;
+		}
+		return devDateProcessed
+			? 'Saving will move this roll to Developed (Date Processed is set).'
+			: 'Saving will move this roll to Developing — set Date Processed to mark it Developed.';
 	});
 
 	// --- Form helpers ---
@@ -125,6 +178,9 @@
 			resetLabDevForm();
 			// Smart date default: last shot's date > roll's date_loaded > empty
 			if (defaultDate) devDateDroppedOff = defaultDate;
+			// Honor a "Lab Done" chevron click: date_received is what the backend
+			// uses to land the roll at Lab Done instead of At Lab, so seed it.
+			if (promptTarget === 'lab-done') devDateReceived = todayLocal();
 		}
 		devLabError = '';
 		showLabDevDialog = true;
@@ -150,11 +206,41 @@
 			}));
 		} else {
 			resetSelfDevForm();
-			// Smart date default: last shot's date > roll's date_loaded > empty
-			if (defaultDate) devDateProcessed = defaultDate;
+			// Honor the clicked chevron: date_processed is what the backend uses to land
+			// the roll at Developed vs Developing. "Developed" seeds today; "Developing"
+			// leaves it empty (a pre-filled date would overshoot the clicked status).
+			if (promptTarget === 'developed') {
+				devDateProcessed = todayLocal();
+			} else if (promptTarget !== 'developing' && defaultDate) {
+				// Smart date default: last shot's date > roll's date_loaded > empty
+				devDateProcessed = defaultDate;
+			}
 		}
 		devSelfError = '';
 		showSelfDevDialog = true;
+	}
+
+	// Clear the auto-prompt bookkeeping once a dialog closes (saved or not) so the
+	// next Edit-button open doesn't inherit a stale target.
+	function clearPromptState() {
+		promptOpen = false;
+		promptTarget = null;
+	}
+
+	function cancelLabDevDialog() {
+		showLabDevDialog = false;
+		resetLabDevForm();
+		// A prompt-opened dialog that's dismissed means the clicked status never
+		// happened — let the parent say so instead of silently dropping the click.
+		if (promptOpen) onpromptcancel?.();
+		clearPromptState();
+	}
+
+	function cancelSelfDevDialog() {
+		showSelfDevDialog = false;
+		resetSelfDevForm();
+		if (promptOpen) onpromptcancel?.();
+		clearPromptState();
 	}
 
 	async function handleSaveLabDev() {
@@ -176,6 +262,7 @@
 			}
 			showLabDevDialog = false;
 			resetLabDevForm();
+			clearPromptState();
 			await onchange();
 		} catch (err) {
 			devLabError = err instanceof Error ? err.message : String(err);
@@ -214,6 +301,7 @@
 			}
 			showSelfDevDialog = false;
 			resetSelfDevForm();
+			clearPromptState();
 			await onchange();
 		} catch (err) {
 			devSelfError = err instanceof Error ? err.message : String(err);
@@ -357,8 +445,13 @@
 
 <!-- Lab Development Dialog -->
 {#if showLabDevDialog}
-	<Dialog open={true} title={labDev ? 'Edit Lab Development' : 'Lab Development'} onclose={() => { showLabDevDialog = false; resetLabDevForm(); }}>
+	<Dialog open={true} title={labDev ? 'Edit Lab Development' : 'Lab Development'} onclose={cancelLabDevDialog}>
 		<div class="space-y-4">
+			{#if !labDev}
+				<div class="rounded-lg border border-accent/25 bg-accent/5 px-3 py-2 text-sm text-accent">
+					{labStatusNote}
+				</div>
+			{/if}
 			<Select label="Lab" bind:value={devLabId} options={labOptions} />
 			<div class="grid grid-cols-2 gap-3">
 				<DateInput label="Date Submitted" bind:value={devDateDroppedOff} />
@@ -371,7 +464,7 @@
 				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{devLabError}</div>
 			{/if}
 			<div class="flex justify-end gap-2 pt-2">
-				<Button variant="ghost" onclick={() => { showLabDevDialog = false; resetLabDevForm(); }}>Cancel</Button>
+				<Button variant="ghost" onclick={cancelLabDevDialog}>Cancel</Button>
 				<Button variant="primary" disabled={!!labDateError} onclick={handleSaveLabDev}>Save</Button>
 			</div>
 		</div>
@@ -380,8 +473,13 @@
 
 <!-- Self Development Dialog -->
 {#if showSelfDevDialog}
-	<Dialog open={true} title={selfDev ? 'Edit Self Development' : 'Self Development'} onclose={() => { showSelfDevDialog = false; resetSelfDevForm(); }}>
+	<Dialog open={true} title={selfDev ? 'Edit Self Development' : 'Self Development'} onclose={cancelSelfDevDialog}>
 		<div class="space-y-4">
+			{#if !selfDev}
+				<div class="rounded-lg border border-accent/25 bg-accent/5 px-3 py-2 text-sm text-accent">
+					{selfStatusNote}
+				</div>
+			{/if}
 			<div class="grid grid-cols-2 gap-3">
 				<DateInput label="Date Processed" bind:value={devDateProcessed} />
 				<Input label="Temperature" bind:value={devTemperature} placeholder="20°C" />
@@ -448,7 +546,7 @@
 				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{devSelfError}</div>
 			{/if}
 			<div class="flex justify-end gap-2 pt-2">
-				<Button variant="ghost" onclick={() => { showSelfDevDialog = false; resetSelfDevForm(); }}>Cancel</Button>
+				<Button variant="ghost" onclick={cancelSelfDevDialog}>Cancel</Button>
 				<Button variant="primary" disabled={!!selfDateError} onclick={handleSaveSelfDev}>Save</Button>
 			</div>
 		</div>

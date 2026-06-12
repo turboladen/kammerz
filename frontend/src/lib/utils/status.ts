@@ -166,6 +166,14 @@ export function getDevPath(
 }
 
 /**
+ * Request to auto-open a dev dialog (chevron click / Develop menu). `target` is the
+ * status chevron the user actually clicked (when any) so the dialog can seed the
+ * date field that lands the roll there and explain where saving will move it —
+ * without it, a "Lab Done" click silently lands at At Lab (kammerz-zoo).
+ */
+export type DevAutoPrompt = { kind: 'lab' | 'self'; target?: RollStatus };
+
+/**
  * Which development record a status belongs to, or null for roll-owned / undecided statuses.
  * The single source of the status→record-kind inference (also used by {@link getDevPath}) — a
  * pure lookup independent of whether the record exists. Used to gate "open the dev dialog before
