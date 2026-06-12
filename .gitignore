@@ -47,4 +47,6 @@ vite.config.ts.timestamp-*
 *.db-shm
 *.db-wal
 *.db-journal
+# Pre-migration snapshots (kammerz.db.pre-migrate-<ts> + its .tmp staging file)
+*.db.pre-migrate*
 .beads-credential-key

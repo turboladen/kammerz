@@ -3,16 +3,16 @@
 //! catalog, and must NOT snapshot fresh databases or up-to-date ones.
 
 use migration::{Migrator, MigratorTrait};
-
-/// Snapshots default OFF in debug builds (which tests are); force them on so
-/// these tests exercise the deployed-mode behavior. Every test in this file
-/// sets the same value, so the process-global env var cannot race.
-fn force_snapshots_on() {
-    std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "1");
-}
+use sea_orm::ConnectionTrait;
 
 /// Fresh temp dir + DB path for an isolated file-backed SQLite database.
+///
+/// Also forces snapshots ON: they default OFF in debug builds (which tests
+/// are), and folding the override into the fixture means a future test can't
+/// forget it and pass vacuously. Every test sets the same value, so the
+/// process-global env var cannot race.
 fn temp_db(name: &str) -> (std::path::PathBuf, std::path::PathBuf, String) {
+    std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "1");
     let dir = std::env::temp_dir().join(format!(
         "kammerz-snapshot-test-{name}-{}",
         std::process::id()
@@ -43,7 +43,6 @@ fn snapshots_in(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
 
 #[tokio::test]
 async fn fresh_db_takes_no_snapshot() {
-    force_snapshots_on();
     let (dir, _db_path, url) = temp_db("fresh");
 
     let db = kammerz::db::init(&url).await.unwrap();
@@ -58,7 +57,6 @@ async fn fresh_db_takes_no_snapshot() {
 
 #[tokio::test]
 async fn up_to_date_db_takes_no_snapshot() {
-    force_snapshots_on();
     let (dir, _db_path, url) = temp_db("up-to-date");
 
     let db = kammerz::db::init(&url).await.unwrap();
@@ -91,14 +89,23 @@ async fn applied_migration_count(db_file: &std::path::Path) -> i64 {
 
 #[tokio::test]
 async fn pending_migration_on_existing_db_takes_snapshot() {
-    force_snapshots_on();
     let (dir, db_path, url) = temp_db("pending");
 
     // First boot: apply all migrations, then roll the last one back so the
     // next boot sees an existing catalog with a genuinely pending migration —
     // the "upgrade the binary, restart the service" self-hoster flow.
     let db = kammerz::db::init(&url).await.unwrap();
+    // Project rule: migrations run with FK enforcement OFF (init() re-enabled
+    // it on this connection) — a future last migration whose down() rebuilds a
+    // table would otherwise cascade-delete child rows here. Note this test
+    // also assumes the newest migration has a working down().
+    db.execute_unprepared("PRAGMA foreign_keys=OFF")
+        .await
+        .unwrap();
     Migrator::down(&db, Some(1)).await.unwrap();
+    db.execute_unprepared("PRAGMA foreign_keys=ON")
+        .await
+        .unwrap();
     db.close().await.unwrap();
 
     let db = kammerz::db::init(&url).await.unwrap();
