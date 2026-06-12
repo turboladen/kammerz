@@ -5,6 +5,7 @@ import type {
 	DevelopmentSelfInsert,
 	DevStage,
 	DevStageInsert,
+	LabDevListItem,
 	SelfDevListItem
 } from '$lib/types';
 import { request } from './client';
@@ -20,6 +21,8 @@ export const updateLabDev = (id: number, data: Partial<DevelopmentLabInsert>) =>
 	request<void>('PUT', `/api/development/lab/${id}`, data);
 
 export const deleteLabDev = (id: number) => request<void>('DELETE', `/api/development/lab/${id}`);
+
+export const listAllLabDevelopments = () => request<LabDevListItem[]>('GET', '/api/development/lab');
 
 // --- Self Development ---
 

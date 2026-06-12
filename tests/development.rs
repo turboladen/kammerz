@@ -142,6 +142,68 @@ async fn create_self_dev_with_stages_and_lists() {
     assert_eq!(sd["id"].as_i64().unwrap() as i32, dev_id);
 }
 
+// kammerz-rv7: the /developments page must include lab developments (it was
+// self-only, leaving lab-path users a permanently empty page). GET
+// /api/development/lab lists every lab dev with its joined roll context, lab
+// name, drop-off/received dates, and cost.
+#[tokio::test]
+async fn list_all_lab_developments_includes_roll_and_lab_context() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "LAB-LIST").await;
+
+    // A named lab so the join surfaces a non-null lab_name.
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/labs", &json!({ "name": "The Darkroom" })))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let lab_id: i32 = json_body(res).await;
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/lab",
+            &json!({
+                "roll_id": roll_pk,
+                "lab_id": lab_id,
+                "date_dropped_off": "2026-05-01",
+                "date_received": "2026-05-10",
+                "cost": 18.5
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let dev_id: i32 = json_body(res).await;
+
+    let res = app.oneshot(get("/api/development/lab")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let all: Vec<Value> = json_body(res).await;
+    let ours = all
+        .iter()
+        .find(|d| d["dev_id"].as_i64() == Some(dev_id as i64))
+        .expect("our lab dev appears in list_all");
+
+    assert_eq!(ours["roll_pk"].as_i64().unwrap() as i32, roll_pk);
+    assert_eq!(ours["roll_id"], "LAB-LIST");
+    assert_eq!(ours["lab_name"], "The Darkroom");
+    assert_eq!(ours["date_dropped_off"], "2026-05-01");
+    assert_eq!(ours["date_received"], "2026-05-10");
+    assert_eq!(ours["cost"].as_f64().unwrap(), 18.5);
+}
+
+// kammerz-rv7: with no lab devs at all the endpoint returns an empty array (200),
+// not an error — so the page renders its empty state instead of failing.
+#[tokio::test]
+async fn list_all_lab_developments_empty_returns_ok() {
+    let app = open_app().await;
+    let res = app.oneshot(get("/api/development/lab")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let all: Vec<Value> = json_body(res).await;
+    assert!(all.is_empty(), "no lab devs seeded → empty list");
+}
+
 #[tokio::test]
 async fn create_lab_dev_advances_status() {
     let app = open_app().await;
