@@ -10,7 +10,7 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 mod common;
-use common::{app_with_password, get, open_app_with_db};
+use common::{app_with_password, get, open_app_with_url};
 
 #[tokio::test]
 async fn backup_returns_sqlite_snapshot_as_download() {
@@ -22,7 +22,7 @@ async fn backup_returns_sqlite_snapshot_as_download() {
         "kammerz-test-backup-{}-{nanos}.db",
         std::process::id()
     ));
-    let app = open_app_with_db(&format!("sqlite:{}?mode=rwc", db_path.to_str().unwrap())).await;
+    let app = open_app_with_url(&format!("sqlite:{}?mode=rwc", db_path.to_str().unwrap())).await;
 
     let res = app.oneshot(get("/api/backup")).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);

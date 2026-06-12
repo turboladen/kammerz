@@ -17,14 +17,14 @@ use kammerz::AppState;
 /// Build an app in OPEN auth mode (no password) backed by a fresh in-memory DB.
 /// In open mode `RequireAuth` passes without a session, so no session layer is needed.
 pub async fn open_app() -> axum::Router {
-    open_app_with_db("sqlite::memory:").await
+    open_app_with_url("sqlite::memory:").await
 }
 
 /// Like [`open_app`] but against an explicit `DATABASE_URL`. Used by tests that
 /// need a file-backed DB (e.g. the backup endpoint: through sqlx, `VACUUM INTO`
 /// on an in-memory database silently produces no output file, whereas a real
 /// deployment is always file-backed).
-pub async fn open_app_with_db(db_url: &str) -> axum::Router {
+pub async fn open_app_with_url(db_url: &str) -> axum::Router {
     let db = kammerz::db::init(db_url).await.unwrap();
     let config = AppConfig {
         password_hash: None,
