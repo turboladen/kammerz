@@ -453,25 +453,25 @@ Run these with `sqlite3 ./kammerz.db` (or whatever `DATABASE_URL` points at):
 
 ```sql
 -- Orphaned shots (no roll)
-SELECT s.id FROM shot s LEFT JOIN roll r ON s.roll_id = r.id WHERE r.id IS NULL;
+SELECT s.id FROM shots s LEFT JOIN rolls r ON s.roll_id = r.id WHERE r.id IS NULL;
 
 -- Orphaned shot_lenses
-SELECT sl.shot_id FROM shot_lenses sl LEFT JOIN shot s ON sl.shot_id = s.id WHERE s.id IS NULL;
+SELECT sl.shot_id FROM shot_lenses sl LEFT JOIN shots s ON sl.shot_id = s.id WHERE s.id IS NULL;
 
 -- Orphaned camera_lenses
-SELECT cl.camera_id FROM camera_lenses cl LEFT JOIN camera c ON cl.camera_id = c.id WHERE c.id IS NULL;
+SELECT cl.camera_id FROM camera_lenses cl LEFT JOIN cameras c ON cl.camera_id = c.id WHERE c.id IS NULL;
 
 -- Rolls with invalid camera_id
-SELECT r.id FROM roll r LEFT JOIN camera c ON r.camera_id = c.id WHERE r.camera_id IS NOT NULL AND c.id IS NULL;
+SELECT r.id FROM rolls r LEFT JOIN cameras c ON r.camera_id = c.id WHERE r.camera_id IS NOT NULL AND c.id IS NULL;
 
 -- Duplicate roll_ids
-SELECT roll_id, COUNT(*) FROM roll GROUP BY roll_id HAVING COUNT(*) > 1;
+SELECT roll_id, COUNT(*) FROM rolls GROUP BY roll_id HAVING COUNT(*) > 1;
 
 -- Multiple lab devs per roll (should be 0)
-SELECT roll_id, COUNT(*) FROM development_lab GROUP BY roll_id HAVING COUNT(*) > 1;
+SELECT roll_id, COUNT(*) FROM development_labs GROUP BY roll_id HAVING COUNT(*) > 1;
 
 -- Multiple self devs per roll (should be 0)
-SELECT roll_id, COUNT(*) FROM development_self GROUP BY roll_id HAVING COUNT(*) > 1;
+SELECT roll_id, COUNT(*) FROM development_selves GROUP BY roll_id HAVING COUNT(*) > 1;
 
 -- Foreign keys enabled at runtime
 PRAGMA foreign_keys;  -- Should return 1
