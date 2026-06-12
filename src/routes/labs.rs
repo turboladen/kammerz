@@ -7,9 +7,10 @@ use serde::Deserialize;
 
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, OptionExt};
-use crate::patch::{double_option, now_string, trim, trim_opt};
+use crate::patch::{double_option, now_string, trim_opt};
 use crate::routes::{friendly_delete_err, friendly_err};
 use crate::services::lab_service::LabService;
+use crate::validate::require_nonempty;
 use crate::AppState;
 use entity::lab;
 
@@ -65,9 +66,11 @@ async fn create(
     State(db): State<sea_orm::DatabaseConnection>,
     Json(data): Json<CreateLabDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
+    let name = require_nonempty("name", &data.name)?;
+
     let now = now_string();
     let model = lab::ActiveModel {
-        name: trim(data.name),
+        name: Set(name),
         location: trim_opt(data.location),
         website: trim_opt(data.website),
         notes: trim_opt(data.notes),
@@ -91,7 +94,7 @@ async fn update(
     let now = now_string();
     let mut model: lab::ActiveModel = existing.into();
     if let Some(v) = data.name {
-        model.name = trim(v);
+        model.name = Set(require_nonempty("name", &v)?);
     }
     if let Some(v) = data.location {
         model.location = trim_opt(v);

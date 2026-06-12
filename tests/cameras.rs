@@ -498,3 +498,94 @@ async fn create_maintenance_with_malformed_date_is_rejected() {
     let body: Value = json_body(res).await;
     assert_eq!(body["error"]["code"], "VALIDATION_ERROR");
 }
+
+// --- Server-side input validation (kammerz-grd) ---
+
+#[tokio::test]
+async fn create_camera_rejects_whitespace_brand() {
+    let app = open_app().await;
+    let mount_id = seeded_mount_id(&app).await;
+    let payload = json!({
+        "brand": "   ",
+        "model": "M-1",
+        "format": "35mm",
+        "lens_mount_id": mount_id
+    });
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/cameras", &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(
+        body["error"]["message"].as_str().unwrap().contains("brand"),
+        "message names the offending field"
+    );
+
+    // Nothing persisted.
+    let res = app.oneshot(get("/api/cameras")).await.unwrap();
+    let cams: Vec<Value> = json_body(res).await;
+    assert!(!cams.iter().any(|c| c["model"] == "M-1"));
+}
+
+#[tokio::test]
+async fn update_camera_rejects_whitespace_model() {
+    let app = open_app().await;
+    let camera_id = create_camera(&app, "Keepbrand", "Keepmodel").await;
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/cameras/{camera_id}"),
+            &json!({ "model": "  " }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    // Original survives.
+    let res = app
+        .oneshot(get(&format!("/api/cameras/{camera_id}")))
+        .await
+        .unwrap();
+    let cam: Value = json_body(res).await;
+    assert_eq!(cam["model"], "Keepmodel");
+}
+
+#[tokio::test]
+async fn create_maintenance_rejects_negative_cost() {
+    let app = open_app().await;
+    let camera_id = create_camera(&app, "Costly", "C-1").await;
+    let res = app
+        .oneshot(post_json(
+            "/api/maintenance",
+            &json!({
+                "camera_id": camera_id,
+                "maintenance_type": "CLA",
+                "cost": -5.0
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"].as_str().unwrap().contains("cost"));
+}
+
+#[tokio::test]
+async fn create_maintenance_accepts_zero_cost() {
+    let app = open_app().await;
+    let camera_id = create_camera(&app, "Freebie", "F-1").await;
+    let res = app
+        .oneshot(post_json(
+            "/api/maintenance",
+            &json!({
+                "camera_id": camera_id,
+                "maintenance_type": "CLA",
+                "cost": 0.0
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+}

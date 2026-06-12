@@ -1103,3 +1103,112 @@ async fn update_lab_dev_clearing_date_does_not_adopt_user_moved_cross_flow_roll(
         "clearing a date on an existing lab dev must not adopt a user-moved cross-flow roll onto the lab path"
     );
 }
+
+// --- Server-side input validation (kammerz-grd) ---
+
+#[tokio::test]
+async fn create_lab_dev_rejects_negative_cost() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "LABDEV-NEG-COST").await;
+    let res = app
+        .oneshot(post_json(
+            "/api/development/lab",
+            &json!({ "roll_id": roll_pk, "cost": -10.0 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"].as_str().unwrap().contains("cost"));
+}
+
+#[tokio::test]
+async fn update_lab_dev_rejects_negative_cost() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "LABDEV-UPD-COST").await;
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/lab",
+            &json!({ "roll_id": roll_pk, "cost": 12.5 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let dev_id: i32 = json_body(res).await;
+
+    let res = app
+        .oneshot(put_json(
+            &format!("/api/development/lab/{dev_id}"),
+            &json!({ "cost": -1.0 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn create_self_dev_rejects_whitespace_stage_name() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "SELFDEV-BLANK-STAGE").await;
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/self",
+            &json!({
+                "roll_id": roll_pk,
+                "stages": [
+                    { "stage_name": "   ", "duration_seconds": 60, "sort_order": 0 }
+                ]
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("stage_name"));
+
+    // Validation failed before the transaction — no self dev persisted.
+    let res = app
+        .oneshot(get(&format!("/api/development/self/for-roll/{roll_pk}")))
+        .await
+        .unwrap();
+    let dev: Value = json_body(res).await;
+    assert!(dev.is_null(), "rejected self dev must not persist");
+}
+
+#[tokio::test]
+async fn create_self_dev_rejects_negative_stage_duration() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "SELFDEV-NEG-STAGE").await;
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/self",
+            &json!({
+                "roll_id": roll_pk,
+                "stages": [
+                    { "stage_name": "Develop", "duration_seconds": -60, "sort_order": 0 }
+                ]
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("duration_seconds"));
+
+    // Validation failed before the transaction — no self dev persisted.
+    let res = app
+        .oneshot(get(&format!("/api/development/self/for-roll/{roll_pk}")))
+        .await
+        .unwrap();
+    let dev: Value = json_body(res).await;
+    assert!(dev.is_null(), "rejected self dev must not persist");
+}

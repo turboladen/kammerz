@@ -1,7 +1,7 @@
 mod common;
 
 use axum::http::StatusCode;
-use common::{delete, get, json_body, open_app, post_json};
+use common::{delete, get, json_body, open_app, post_json, put_json};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
@@ -222,4 +222,107 @@ async fn create_shot_for_missing_roll_is_friendly_422_not_delete_wording() {
         msg.contains("no longer exists"),
         "create-path FK violation should say the referenced record is missing, got: {msg}"
     );
+}
+
+// --- Server-side input validation (kammerz-grd) ---
+
+/// Create a valid shot on a fresh loaded roll, returning (shot_id, roll_pk).
+async fn create_shot(app: &axum::Router, roll_id: &str) -> (i32, i32) {
+    let roll_pk = create_loaded_roll(app, roll_id).await;
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/shots",
+            &json!({ "roll_id": roll_pk, "frame_number": "1" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let shot_id: i32 = json_body(res).await;
+    (shot_id, roll_pk)
+}
+
+#[tokio::test]
+async fn create_shot_rejects_whitespace_frame_number() {
+    let app = open_app().await;
+    let roll_pk = create_loaded_roll(&app, "SHOT-BLANK-FRAME").await;
+    let res = app
+        .oneshot(post_json(
+            "/api/shots",
+            &json!({ "roll_id": roll_pk, "frame_number": "   " }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("frame_number"));
+}
+
+#[tokio::test]
+async fn create_shot_rejects_out_of_range_latitude() {
+    let app = open_app().await;
+    let roll_pk = create_loaded_roll(&app, "SHOT-BAD-LAT").await;
+    let res = app
+        .oneshot(post_json(
+            "/api/shots",
+            &json!({ "roll_id": roll_pk, "frame_number": "1", "gps_lat": 91.0 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("gps_lat"));
+}
+
+#[tokio::test]
+async fn create_shot_accepts_boundary_coordinates() {
+    let app = open_app().await;
+    let roll_pk = create_loaded_roll(&app, "SHOT-EDGE-GPS").await;
+    let res = app
+        .oneshot(post_json(
+            "/api/shots",
+            &json!({
+                "roll_id": roll_pk,
+                "frame_number": "1",
+                "gps_lat": -90.0,
+                "gps_lon": 180.0
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+}
+
+#[tokio::test]
+async fn update_shot_rejects_out_of_range_longitude() {
+    let app = open_app().await;
+    let (shot_id, _roll_pk) = create_shot(&app, "SHOT-UPD-LON").await;
+    let res = app
+        .oneshot(put_json(
+            &format!("/api/shots/{shot_id}"),
+            &json!({ "gps_lon": -181.0 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn update_shot_rejects_whitespace_frame_number() {
+    let app = open_app().await;
+    let (shot_id, _roll_pk) = create_shot(&app, "SHOT-UPD-FRAME").await;
+    let res = app
+        .oneshot(put_json(
+            &format!("/api/shots/{shot_id}"),
+            &json!({ "frame_number": "  " }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }

@@ -7,10 +7,10 @@ use serde::Deserialize;
 
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, OptionExt};
-use crate::patch::{double_option, now_string, trim, trim_opt};
+use crate::patch::{double_option, now_string, trim_opt};
 use crate::routes::{friendly_delete_err, friendly_err};
 use crate::services::lens_service::LensService;
-use crate::validate::validate_date_opt;
+use crate::validate::{require_nonempty, validate_date_opt, validate_non_negative_i32};
 use crate::AppState;
 use entity::lens;
 
@@ -100,10 +100,13 @@ async fn create(
 ) -> AppResult<(StatusCode, Json<i32>)> {
     validate_date_opt("date_purchased", &data.date_purchased)?;
     validate_date_opt("date_sold", &data.date_sold)?;
+    let brand = require_nonempty("brand", &data.brand)?;
+    validate_non_negative_i32("filter_thread_front_mm", data.filter_thread_front_mm)?;
+    validate_non_negative_i32("filter_thread_rear_mm", data.filter_thread_rear_mm)?;
 
     let now = now_string();
     let model = lens::ActiveModel {
-        brand: trim(data.brand),
+        brand: Set(brand),
         lens_mount_id: Set(data.lens_mount_id),
         lens_system: trim_opt(data.lens_system),
         model: trim_opt(data.model),
@@ -140,10 +143,16 @@ async fn update(
     if let Some(v) = &data.date_sold {
         validate_date_opt("date_sold", v)?;
     }
+    if let Some(v) = data.filter_thread_front_mm {
+        validate_non_negative_i32("filter_thread_front_mm", v)?;
+    }
+    if let Some(v) = data.filter_thread_rear_mm {
+        validate_non_negative_i32("filter_thread_rear_mm", v)?;
+    }
     let now = now_string();
     let mut model: lens::ActiveModel = existing.into();
     if let Some(v) = data.brand {
-        model.brand = trim(v);
+        model.brand = Set(require_nonempty("brand", &v)?);
     }
     if let Some(v) = data.lens_mount_id {
         model.lens_mount_id = Set(v);
