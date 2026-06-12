@@ -125,6 +125,27 @@ async fn import_parsed_roll(
         validate_date_opt(&format!("shots[{i}].date"), &s.date)?;
     }
 
+    // Pre-validate frame numbers against the UNIQUE(roll_id, frame_number) index
+    // the transaction would otherwise hit. The LLM prompt encourages "Same"-
+    // propagation and range notation, so duplicates are plausible; surfacing them
+    // here yields a targeted 422 naming the offending shot instead of the generic
+    // constraint error mapped through `friendly_err`. Compare trimmed values, the
+    // same form persisted below.
+    let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    for (i, s) in data.shots.iter().enumerate() {
+        let frame = s.frame_number.trim();
+        if frame.is_empty() {
+            return Err(AppError::UnprocessableEntity(format!(
+                "shots[{i}]: frame number is required"
+            )));
+        }
+        if !seen.insert(frame) {
+            return Err(AppError::UnprocessableEntity(format!(
+                "shots[{i}]: duplicate frame number \"{frame}\""
+            )));
+        }
+    }
+
     let now = now_string();
 
     let roll_model = roll::ActiveModel {

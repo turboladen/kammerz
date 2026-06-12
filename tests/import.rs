@@ -143,11 +143,12 @@ async fn import_roll_with_malformed_shot_date_is_rejected_atomically() {
 }
 
 #[tokio::test]
-async fn import_roll_with_duplicate_frames_persists_nothing() {
+async fn import_roll_with_duplicate_frames_is_rejected_with_targeted_message() {
     let app = open_app().await;
 
-    // UNIQUE(roll_id, frame_number) on shots makes the second shot fail mid-
-    // transaction — the roll inserted in the same transaction must roll back.
+    // Duplicate frame numbers are pre-validated before the transaction opens, so
+    // the user gets a message naming the offending shot index and value instead
+    // of the generic UNIQUE-constraint error mapped through friendly_err.
     let payload = json!({
         "roll_id": "IMPORT-DUP",
         "status": "shot",
@@ -162,11 +163,90 @@ async fn import_roll_with_duplicate_frames_persists_nothing() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    let msg = body["error"]["message"].as_str().unwrap_or_default();
+    assert!(
+        msg.contains("shots[1]") && msg.contains("duplicate frame number") && msg.contains("\"1\""),
+        "message names the offending shot index and quoted value, got: {msg}"
+    );
 
     let res = app.oneshot(get("/api/rolls")).await.unwrap();
     let rolls: Vec<Value> = json_body(res).await;
     assert!(
         !rolls.iter().any(|r| r["roll_id"] == "IMPORT-DUP"),
-        "a mid-transaction failure must roll the roll insert back"
+        "a rejected import must not persist the roll"
+    );
+}
+
+#[tokio::test]
+async fn import_roll_duplicate_frames_collide_after_trimming() {
+    let app = open_app().await;
+
+    // Frame numbers are trimmed before persistence, so " 1 " and "1" would both
+    // land as "1" and violate UNIQUE(roll_id, frame_number). Pre-validation must
+    // compare the trimmed values, matching what the DB would see.
+    let payload = json!({
+        "roll_id": "IMPORT-DUP-TRIM",
+        "status": "shot",
+        "shots": [
+            { "frame_number": "1" },
+            { "frame_number": " 1 " }
+        ]
+    });
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/import/roll", &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("duplicate frame number"),
+        "trimmed-equal frame numbers must be flagged as duplicates"
+    );
+
+    let res = app.oneshot(get("/api/rolls")).await.unwrap();
+    let rolls: Vec<Value> = json_body(res).await;
+    assert!(
+        !rolls.iter().any(|r| r["roll_id"] == "IMPORT-DUP-TRIM"),
+        "a rejected import must not persist the roll"
+    );
+}
+
+#[tokio::test]
+async fn import_roll_with_empty_frame_number_is_rejected() {
+    let app = open_app().await;
+
+    // An empty/whitespace frame_number is meaningless for the per-frame log and
+    // must be rejected with a message naming the offending shot index.
+    let payload = json!({
+        "roll_id": "IMPORT-EMPTY",
+        "status": "shot",
+        "shots": [
+            { "frame_number": "1" },
+            { "frame_number": "   " }
+        ]
+    });
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/import/roll", &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    let msg = body["error"]["message"].as_str().unwrap_or_default();
+    assert!(
+        msg.contains("shots[1]") && msg.contains("frame number is required"),
+        "message names the offending shot index, got: {msg}"
+    );
+
+    let res = app.oneshot(get("/api/rolls")).await.unwrap();
+    let rolls: Vec<Value> = json_body(res).await;
+    assert!(
+        !rolls.iter().any(|r| r["roll_id"] == "IMPORT-EMPTY"),
+        "a rejected import must not persist the roll"
     );
 }

@@ -1119,6 +1119,7 @@ dependencies = [
  "http-body-util",
  "migration",
  "mime_guess",
+ "once_cell",
  "reqwest",
  "rpassword",
  "rust-embed",
