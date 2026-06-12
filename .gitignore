@@ -35,9 +35,6 @@ vite.config.ts.timestamp-*
 # Rust
 /target
 
-# Bun
-bun.lock
-
 # Claude
 .claude/settings.local.json
 # Superpowers brainstorm companion (mockups/scratch)

@@ -49,8 +49,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      # No lockfile is committed (bun.lock is gitignored), so install fresh.
-      - run: bun install
+      # The committed bun.lock pins the frontend supply chain; --frozen-lockfile
+      # fails the build if package.json and the lockfile drift apart.
+      - run: bun install --frozen-lockfile
       - run: bun run check
       - run: bun run build
 
@@ -73,7 +74,7 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: |
-          bun install
+          bun install --frozen-lockfile
           bun run build
 
       - name: Build release binary
