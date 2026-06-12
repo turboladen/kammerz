@@ -9,6 +9,7 @@ use crate::auth::{handlers, rate_limit};
 use crate::error::AppError;
 use crate::AppState;
 
+pub mod backup;
 pub mod cameras;
 pub mod development;
 pub mod film_stocks;
@@ -56,6 +57,7 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/api/stats", stats::router())
         .nest("/api/settings", settings::router())
         .nest("/api/import", import::router())
+        .nest("/api/backup", backup::router())
         .with_state(state)
 }
 
