@@ -1,4 +1,20 @@
+use std::time::Duration;
+
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+
+/// Shared HTTP client for outbound Anthropic calls. reqwest has no total request
+/// timeout by default, so a stalled upstream would hang `/api/import/models` or
+/// `/api/import/parse` indefinitely. Built once and reused so the connection pool
+/// is shared across requests. `parse_note` can be slow on a long completion, so
+/// the total timeout is generous (60s) while the connect timeout stays tight.
+static HTTP_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(60))
+        .connect_timeout(Duration::from_secs(10))
+        .build()
+        .expect("failed to build Anthropic HTTP client")
+});
 
 /// Parsed roll data extracted from freeform note text by the LLM.
 #[derive(Debug, Serialize, Deserialize)]
@@ -122,9 +138,7 @@ pub struct ImportService;
 impl ImportService {
     /// Fetch available models from the Anthropic API.
     pub async fn list_models(api_key: &str) -> Result<Vec<ModelInfo>, String> {
-        let client = reqwest::Client::new();
-
-        let response = client
+        let response = HTTP_CLIENT
             .get("https://api.anthropic.com/v1/models")
             .query(&[("limit", "1000")])
             .header("x-api-key", api_key)
@@ -169,8 +183,6 @@ impl ImportService {
         model: &str,
         note_text: &str,
     ) -> Result<ParsedRoll, String> {
-        let client = reqwest::Client::new();
-
         let request = MessagesRequest {
             model: model.to_string(),
             max_tokens: 4096,
@@ -181,7 +193,7 @@ impl ImportService {
             }],
         };
 
-        let response = client
+        let response = HTTP_CLIENT
             .post("https://api.anthropic.com/v1/messages")
             .header("x-api-key", api_key)
             .header("anthropic-version", "2023-06-01")
