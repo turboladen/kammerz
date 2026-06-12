@@ -64,7 +64,11 @@ KAMMERZ_PASSWORD_HASH='$argon2id$v=19$...'  # from `kammerz hash-password` — k
 SECURE_COOKIES=false   # set true only when served over HTTPS (behind a TLS reverse proxy)
 PORT=3002
 ANTHROPIC_API_KEY=     # optional; overrides the claude_api_key settings row for AI import
+# RUST_LOG=info        # log verbosity; defaults to `info` in code when unset (per-request access logs); set it to override, e.g. `tower_http=debug` for full spans
+# SQLITE_BUSY_TIMEOUT_MS=5000  # ms a SQLite write waits on a busy lock before failing
 ```
+
+Other recognized variables (all optional, with sensible defaults): `KAMMERZ_TRUST_PROXY` (see [`.env.example`](.env.example) for the X-Forwarded-For caveats), `KAMMERZ_MIGRATION_SNAPSHOTS` (pre-migration DB snapshots; on in release builds), `RUST_LOG` (tracing env-filter; the binary defaults to `info` when unset, so access logs appear out of the box — set it to override), and `SQLITE_BUSY_TIMEOUT_MS` (SQLite busy-lock wait, default `5000`).
 
 ## Deployment (systemd)
 
