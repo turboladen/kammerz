@@ -5,6 +5,7 @@ use crate::patch::now_string;
 use crate::services::shot_service::ShotService;
 use ::entity::roll::{self, Entity as Roll, PushPull, RollStatus};
 use ::entity::shot;
+use ::entity::{development_lab, development_self};
 
 /// Convert `TransactionError<DbErr>` to `DbErr`.
 fn transaction_err(e: TransactionError<DbErr>) -> DbErr {
@@ -277,7 +278,8 @@ impl RollService {
     /// Reconcile a roll's status when a lab dev record is created. Data-driven:
     /// a recorded `date_received` means the lab is done (→ `lab-done`); otherwise
     /// the roll is at the lab (→ `at-lab`). Advances forward only, so the normal
-    /// shot→at-lab transition and orphan at-lab→lab-done recovery share one path.
+    /// shot→at-lab transition and orphan at-lab→lab-done recovery share one path
+    /// (kammerz-afc).
     pub async fn sync_lab_dev_status(
         db: &impl ConnectionTrait,
         roll_id: i32,
@@ -305,6 +307,94 @@ impl RollService {
             RollStatus::Developing
         };
         Self::advance_status_along(db, roll_id, SELF_FLOW, target).await
+    }
+
+    /// Whether `roll_id` has a self development record. Used by cross-flow
+    /// adoption to leave a roll on the path its sibling record justifies.
+    async fn has_self_dev(db: &impl ConnectionTrait, roll_id: i32) -> Result<bool, DbErr> {
+        Ok(development_self::Entity::find()
+            .filter(development_self::Column::RollId.eq(roll_id))
+            .count(db)
+            .await?
+            > 0)
+    }
+
+    /// Whether `roll_id` has a lab development record. Mirror of `has_self_dev`.
+    async fn has_lab_dev(db: &impl ConnectionTrait, roll_id: i32) -> Result<bool, DbErr> {
+        Ok(development_lab::Entity::find()
+            .filter(development_lab::Column::RollId.eq(roll_id))
+            .count(db)
+            .await?
+            > 0)
+    }
+
+    /// Reconcile a roll's status when a lab dev record is **created**. Runs the
+    /// forward `sync_lab_dev_status` advance, then, if that no-ops, performs
+    /// cross-flow orphan adoption (kammerz-e2u).
+    ///
+    /// A roll can be orphaned on the SELF path (`developing`/`developed`) with
+    /// no self dev record — importable, or set via `PUT /api/rolls/{id}`.
+    /// `advance_status_along` no-ops there (those statuses aren't on `LAB_FLOW`),
+    /// which would strand a self-path status against a lab-only record. When that
+    /// happens and no sibling self dev exists, snap the roll onto the lab path at
+    /// the data-driven target. A surviving sibling record (legacy both-dev data,
+    /// kammerz-ysw) keeps its status — we never yank a roll off a path its
+    /// sibling still justifies.
+    ///
+    /// Adoption is scoped to creation: a dev record's *edit* (`resync_*`) must
+    /// not relocate a roll the user deliberately positioned cross-flow
+    /// (kammerz-3wg), so the update path calls `sync_lab_dev_status` directly.
+    pub async fn create_synced_lab_dev_status(
+        db: &impl ConnectionTrait,
+        roll_id: i32,
+        has_received: bool,
+    ) -> Result<bool, DbErr> {
+        if Self::sync_lab_dev_status(db, roll_id, has_received).await? {
+            return Ok(true);
+        }
+        if Self::has_self_dev(db, roll_id).await? {
+            return Ok(false);
+        }
+        let target = if has_received {
+            RollStatus::LabDone
+        } else {
+            RollStatus::AtLab
+        };
+        Self::auto_sync_status(
+            db,
+            roll_id,
+            &[RollStatus::Developing, RollStatus::Developed],
+            target,
+        )
+        .await
+    }
+
+    /// Reconcile a roll's status when a self dev record is **created**. Mirror of
+    /// `create_synced_lab_dev_status`, adopting a no-record orphan stranded on
+    /// the lab path (`at-lab`/`lab-done`) onto the self path (kammerz-e2u).
+    pub async fn create_synced_self_dev_status(
+        db: &impl ConnectionTrait,
+        roll_id: i32,
+        has_processed: bool,
+    ) -> Result<bool, DbErr> {
+        if Self::sync_self_dev_status(db, roll_id, has_processed).await? {
+            return Ok(true);
+        }
+        if Self::has_lab_dev(db, roll_id).await? {
+            return Ok(false);
+        }
+        let target = if has_processed {
+            RollStatus::Developed
+        } else {
+            RollStatus::Developing
+        };
+        Self::auto_sync_status(
+            db,
+            roll_id,
+            &[RollStatus::AtLab, RollStatus::LabDone],
+            target,
+        )
+        .await
     }
 
     /// Reconcile a roll's status when a lab dev record is *edited*. Like

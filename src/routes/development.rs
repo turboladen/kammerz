@@ -205,10 +205,16 @@ async fn create_lab_dev(
 
                 // Auto-advance forward: → at-lab (or lab-done if a received date was
                 // stored), from any prior status on the lab path including an orphaned
-                // at-lab. Derive the signal from the persisted value so the status
-                // decision matches exactly what `trim_opt` stored (empty → None).
-                RollService::sync_lab_dev_status(txn, data.roll_id, result.date_received.is_some())
-                    .await?;
+                // at-lab. A roll orphaned cross-flow on the self path with no self dev
+                // is adopted onto the lab path here (kammerz-e2u). Derive the signal
+                // from the persisted value so the status decision matches exactly what
+                // `trim_opt` stored (empty → None).
+                RollService::create_synced_lab_dev_status(
+                    txn,
+                    data.roll_id,
+                    result.date_received.is_some(),
+                )
+                .await?;
 
                 Ok(result.id)
             })
@@ -238,6 +244,13 @@ async fn update_lab_dev(
 
     let now = now_string();
 
+    // Status is driven by the *presence* of a received date. Capture it before
+    // the model is consumed so we can tell a status-relevant edit from one that
+    // merely echoes the unchanged date (kammerz-3wg): only the former resyncs,
+    // so an unrelated edit (e.g. notes) never silently undoes a confirmed
+    // backward status move.
+    let old_received_present = existing.date_received.is_some();
+
     db.transaction::<_, (), DbErr>(|txn| {
         Box::pin(async move {
             let mut model: development_lab::ActiveModel = existing.into();
@@ -262,10 +275,15 @@ async fn update_lab_dev(
             let result = DevelopmentService::update_lab_dev(txn, model).await?;
 
             // Data-driven status reconcile (kammerz-42u): adding a received date
-            // advances → lab-done, clearing it reverts lab-done → at-lab. Derive
-            // the signal from the persisted value, matching the create path.
-            RollService::resync_lab_dev_status(txn, result.roll_id, result.date_received.is_some())
-                .await?;
+            // advances → lab-done, clearing it reverts lab-done → at-lab. Only
+            // resync when the received-date presence actually changed in this
+            // update (kammerz-3wg) — an edit that re-sends the same date must not
+            // disturb a status the user moved by hand.
+            let new_received_present = result.date_received.is_some();
+            if new_received_present != old_received_present {
+                RollService::resync_lab_dev_status(txn, result.roll_id, new_received_present)
+                    .await?;
+            }
 
             Ok(())
         })
@@ -388,9 +406,11 @@ async fn create_self_dev(
 
                 // Auto-advance forward: → developing (or developed if a processed date
                 // was stored), from any prior status on the self path including an
-                // orphaned developing. Derive the signal from the persisted value so the
-                // status decision matches exactly what `trim_opt` stored (empty → None).
-                RollService::sync_self_dev_status(
+                // orphaned developing. A roll orphaned cross-flow on the lab path with
+                // no lab dev is adopted onto the self path here (kammerz-e2u). Derive
+                // the signal from the persisted value so the status decision matches
+                // exactly what `trim_opt` stored (empty → None).
+                RollService::create_synced_self_dev_status(
                     txn,
                     data.roll_id,
                     result.date_processed.is_some(),
@@ -421,6 +441,11 @@ async fn update_self_dev(
     }
 
     let now = now_string();
+
+    // Mirror of update_lab_dev (kammerz-3wg): status is driven by the presence
+    // of a processed date, so capture it before the model is consumed and only
+    // resync when that presence actually changes in this update.
+    let old_processed_present = existing.date_processed.is_some();
 
     db.transaction::<_, (), DbErr>(|txn| {
         Box::pin(async move {
@@ -469,12 +494,14 @@ async fn update_self_dev(
 
             // Data-driven status reconcile (kammerz-42u): adding a processed date
             // advances → developed, clearing it reverts developed → developing.
-            RollService::resync_self_dev_status(
-                txn,
-                result.roll_id,
-                result.date_processed.is_some(),
-            )
-            .await?;
+            // Only resync when the processed-date presence actually changed in
+            // this update (kammerz-3wg) — an unrelated edit must not undo a
+            // hand-set status.
+            let new_processed_present = result.date_processed.is_some();
+            if new_processed_present != old_processed_present {
+                RollService::resync_self_dev_status(txn, result.roll_id, new_processed_present)
+                    .await?;
+            }
 
             Ok(())
         })

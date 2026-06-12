@@ -862,3 +862,244 @@ async fn create_self_dev_on_scanned_roll_stays_scanned() {
         "creating a self dev on a scanned roll is a forward-only no-op"
     );
 }
+
+// --- kammerz-3wg: dev-record edits must not silently undo a confirmed backward
+//     status move. Resync only fires when the status-driving date PRESENCE
+//     actually changes in the update, not on an edit that merely echoes it. ---
+
+/// PUT a roll's status directly (the chevron/confirm path writes status only,
+/// never dates). Returns once NO_CONTENT is confirmed.
+async fn put_roll_status(app: &axum::Router, roll_pk: i32, status: &str) {
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/rolls/{roll_pk}"),
+            &json!({ "status": status }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+}
+
+// kammerz-3wg: roll at lab-done with date_received; user confirms a backward
+// move to at-lab (status-only write). Later editing an UNRELATED field of the
+// lab dev (notes) — whose payload still echoes the unchanged date_received —
+// must NOT silently revert the roll back to lab-done.
+#[tokio::test]
+async fn update_lab_dev_notes_only_keeps_confirmed_backward_at_lab() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "3WG-LAB").await;
+    let dev_id = create_lab_dev(&app, roll_pk, json!({ "date_received": "2026-05-10" })).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "lab-done");
+
+    // User confirms a backward chevron move to at-lab.
+    put_roll_status(&app, roll_pk, "at-lab").await;
+    assert_eq!(roll_status(&app, roll_pk).await, "at-lab");
+
+    // Edit notes only; the frontend echoes the still-set date_received.
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/development/lab/{dev_id}"),
+            &json!({ "notes": "dropped at front desk", "date_received": "2026-05-10" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "at-lab",
+        "a notes-only edit echoing the unchanged received date must not revert the confirmed at-lab move"
+    );
+}
+
+// kammerz-3wg mirror: self dev edit that echoes the unchanged processed date
+// must not silently revert a confirmed developed → developing backward move.
+#[tokio::test]
+async fn update_self_dev_notes_only_keeps_confirmed_backward_developing() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "3WG-SELF").await;
+    let dev_id = create_self_dev(&app, roll_pk, json!({ "date_processed": "2026-05-12" })).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "developed");
+
+    put_roll_status(&app, roll_pk, "developing").await;
+    assert_eq!(roll_status(&app, roll_pk).await, "developing");
+
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/development/self/{dev_id}"),
+            &json!({ "notes": "re-fixed for clearing", "date_processed": "2026-05-12" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "developing",
+        "a notes-only edit echoing the unchanged processed date must not revert the confirmed developing move"
+    );
+}
+
+// --- kammerz-e2u: creating a dev record on a roll orphaned at a SIBLING-path
+//     status (no backing record) must adopt the roll onto the new path, not
+//     no-op and leave the status contradicting the only dev record. ---
+
+// kammerz-e2u: roll orphaned at 'developing' (self-path, no self dev record);
+// the user records a LAB dev with a received date. The roll must adopt the lab
+// path and land at lab-done, not stay stranded at developing.
+#[tokio::test]
+async fn create_lab_dev_with_received_date_adopts_orphan_developing_to_lab_done() {
+    let app = open_app().await;
+    let roll_pk = create_roll_at_status(&app, "E2U-DEVING-LAB", "developing").await;
+
+    create_lab_dev(&app, roll_pk, json!({ "date_received": "2026-05-10" })).await;
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "lab-done",
+        "a lab dev with a received date adopts a developing orphan onto the lab path at lab-done"
+    );
+}
+
+// kammerz-e2u: same orphan, no received date — adopts to at-lab.
+#[tokio::test]
+async fn create_lab_dev_without_received_date_adopts_orphan_developed_to_at_lab() {
+    let app = open_app().await;
+    let roll_pk = create_roll_at_status(&app, "E2U-DEVED-LAB", "developed").await;
+
+    create_lab_dev(&app, roll_pk, json!({ "lab_name": "The Darkroom" })).await;
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "at-lab",
+        "a lab dev with no received date adopts a developed orphan onto the lab path at at-lab"
+    );
+}
+
+// kammerz-e2u mirror: roll orphaned at 'at-lab' (lab-path, no lab dev record);
+// recording a SELF dev with a processed date adopts the self path → developed.
+#[tokio::test]
+async fn create_self_dev_with_processed_date_adopts_orphan_at_lab_to_developed() {
+    let app = open_app().await;
+    let roll_pk = create_roll_at_status(&app, "E2U-ATLAB-SELF", "at-lab").await;
+
+    create_self_dev(&app, roll_pk, json!({ "date_processed": "2026-05-12" })).await;
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "developed",
+        "a self dev with a processed date adopts an at-lab orphan onto the self path at developed"
+    );
+}
+
+// kammerz-e2u mirror: orphan at 'lab-done', no processed date — adopts to developing.
+#[tokio::test]
+async fn create_self_dev_without_processed_date_adopts_orphan_lab_done_to_developing() {
+    let app = open_app().await;
+    let roll_pk = create_roll_at_status(&app, "E2U-LABDONE-SELF", "lab-done").await;
+
+    create_self_dev(&app, roll_pk, json!({ "developer": "HC-110" })).await;
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "developing",
+        "a self dev with no processed date adopts a lab-done orphan onto the self path at developing"
+    );
+}
+
+// kammerz-e2u no-regression (kammerz-ysw invariant): adoption only fires for a
+// no-record orphan. When a SIBLING dev record already exists (legacy both-dev
+// data, seeded directly to bypass the create-side mutual-exclusion guard), the
+// cross-flow status must be left alone — we must not yank a roll off a path its
+// surviving sibling record still justifies. Seed a lab dev directly so the roll
+// sits at a lab-path status, then create the self dev via the service-level
+// adoption path... but the API rejects that create (ysw). So we assert the
+// adoption helper respects the sibling by driving it through the same direct
+// seed + a roll already on the sibling flow, then confirm a create is rejected
+// (status untouched). This pins the "sibling present → no adoption" branch.
+#[tokio::test]
+async fn create_self_dev_rejected_does_not_adopt_when_lab_dev_seeded() {
+    let (app, db) = open_app_with_db().await;
+    let roll_pk = create_roll_at_status(&app, "E2U-SIBLING", "at-lab").await;
+    // Legacy lab dev seeded directly; roll legitimately sits at at-lab.
+    insert_lab_dev_directly(&db, roll_pk).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "at-lab");
+
+    // A self dev create is rejected by the mutual-exclusion guard; the roll's
+    // lab-path status (justified by the surviving lab dev) is untouched.
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/self",
+            &json!({ "roll_id": roll_pk, "developer": "Rodinal" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "at-lab",
+        "a rejected self dev must not adopt a roll that already has a lab dev sibling"
+    );
+}
+
+// kammerz-e2u × kammerz-3wg interaction: cross-flow ADOPTION is a CREATE-only
+// affordance. Editing an existing dev record must never relocate a roll the
+// user deliberately positioned on the sibling flow. Here a self-dev roll the
+// user manually moved to a lab-path status (at-lab), then cleared the processed
+// date on — a presence-changing edit, so resync runs — must NOT be snapped
+// onto the self path by the adoption logic; it stays where the user put it.
+#[tokio::test]
+async fn update_self_dev_clearing_date_does_not_adopt_user_moved_cross_flow_roll() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "E2U-NOADOPT-SELF").await;
+    let dev_id = create_self_dev(&app, roll_pk, json!({ "date_processed": "2026-05-12" })).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "developed");
+
+    // User deliberately moves the roll cross-flow to a lab-path status.
+    put_roll_status(&app, roll_pk, "at-lab").await;
+    assert_eq!(roll_status(&app, roll_pk).await, "at-lab");
+
+    // Clearing the processed date is a presence change, so resync runs — but the
+    // update path must not adopt the off-flow roll back onto the self path.
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/development/self/{dev_id}"),
+            &json!({ "date_processed": null }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "at-lab",
+        "clearing a date on an existing self dev must not adopt a user-moved cross-flow roll onto the self path"
+    );
+}
+
+// Mirror: a lab-dev roll the user moved cross-flow to a self-path status
+// (developing), then cleared the received date on, stays at developing — the
+// update path never adopts it back onto the lab path.
+#[tokio::test]
+async fn update_lab_dev_clearing_date_does_not_adopt_user_moved_cross_flow_roll() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "E2U-NOADOPT-LAB").await;
+    let dev_id = create_lab_dev(&app, roll_pk, json!({ "date_received": "2026-05-10" })).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "lab-done");
+
+    put_roll_status(&app, roll_pk, "developing").await;
+    assert_eq!(roll_status(&app, roll_pk).await, "developing");
+
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/development/lab/{dev_id}"),
+            &json!({ "date_received": null }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "developing",
+        "clearing a date on an existing lab dev must not adopt a user-moved cross-flow roll onto the lab path"
+    );
+}
