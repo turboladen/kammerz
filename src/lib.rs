@@ -3,6 +3,7 @@ pub mod compression;
 pub mod config;
 pub mod db;
 pub mod error;
+pub mod extract;
 pub mod patch;
 pub mod routes;
 pub mod services;

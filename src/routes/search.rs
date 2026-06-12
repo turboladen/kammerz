@@ -1,10 +1,11 @@
-use axum::extract::{Query, State};
+use axum::extract::State;
 use axum::routing::get;
-use axum::{Json, Router};
+use axum::Router;
 use serde::Deserialize;
 
 use crate::auth::middleware::RequireAuth;
 use crate::error::AppResult;
+use crate::extract::{Json, Query};
 use crate::services::search_service::{SearchResults, SearchService};
 use crate::AppState;
 
