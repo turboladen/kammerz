@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
@@ -25,8 +26,8 @@
 	let deletingStock: FilmStock | null = $state(null);
 	let error = $state('');
 
-	// Toolbar state
-	let searchQuery = $state('');
+	// Toolbar state (?q= pre-filters the list, e.g. from a search result link)
+	let searchQuery = $state(page.url.searchParams.get('q') ?? '');
 	let groupBy = $state('brand');
 	let sortBy = $state('brand-asc');
 

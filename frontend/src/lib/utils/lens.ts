@@ -1,7 +1,11 @@
 import type { Lens, LensMount } from '$lib/types';
 import { buildDisambiguatedLabels } from './disambiguate';
 
-export function lensDisplayName(lens: Lens): string {
+/** Minimal shape needed to render a lens display name — satisfied by both Lens and LensSearchResult. */
+export type LensNameParts = Pick<Lens, 'brand' | 'model'> &
+	Partial<Pick<Lens, 'focal_length' | 'max_aperture'>>;
+
+export function lensDisplayName(lens: LensNameParts): string {
 	if (lens.model) {
 		// Avoid doubling brand when model starts with it (e.g. "Mamiya 90mm K/L")
 		if (lens.model.toLowerCase().startsWith(lens.brand.toLowerCase())) return lens.model;
