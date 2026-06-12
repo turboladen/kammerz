@@ -83,7 +83,11 @@ pub struct RollService;
 
 /// Lab development path, in progression order. Used by `advance_status_along` to
 /// reconcile a roll forward when a lab dev record is created (kammerz-afc).
-const LAB_FLOW: &[RollStatus] = &[
+///
+/// `pub` so `tests/status_flows.rs` can assert it against the canonical
+/// `frontend/src/lib/status-flows.json` fixture (kammerz-mon). Visibility only —
+/// not used outside this module.
+pub const LAB_FLOW: &[RollStatus] = &[
     RollStatus::Loaded,
     RollStatus::Shooting,
     RollStatus::Shot,
@@ -95,7 +99,8 @@ const LAB_FLOW: &[RollStatus] = &[
 ];
 
 /// Self development path, in progression order (mirror of `LAB_FLOW`).
-const SELF_FLOW: &[RollStatus] = &[
+/// `pub` for the same fixture cross-check as `LAB_FLOW` (kammerz-mon).
+pub const SELF_FLOW: &[RollStatus] = &[
     RollStatus::Loaded,
     RollStatus::Shooting,
     RollStatus::Shot,

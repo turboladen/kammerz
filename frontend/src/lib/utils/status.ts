@@ -1,4 +1,5 @@
 import type { RollStatus } from '$lib/types';
+import statusFlows from '$lib/status-flows.json';
 
 /**
  * Canonical status metadata — single source of truth for all status display info.
@@ -81,53 +82,88 @@ export const statusConfig: Record<
 };
 
 // ---------------------------------------------------------------------------
-// Path-specific status flows
+// Path-specific status flows — DERIVED from the canonical fixture
 // ---------------------------------------------------------------------------
+//
+// The flow arrays below are not hand-written here: they are read from
+// `$lib/status-flows.json`, the single committed source of the status ordering.
+// The same fixture is asserted against the Rust `LAB_FLOW`/`SELF_FLOW` constants
+// and the `RollStatus` enum's full variant ordering by `tests/status_flows.rs`,
+// so any drift between the frontend arrays, the backend flows, and the enum
+// fails `cargo test`. See CLAUDE.md (status-flow / enum-sync conventions).
+//
+// `status-flows.json` is typed by the co-located `status-flows.d.ts` so these
+// arrays import as `RollStatus[]` rather than the widened `string[]` a raw JSON
+// import yields. The fixture's CONTENTS (every entry being a real status, the
+// flows matching the backend) are gated by `tests/status_flows.rs`, which asserts
+// the fixture against the `RollStatus` enum and the `LAB_FLOW`/`SELF_FLOW`
+// constants — a typo or reordering there fails `cargo test`. `assertStatusFixture`
+// below is the frontend's complementary runtime guard (it runs in the browser /
+// dev and backs any future frontend unit test), binding the fixture to the
+// `RollStatus` union via `statusConfig`'s keys.
 
 /** Lab development path: Shot → At Lab → Lab Done → Scanned → Archived */
-export const labFlow: RollStatus[] = [
-	'loaded',
-	'shooting',
-	'shot',
-	'at-lab',
-	'lab-done',
-	'scanned',
-	'post-processed',
-	'archived'
-];
+export const labFlow = statusFlows.labFlow;
 
 /** Self development path: Shot → Developing → Developed → Scanned → Archived */
-export const selfFlow: RollStatus[] = [
-	'loaded',
-	'shooting',
-	'shot',
-	'developing',
-	'developed',
-	'scanned',
-	'post-processed',
-	'archived'
-];
+export const selfFlow = statusFlows.selfFlow;
 
 /** Undecided path (no dev record): shows shared prefix + suffix with a visual gap. */
-export const undecidedFlow: RollStatus[] = ['loaded', 'shooting', 'shot', 'scanned', 'post-processed', 'archived'];
+export const undecidedFlow = statusFlows.undecidedFlow;
 
 /**
  * Combined sort order — includes ALL statuses for cross-roll sorting contexts
  * (dashboard "In the Darkroom", rolls list group-by-status, status distribution bar).
  * Lab-path statuses are interleaved before self-path at their natural position.
  */
-export const allStatusOrder: RollStatus[] = [
-	'loaded',
-	'shooting',
-	'shot',
-	'at-lab',
-	'lab-done',
-	'developing',
-	'developed',
-	'scanned',
-	'post-processed',
-	'archived'
-];
+export const allStatusOrder = statusFlows.statuses;
+
+/**
+ * Runtime cross-check that the fixture's `statuses` and the `RollStatus` union
+ * (as enumerated by `statusConfig`'s keys) describe exactly the same set, and
+ * that each flow is an order-preserving subsequence of `statuses`. Throws at
+ * module load on drift — every fixture status must be a known config key, every
+ * config key must appear in the fixture, and each flow must list a subset of the
+ * canonical statuses in canonical order. This is the frontend half of the
+ * cross-check; the Rust `tests/status_flows.rs` half binds the fixture to the
+ * backend `LAB_FLOW`/`SELF_FLOW` constants and the enum ordering — but the Rust
+ * side does not cover `undecidedFlow` (frontend-only, no backend constant), so
+ * this subsequence check is the only guard on `undecidedFlow`'s ordering.
+ */
+function assertStatusFixture(): void {
+	const configKeys = new Set(Object.keys(statusConfig));
+	const canonicalIndex = new Map<string, number>(statusFlows.statuses.map((s, i) => [s, i]));
+
+	for (const status of statusFlows.statuses) {
+		if (!configKeys.has(status)) {
+			throw new Error(`status-flows.json lists unknown status "${status}" not in statusConfig (RollStatus union)`);
+		}
+	}
+	for (const key of configKeys) {
+		if (!canonicalIndex.has(key)) {
+			throw new Error(`RollStatus "${key}" is missing from status-flows.json "statuses"`);
+		}
+	}
+	for (const [name, flow] of [
+		['labFlow', statusFlows.labFlow],
+		['selfFlow', statusFlows.selfFlow],
+		['undecidedFlow', statusFlows.undecidedFlow]
+	] as const) {
+		let prev = -1;
+		for (const status of flow) {
+			const idx = canonicalIndex.get(status);
+			if (idx === undefined) {
+				throw new Error(`status-flows.json ${name} references "${status}" not in "statuses"`);
+			}
+			if (idx <= prev) {
+				throw new Error(`status-flows.json ${name} is not in canonical "statuses" order at "${status}"`);
+			}
+			prev = idx;
+		}
+	}
+}
+
+assertStatusFixture();
 
 /** @deprecated Use allStatusOrder or getFlowForPath() for path-specific rendering. */
 export const statusOrder = allStatusOrder;
