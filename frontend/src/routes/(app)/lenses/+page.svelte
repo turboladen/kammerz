@@ -342,7 +342,7 @@
 									</div>
 								{/if}
 							</div>
-							<div class="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+							<div class="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
 								<Button size="sm" variant="ghost" onclick={() => startEdit(lens)}>Edit</Button>
 								<Button size="sm" variant="ghost" onclick={() => handleDelete(lens)}>&times;</Button>
 							</div>

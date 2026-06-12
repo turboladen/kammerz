@@ -526,7 +526,7 @@
 										<span class="rounded bg-red-500/15 px-1.5 py-0.5 text-xs text-red-400">Sold</span>
 									{/if}
 								</div>
-								<Button size="sm" variant="ghost" class="opacity-0 group-hover:opacity-100 transition-opacity" onclick={() => handleUnlinkLens(lens.id)}>&times;</Button>
+								<Button size="sm" variant="ghost" class="opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 pointer-coarse:opacity-100" onclick={() => handleUnlinkLens(lens.id)}>&times;</Button>
 							</div>
 						{/each}
 					</div>

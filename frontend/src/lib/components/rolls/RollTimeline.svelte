@@ -52,7 +52,7 @@
 					<span class="font-mono text-xs {milestone.date ? 'text-text' : 'text-text-faint'}">
 						{milestone.date ?? 'Set date'}
 					</span>
-					<Pencil size={12} strokeWidth={1.75} class="text-text-faint opacity-0 transition-opacity group-hover:opacity-100" />
+					<Pencil size={12} strokeWidth={1.75} class="text-text-faint opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 pointer-coarse:opacity-100" />
 				</button>
 			{:else}
 				<span class="font-mono text-xs text-text-faint">{milestone.date ?? '—'}</span>

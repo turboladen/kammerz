@@ -976,7 +976,7 @@
 									{/if}
 								</div>
 							</div>
-							<div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+							<div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
 								<Button size="sm" variant="ghost" onclick={() => openEditShotDialog(shot)}>Edit</Button>
 								<Button size="sm" variant="ghost" onclick={() => (deletingShotId = shot.id)}>&times;</Button>
 							</div>
