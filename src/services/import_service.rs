@@ -1,6 +1,6 @@
+use std::sync::LazyLock;
 use std::time::Duration;
 
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 /// Shared HTTP client for outbound Anthropic calls. reqwest has no total request
@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// `/api/import/parse` indefinitely. Built once and reused so the connection pool
 /// is shared across requests. `parse_note` can be slow on a long completion, so
 /// the total timeout is generous (60s) while the connect timeout stays tight.
-static HTTP_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
+static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(60))
         .connect_timeout(Duration::from_secs(10))
