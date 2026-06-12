@@ -21,32 +21,38 @@ permissions:
 env:
   BUN_VERSION: "1.3.14"
 
+# WHAT each job does lives in the justfile (the ci-* / fmt-check / e2e recipes);
+# these jobs only handle Actions-specific concerns — checkout, toolchain/tool
+# setup, caching, the BUN_VERSION pin, and artifact upload — then call the
+# matching recipe. `just ci` chains the same recipes locally; keep them in sync
+# by editing the justfile, not by re-describing the commands here.
 jobs:
-  # Format gate: dprint (Markdown/JSON/TOML/YAML per dprint.jsonc), Prettier
-  # (frontend Svelte/TS/CSS per frontend/.prettierrc), rustfmt (Rust).
-  # Mirror locally with `just fmt-check`; fix with `just fmt`.
+  # Format gate → `just fmt-check`: dprint (Markdown/JSON/TOML/YAML per
+  # dprint.jsonc), Prettier (frontend Svelte/TS/CSS), rustfmt (Rust). Fix
+  # locally with `just fmt`.
   format:
     name: format (dprint + prettier + rustfmt)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: dprint/check@v2.3
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
-      - run: cargo fmt --all --check
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just,dprint
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - run: bun install
+      # Prettier needs node_modules; the recipe assumes deps are present.
+      - run: bun install --frozen-lockfile
         working-directory: frontend
-      - run: bun run format:check
-        working-directory: frontend
+      - run: just fmt-check
 
-  # Backend gate: cargo build + test. Compiles against the empty
-  # frontend/build embed (the committed .gitkeep satisfies rust-embed's
-  # #[folder]) — the SPA is never served in tests, so no frontend build here.
+  # Backend gate → `just ci-backend`: cargo build + test --workspace --locked.
+  # Compiles against the empty frontend/build embed (the committed .gitkeep
+  # satisfies rust-embed's #[folder]) — the SPA is never served in tests.
   backend:
     name: backend (cargo test)
     runs-on: ubuntu-latest
@@ -55,31 +61,32 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --workspace --locked
-      - run: cargo test --workspace --locked
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - run: just ci-backend
 
-  # Frontend gate: type-check (svelte-check) + production build (adapter-static).
+  # Frontend gate → `just ci-frontend`: frozen install + svelte-check +
+  # production build (adapter-static).
   frontend:
     name: frontend (check + build)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      # The committed bun.lock pins the frontend supply chain; --frozen-lockfile
-      # fails the build if package.json and the lockfile drift apart.
-      - run: bun install --frozen-lockfile
-      - run: bun run check
-      - run: bun run build
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - run: just ci-frontend
 
-  # End-to-end smoke: build the real SPA, embed it in the release binary, and
-  # drive the Playwright suite against the running server. The binary serves
-  # both the API and the embedded frontend on :3002.
+  # End-to-end smoke → `just e2e`: the recipe builds the SPA (via its
+  # ci-frontend dependency), embeds it in the release binary, starts the server
+  # with a runtime-minted argon2 hash, and drives the Playwright suite against
+  # :3002. On failure it dumps the server log to the job output; the trace.zip +
+  # screenshots are uploaded below for local replay (playwright show-trace).
   e2e:
     name: e2e (playwright smoke)
     runs-on: ubuntu-latest
@@ -91,59 +98,14 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - run: just e2e
 
-      # Build the SPA so rust-embed bakes real assets into the release binary.
-      - name: Build frontend
-        working-directory: frontend
-        run: |
-          bun install --frozen-lockfile
-          bun run build
-
-      - name: Build release binary
-        run: cargo build --release --locked
-
-      - name: Install Playwright browser
-        working-directory: frontend
-        run: bunx playwright install --with-deps chromium
-
-      # Mint an argon2 hash at runtime from a throwaway password (read from
-      # stdin, printed to stdout) — no committed secret. E2E_PASSWORD must match.
-      - name: Start server
-        run: |
-          HASH="$(printf '%s' secret | ./target/release/kammerz hash-password)"
-          rm -f ci.db ci.db-wal ci.db-shm  # deterministic start if a run is retried
-          # Capture stdout/stderr so a boot failure is diagnosable, not opaque.
-          KAMMERZ_PASSWORD_HASH="$HASH" \
-          DATABASE_URL='sqlite:./ci.db?mode=rwc' \
-          PORT=3002 \
-            ./target/release/kammerz > server.log 2>&1 &
-          # Wait for the server to come up before running tests.
-          for i in $(seq 1 60); do
-            if curl -fsS http://localhost:3002/api/health >/dev/null 2>&1; then
-              echo "server ready after ${i}s"; exit 0
-            fi
-            sleep 1
-          done
-          echo "server did not become ready in time" >&2
-          cat server.log >&2 || true
-          exit 1
-
-      - name: Run Playwright smoke tests
-        working-directory: frontend
-        env:
-          E2E_PASSWORD: secret
-          E2E_BASE: http://localhost:3002
-        run: bun run test:e2e
-
-      # Surface server-side output when the smoke suite fails (e.g. a 500 that
-      # the test only sees as a failed assertion) so red builds are debuggable.
-      - name: Server log (on failure)
-        if: failure()
-        run: cat server.log || true
-
-      # Client-side complement to server.log: upload the Playwright trace.zip +
-      # screenshots so a maintainer can replay the failed run's DOM/network
-      # locally (npx playwright show-trace). Default outputDir is test-results/.
+      # Client-side complement to the recipe's server-log dump: upload the
+      # Playwright trace.zip + screenshots so a maintainer can replay the failed
+      # run's DOM/network locally. Default outputDir is frontend/test-results/.
       - name: Upload Playwright artifacts (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
