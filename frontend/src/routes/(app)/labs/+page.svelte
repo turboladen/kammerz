@@ -39,6 +39,12 @@
 		notes = '';
 	}
 
+	function openAddDialog() {
+		resetForm();
+		error = '';
+		showAddDialog = true;
+	}
+
 	async function handleAdd() {
 		error = '';
 		try {
@@ -58,6 +64,7 @@
 	}
 
 	function startEdit(lab: Lab) {
+		error = '';
 		editingLab = lab;
 		name = lab.name;
 		location = lab.location ?? '';
@@ -108,13 +115,7 @@
 </script>
 
 <PageHeader title="Labs" description="Development labs you use">
-	<Button
-		variant="primary"
-		onclick={() => {
-			resetForm();
-			showAddDialog = true;
-		}}>+ Add Lab</Button
-	>
+	<Button variant="primary" onclick={openAddDialog}>+ Add Lab</Button>
 </PageHeader>
 
 <div class="p-6">
@@ -127,7 +128,7 @@
 	{:else if labs.length === 0}
 		<EmptyState title="No Labs" message="Add the labs you use for film development.">
 			{#snippet icon()}<FlaskConical size={24} strokeWidth={1.5} />{/snippet}
-			<Button variant="primary" onclick={() => (showAddDialog = true)}>+ Add Lab</Button>
+			<Button variant="primary" onclick={openAddDialog}>+ Add Lab</Button>
 		</EmptyState>
 	{:else}
 		<div class="grid gap-3">
@@ -161,7 +162,7 @@
 	{/if}
 </div>
 
-<Dialog bind:open={showAddDialog} title="Add Lab">
+<Dialog bind:open={showAddDialog} title="Add Lab" onclose={resetForm}>
 	<div class="space-y-4">
 		<Input label="Lab Name" bind:value={name} placeholder="The Darkroom" />
 		<Input label="Location" bind:value={location} placeholder="San Clemente, CA" />
@@ -171,7 +172,13 @@
 			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 		{/if}
 		<div class="flex justify-end gap-2 pt-2">
-			<Button variant="ghost" onclick={() => (showAddDialog = false)}>Cancel</Button>
+			<Button
+				variant="ghost"
+				onclick={() => {
+					showAddDialog = false;
+					resetForm();
+				}}>Cancel</Button
+			>
 			<Button variant="primary" onclick={handleAdd}>Add Lab</Button>
 		</div>
 	</div>

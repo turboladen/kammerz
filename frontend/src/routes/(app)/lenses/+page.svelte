@@ -181,6 +181,12 @@
 		notes = '';
 	}
 
+	function openAddDialog() {
+		resetForm();
+		error = '';
+		showAddDialog = true;
+	}
+
 	function buildInsert(): LensInsert {
 		return {
 			brand,
@@ -221,6 +227,7 @@
 	}
 
 	function startEdit(lens: Lens) {
+		error = '';
 		editingLens = lens;
 		brand = lens.brand;
 		lensMountId = String(lens.lens_mount_id);
@@ -283,13 +290,7 @@
 </script>
 
 <PageHeader title="Lenses" description="Your lens collection">
-	<Button
-		variant="primary"
-		onclick={() => {
-			resetForm();
-			showAddDialog = true;
-		}}>+ Add Lens</Button
-	>
+	<Button variant="primary" onclick={openAddDialog}>+ Add Lens</Button>
 </PageHeader>
 
 <div class="p-6">
@@ -326,7 +327,7 @@
 	{:else if resultCount === 0 && lenses.length === 0}
 		<EmptyState title="No Lenses" message="Add your first lens to get started.">
 			{#snippet icon()}<Aperture size={24} strokeWidth={1.5} />{/snippet}
-			<Button variant="primary" onclick={() => (showAddDialog = true)}>+ Add Lens</Button>
+			<Button variant="primary" onclick={openAddDialog}>+ Add Lens</Button>
 		</EmptyState>
 	{:else if resultCount === 0}
 		<p class="mt-6 text-center text-sm text-text-muted">
@@ -394,7 +395,7 @@
 </div>
 
 <!-- Add Lens Dialog -->
-<Dialog bind:open={showAddDialog} title="Add Lens">
+<Dialog bind:open={showAddDialog} title="Add Lens" onclose={resetForm}>
 	<div class="space-y-4">
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<ComboInput label="Brand/Manufacturer" bind:value={brand} placeholder="Minolta" options={brandOptions} />
@@ -423,7 +424,13 @@
 			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 		{/if}
 		<div class="flex justify-end gap-2 pt-2">
-			<Button variant="ghost" onclick={() => (showAddDialog = false)}>Cancel</Button>
+			<Button
+				variant="ghost"
+				onclick={() => {
+					showAddDialog = false;
+					resetForm();
+				}}>Cancel</Button
+			>
 			<Button variant="primary" disabled={!!dateError} onclick={handleAdd}>Add Lens</Button>
 		</div>
 	</div>

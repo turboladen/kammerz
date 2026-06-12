@@ -189,6 +189,7 @@
 		lensModel = '';
 		lensFocalLength = '';
 		lensMaxAperture = '';
+		error = '';
 	}
 
 	async function handleAdd() {
@@ -339,7 +340,7 @@
 </div>
 
 <!-- Add Camera Dialog -->
-<Dialog bind:open={showAddDialog} title="Add Camera">
+<Dialog bind:open={showAddDialog} title="Add Camera" onclose={resetForm}>
 	<div class="space-y-4">
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<ComboInput label="Brand" bind:value={brand} placeholder="Minolta" options={brandOptions} />

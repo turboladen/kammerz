@@ -155,6 +155,12 @@
 		notes = '';
 	}
 
+	function openAddDialog() {
+		resetForm();
+		error = '';
+		showAddDialog = true;
+	}
+
 	function buildInsert(): FilmStockInsert {
 		return {
 			brand,
@@ -245,7 +251,7 @@
 </script>
 
 <PageHeader title="Film Stocks" description="Film stock catalog">
-	<Button variant="primary" onclick={() => (showAddDialog = true)}>+ Add Film Stock</Button>
+	<Button variant="primary" onclick={openAddDialog}>+ Add Film Stock</Button>
 </PageHeader>
 
 <div class="p-6">
@@ -311,7 +317,7 @@
 	{:else if resultCount === 0 && stocks.length === 0}
 		<EmptyState title="No Film Stocks" message="Add your first film stock to get started.">
 			{#snippet icon()}<Film size={24} strokeWidth={1.5} />{/snippet}
-			<Button variant="primary" onclick={() => (showAddDialog = true)}>+ Add Film Stock</Button>
+			<Button variant="primary" onclick={openAddDialog}>+ Add Film Stock</Button>
 		</EmptyState>
 	{:else if resultCount === 0}
 		<p class="mt-6 text-center text-sm text-text-muted">
@@ -357,7 +363,7 @@
 	{/if}
 </div>
 
-<Dialog bind:open={showAddDialog} title="Add Film Stock">
+<Dialog bind:open={showAddDialog} title="Add Film Stock" onclose={resetForm}>
 	<div class="space-y-4">
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<ComboInput label="Brand" bind:value={brand} placeholder="Kodak" options={filmBrandOptions} />
