@@ -7,12 +7,15 @@
 	import Input from '$lib/components/ui/Input.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
+	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import { listRolls, updateRoll } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import { listLenses } from '$lib/api/lenses';
 	import { listShotsForRoll, createShot, suggestNextFrame } from '$lib/api/shots';
 	import { buildLensOptions, lensDisplayName } from '$lib/utils/lens';
 	import { listLensMounts } from '$lib/api/lens-mounts';
+	import { getStatusLabel } from '$lib/utils/status';
+	import { todayLocal, dateFieldError } from '$lib/utils/date';
 	import type { RollWithDetails, Camera, Lens, LensMount, Shot } from '$lib/types';
 
 	let rolls: RollWithDetails[] = $state([]);
@@ -43,14 +46,14 @@
 		const options: { value: string; label: string; disabled?: boolean }[] = [{ value: '', label: 'Select a roll...' }];
 		for (const r of active) {
 			const filmInfo = r.film_stock_brand ? ` — ${r.film_stock_brand} ${r.film_stock_name}` : '';
-			options.push({ value: String(r.id), label: `${r.roll_id}${filmInfo} (${r.status})` });
+			options.push({ value: String(r.id), label: `${r.roll_id}${filmInfo} (${getStatusLabel(r.status)})` });
 		}
 		if (other.length > 0 && active.length > 0) {
 			options.push({ value: '__divider__', label: '── Other rolls ──', disabled: true });
 		}
 		for (const r of other) {
 			const filmInfo = r.film_stock_brand ? ` — ${r.film_stock_brand} ${r.film_stock_name}` : '';
-			options.push({ value: String(r.id), label: `${r.roll_id}${filmInfo} (${r.status})` });
+			options.push({ value: String(r.id), label: `${r.roll_id}${filmInfo} (${getStatusLabel(r.status)})` });
 		}
 		return options;
 	});
@@ -82,6 +85,14 @@
 
 	// Roll-full nudge state
 	let rollFullDismissed = $state(false);
+
+	// Finish date shown in the roll-complete nudge — written as date_finished when the
+	// roll is marked Shot, so the Timeline's "Finished shooting" milestone isn't left
+	// blank (kammerz-fis). Seeded per-roll in loadRollData: an already-set date_finished,
+	// else today.
+	let finishDate = $state(todayLocal());
+	const finishDateError = $derived(dateFieldError(finishDate));
+
 	const showRollFullNudge = $derived(
 		selectedRoll?.status === 'shooting' &&
 			frameInfo !== null &&
@@ -91,9 +102,9 @@
 	);
 
 	async function markRollShot() {
-		if (!selectedRoll) return;
+		if (!selectedRoll || !finishDate.trim() || finishDateError) return;
 		try {
-			await updateRoll(selectedRoll.id, { status: 'shot' });
+			await updateRoll(selectedRoll.id, { status: 'shot', date_finished: finishDate });
 			rolls = await listRolls();
 			rollFullDismissed = true;
 		} catch (err) {
@@ -125,6 +136,11 @@
 		error = '';
 		try {
 			shots = await listShotsForRoll(rollId);
+
+			// Seed the finish-date nudge: an already-recorded date_finished wins, else today.
+			// (Mirrors the roll-detail nudge; quick-entry shots carry no per-shot date.)
+			const roll = rolls.find((r) => r.id === rollId);
+			finishDate = roll?.date_finished ?? todayLocal();
 
 			// Suggest next frame
 			try {
@@ -278,15 +294,27 @@
 
 			{#if showRollFullNudge}
 				<FadeIn delay={50}>
-					<div class="mb-5 flex items-center justify-between rounded-lg border border-accent/30 bg-accent/10 px-4 py-3">
-						<div>
-							<p class="text-sm font-medium text-accent">Roll complete</p>
-							<p class="text-xs text-accent/70">
-								All {frameInfo?.total} frames shot. Ready to mark as done?
-							</p>
+					<div
+						class="mb-5 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3"
+					>
+						<div class="flex flex-col gap-2">
+							<div>
+								<p class="text-sm font-medium text-accent">Roll complete</p>
+								<p class="text-xs text-accent/70">
+									All {frameInfo?.total} frames shot. When did you finish it?
+								</p>
+							</div>
+							<div class="w-44">
+								<DateInput label="Finished shooting" bind:value={finishDate} />
+							</div>
 						</div>
 						<div class="flex items-center gap-2">
-							<Button size="sm" variant="primary" onclick={markRollShot}>Mark as Shot</Button>
+							<Button
+								size="sm"
+								variant="primary"
+								disabled={!finishDate.trim() || !!finishDateError}
+								onclick={markRollShot}>Mark as Shot</Button
+							>
 							<button
 								onclick={() => {
 									rollFullDismissed = true;
