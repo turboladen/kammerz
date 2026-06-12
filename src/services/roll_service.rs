@@ -357,20 +357,29 @@ impl RollService {
         let prefix = now.format("%y%m%d").to_string();
 
         #[derive(Debug, FromQueryResult)]
-        struct CountRow {
-            count: i64,
+        struct MaxRow {
+            max_suffix: i64,
         }
 
+        // Derive the next suffix from the largest existing one, not a row count:
+        // deleting a non-last same-day roll shrinks the count, so a count-based
+        // suffix would re-suggest a surviving roll's id and fail the UNIQUE
+        // constraint on roll_id (kammerz-cg1). substr strips the "YYMMDD-"
+        // prefix; SQLite CAST reads a leading numeric prefix and ignores the
+        // rest ("2-retry" -> 2), and a tail with no leading digits CASTs to 0 —
+        // both harmless here.
+        let stub = format!("{prefix}-");
         let pattern = format!("{prefix}-%");
-        let row = CountRow::find_by_statement(Statement::from_sql_and_values(
+        let row = MaxRow::find_by_statement(Statement::from_sql_and_values(
             db.get_database_backend(),
-            "SELECT COUNT(*) as count FROM rolls WHERE roll_id LIKE $1",
-            [pattern.into()],
+            "SELECT COALESCE(MAX(CAST(substr(roll_id, length($1) + 1) AS INTEGER)), 0) \
+             AS max_suffix FROM rolls WHERE roll_id LIKE $2",
+            [stub.into(), pattern.into()],
         ))
         .one(db)
         .await?;
 
-        let next = row.map(|r| r.count).unwrap_or(0) + 1;
+        let next = row.map(|r| r.max_suffix).unwrap_or(0) + 1;
         Ok(format!("{prefix}-{next}"))
     }
 }
