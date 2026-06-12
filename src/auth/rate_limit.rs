@@ -2,14 +2,36 @@
 //!
 //! A single shared password reachable over the LAN/VPN is otherwise bounded only
 //! by argon2 cost, so we throttle per client IP with `tower-governor` (GCRA). The
-//! layer is attached to the login route only (see `routes::create_router`); the
-//! per-IP key comes from `PeerIpKeyExtractor`, which reads the
-//! `ConnectInfo<SocketAddr>` that `main.rs` installs via
-//! `into_make_service_with_connect_info`.
+//! layer is attached to the login route only (see `routes::create_router`).
+//!
+//! The per-client key comes from one of two extractors, chosen by
+//! `KAMMERZ_TRUST_PROXY` (default off):
+//!   - `PeerIpKeyExtractor` (default) reads the `ConnectInfo<SocketAddr>` that
+//!     `main.rs` installs via `into_make_service_with_connect_info` — the actual
+//!     TCP peer. Correct when clients connect directly (LAN/VPN).
+//!   - `SmartIpKeyExtractor` (trust-proxy mode) keys on `X-Forwarded-For` instead,
+//!     so clients behind a TLS reverse proxy — which all share the proxy's peer IP
+//!     — get independent buckets. It reads the *leftmost* XFF entry, so enable
+//!     this ONLY behind a proxy that *replaces* the header with the single real
+//!     client IP. An *appending* proxy (e.g. nginx's default
+//!     `$proxy_add_x_forwarded_for`) is unsafe: an attacker sends a forged leading
+//!     IP, the proxy appends the real one after it, and the limiter keys on the
+//!     attacker's value — a fresh bucket per request, defeating the throttle. XFF
+//!     is client-supplied and trivially spoofable without an overwriting proxy.
+//!     Without trust-proxy mode at all, the proxy's single IP collapses every
+//!     client into one bucket, so an attacker hammering login locks the real user
+//!     out. (`SmartIpKeyExtractor` also falls back to `x-real-ip` then `Forwarded`
+//!     then the peer IP, but XFF takes precedence whenever present.)
 //!
 //! We deliberately do NOT spawn governor's background `retain_recent()` cleanup
-//! task: the login keyspace is bounded by the handful of distinct VPN/LAN client
-//! IPs, so storage growth is negligible — and the config is built inside
+//! task. The keyspace stays bounded by the handful of distinct VPN/LAN peer IPs in
+//! the default mode, and — in a correctly-configured trust-proxy deployment (an
+//! overwriting proxy, per the contract above) — by that same set of real client
+//! IPs. The governor map has no eviction, so a *misconfigured* trust-proxy
+//! deployment that admits forged XFF values would grow it one entry per forged IP;
+//! but that same misconfiguration already defeats the throttle (see above), so the
+//! memory growth is strictly secondary to fixing the proxy. In every supported
+//! configuration storage growth is negligible — and the config is built inside
 //! `create_router`, which every integration test calls, so a per-build cleanup
 //! thread would cost far more than it saves.
 

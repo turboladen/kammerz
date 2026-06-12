@@ -12,26 +12,44 @@ use tower::ServiceExt;
 /// `oneshot` bypasses that, so the login rate-limiter's `PeerIpKeyExtractor` would
 /// otherwise fail to extract a key. Distinct `ip` values are throttled independently.
 fn login_req(ip: &str, password: &str) -> Request<Body> {
-    let mut req = Request::builder()
+    login_req_xff(ip, None, password)
+}
+
+/// Like [`login_req`] but optionally sets an `X-Forwarded-For` header. `peer_ip`
+/// is the TCP peer (installed as `ConnectInfo`, what `PeerIpKeyExtractor` reads);
+/// `xff` is the forwarded client IP a proxy would set (what `SmartIpKeyExtractor`
+/// reads). Lets a test pin one and vary the other to prove which the limiter keys on.
+fn login_req_xff(peer_ip: &str, xff: Option<&str>, password: &str) -> Request<Body> {
+    let mut builder = Request::builder()
         .method("POST")
         .uri("/api/auth/login")
-        .header("content-type", "application/json")
+        .header("content-type", "application/json");
+    if let Some(xff) = xff {
+        builder = builder.header("x-forwarded-for", xff);
+    }
+    let mut req = builder
         .body(Body::from(
             serde_json::json!({ "password": password }).to_string(),
         ))
         .unwrap();
-    let addr: SocketAddr = format!("{ip}:9999").parse().unwrap();
+    let addr: SocketAddr = format!("{peer_ip}:9999").parse().unwrap();
     req.extensions_mut().insert(ConnectInfo(addr));
     req
 }
 
-// Helper to build an app with a known password and in-memory DB.
+// Helper to build an app with a known password and in-memory DB. `trust_proxy`
+// selects the limiter's key extractor (XFF-aware when true).
 async fn test_app(password_hash: Option<String>) -> axum::Router {
+    test_app_cfg(password_hash, false).await
+}
+
+async fn test_app_cfg(password_hash: Option<String>, trust_proxy: bool) -> axum::Router {
     let db = kammerz::db::init("sqlite::memory:").await.unwrap();
     let config = kammerz::config::AppConfig {
         password_hash,
         anthropic_api_key: None,
         secure_cookies: false,
+        trust_proxy,
     };
     // Build router WITH a session layer backed by an in-memory DB. min_connections(1)
     // keeps the in-memory DB alive for the life of the pool.
@@ -153,4 +171,76 @@ async fn rate_limit_is_per_ip() {
         .await
         .unwrap();
     assert_eq!(other.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn trust_proxy_keys_rate_limit_on_x_forwarded_for() {
+    // The reverse-proxy scenario the opt-in exists for: every request arrives from
+    // the same proxy peer IP, distinguished only by X-Forwarded-For. In trust-proxy
+    // mode the limiter must key on XFF so two real clients get independent buckets —
+    // exhausting one must not throttle the other.
+    let app = test_app_cfg(
+        Some(kammerz::auth::password::hash_password("pw").unwrap()),
+        true,
+    )
+    .await;
+
+    // Exhaust the burst for client A (all share the proxy's peer IP "10.9.9.9").
+    for _ in 0..LOGIN_BURST_SIZE {
+        let res = app
+            .clone()
+            .oneshot(login_req_xff("10.9.9.9", Some("203.0.113.1"), "nope"))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    }
+    let blocked = app
+        .clone()
+        .oneshot(login_req_xff("10.9.9.9", Some("203.0.113.1"), "nope"))
+        .await
+        .unwrap();
+    assert_eq!(blocked.status(), StatusCode::TOO_MANY_REQUESTS);
+
+    // Client B — same proxy peer IP, different XFF — still has a fresh bucket.
+    let other = app
+        .clone()
+        .oneshot(login_req_xff("10.9.9.9", Some("203.0.113.2"), "nope"))
+        .await
+        .unwrap();
+    assert_eq!(
+        other.status(),
+        StatusCode::UNAUTHORIZED,
+        "a distinct X-Forwarded-For must get its own bucket in trust-proxy mode"
+    );
+}
+
+#[tokio::test]
+async fn default_mode_ignores_x_forwarded_for() {
+    // Without trust-proxy mode, XFF is client-supplied and must NOT be trusted:
+    // varying it cannot mint a fresh bucket. All requests share the peer IP's
+    // bucket, so spoofing XFF can't escape the throttle.
+    let app = test_app(Some(kammerz::auth::password::hash_password("pw").unwrap())).await;
+
+    // Exhaust the burst on one peer IP while rotating the (untrusted) XFF header.
+    for i in 0..LOGIN_BURST_SIZE {
+        let xff = format!("203.0.113.{i}");
+        let res = app
+            .clone()
+            .oneshot(login_req_xff("10.8.8.8", Some(&xff), "nope"))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    }
+    // A brand-new XFF value on the same peer IP is still throttled — proof the
+    // limiter keyed on the peer IP, not the spoofable header.
+    let blocked = app
+        .clone()
+        .oneshot(login_req_xff("10.8.8.8", Some("203.0.113.250"), "nope"))
+        .await
+        .unwrap();
+    assert_eq!(
+        blocked.status(),
+        StatusCode::TOO_MANY_REQUESTS,
+        "default mode must ignore X-Forwarded-For so a spoofed header can't escape the throttle"
+    );
 }
