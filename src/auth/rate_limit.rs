@@ -11,9 +11,9 @@
 //!     TCP peer. Correct when clients connect directly (LAN/VPN).
 //!   - `SmartIpKeyExtractor` (trust-proxy mode) keys on `X-Forwarded-For` instead,
 //!     so clients behind a TLS reverse proxy — which all share the proxy's peer IP
-//!     — get independent buckets. It reads the *leftmost* XFF entry, so enable
-//!     this ONLY behind a proxy that *replaces* the header with the single real
-//!     client IP. An *appending* proxy (e.g. nginx's default
+//!     — get independent buckets. It reads the *leftmost parseable* XFF entry, so
+//!     enable this ONLY behind a proxy that *replaces* the header with the single
+//!     real client IP. An *appending* proxy (e.g. nginx's default
 //!     `$proxy_add_x_forwarded_for`) is unsafe: an attacker sends a forged leading
 //!     IP, the proxy appends the real one after it, and the limiter keys on the
 //!     attacker's value — a fresh bucket per request, defeating the throttle. XFF

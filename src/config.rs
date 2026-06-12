@@ -10,8 +10,8 @@ pub struct AppConfig {
     pub secure_cookies: bool,
     /// Trust `X-Forwarded-For` for the login rate-limiter's per-client key. Set
     /// true ONLY when behind a reverse proxy that *replaces* the header with the
-    /// single real client IP — the limiter keys on the leftmost entry, so an
-    /// *appending* proxy is unsafe (an attacker forges a leading IP the proxy
+    /// single real client IP — the limiter keys on the leftmost parseable entry,
+    /// so an *appending* proxy is unsafe (an attacker forges a leading IP the proxy
     /// preserves). Otherwise every request arrives from the proxy's single IP and
     /// the limiter collapses to one shared bucket (an attacker could then lock out
     /// the real user). Default false: XFF is client-spoofable when no overwriting
