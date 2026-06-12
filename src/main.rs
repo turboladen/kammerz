@@ -86,6 +86,19 @@ async fn main() {
         Some(_) => {}
     }
 
+    // Announce which IP source the login rate limiter keys on — mirrors the
+    // open-auth warning above so an operator can confirm trust-proxy mode took
+    // effect. In trust-proxy mode the limiter reads X-Forwarded-For; without a
+    // proxy that overwrites it, XFF is client-spoofable, hence the opt-in.
+    if config.trust_proxy {
+        tracing::info!(
+            "KAMMERZ_TRUST_PROXY=true — login rate limiter keys on X-Forwarded-For. \
+             Only safe behind a reverse proxy that overwrites that header."
+        );
+    } else {
+        tracing::info!("login rate limiter keys on the peer socket IP (set KAMMERZ_TRUST_PROXY=true when behind a trusted reverse proxy)");
+    }
+
     // Session store: a separate sqlx pool against the same SQLite file (path
     // resolved by the same helper as db::init so the two pools never diverge).
     // busy_timeout matches the data pool so a session write that collides with a
@@ -131,7 +144,8 @@ async fn main() {
     tracing::info!("kammerz listening on http://0.0.0.0:{port}");
     // `into_make_service_with_connect_info` installs `ConnectInfo<SocketAddr>` on
     // each request — the login rate-limiter's `PeerIpKeyExtractor` reads it to key
-    // throttling by client IP.
+    // throttling by client IP (and `SmartIpKeyExtractor`, in trust-proxy mode,
+    // falls back to it when no forwarding header is present).
     //
     // `with_graceful_shutdown` makes SIGTERM/SIGINT (e.g. `systemctl restart
     // kammerz`) drain in-flight requests instead of hard-killing them mid-write.

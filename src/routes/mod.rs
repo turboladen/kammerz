@@ -1,8 +1,9 @@
-use axum::routing::{get, post};
+use axum::routing::{get, post, MethodRouter};
 use axum::{Json, Router};
 use sea_orm::{DbErr, TransactionError};
 use serde_json::{json, Value};
 use tower_governor::governor::GovernorConfigBuilder;
+use tower_governor::key_extractor::{KeyExtractor, PeerIpKeyExtractor, SmartIpKeyExtractor};
 use tower_governor::GovernorLayer;
 
 use crate::auth::{handlers, rate_limit};
@@ -24,24 +25,19 @@ pub mod shots;
 pub mod stats;
 
 pub fn create_router(state: AppState) -> Router {
-    // Per-IP brute-force guard, scoped to the login route only via `.layer()` on
-    // its MethodRouter (logout/me/business routes are untouched). See
-    // `auth::rate_limit` for the rationale and tuning constants.
-    let login_rate_limit = GovernorLayer::new(
-        GovernorConfigBuilder::default()
-            .burst_size(rate_limit::LOGIN_BURST_SIZE)
-            .per_second(rate_limit::LOGIN_REPLENISH_SECONDS)
-            .finish()
-            .expect("login rate-limit config is valid"),
-    )
-    .error_handler(rate_limit::on_governor_error);
+    // Per-IP brute-force guard, scoped to the login route only (logout/me/business
+    // routes are untouched). The key-extractor choice depends on whether we trust a
+    // reverse proxy's `X-Forwarded-For`; both branches erase to the same
+    // `MethodRouter<AppState>`. See `auth::rate_limit` for the rationale/constants.
+    let login_route = if state.config.trust_proxy {
+        login_route(SmartIpKeyExtractor)
+    } else {
+        login_route(PeerIpKeyExtractor)
+    };
 
     Router::<AppState>::new()
         .route("/api/health", get(health))
-        .route(
-            "/api/auth/login",
-            post(handlers::login).layer(login_rate_limit),
-        )
+        .route("/api/auth/login", login_route)
         .route("/api/auth/logout", post(handlers::logout))
         .route("/api/auth/me", get(handlers::me))
         .nest("/api/cameras", cameras::router())
@@ -59,6 +55,36 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/api/import", import::router())
         .nest("/api/backup", backup::router())
         .with_state(state)
+}
+
+/// Build the `POST /api/auth/login` route with the brute-force rate limiter
+/// attached, keyed by `extractor`. Generic over the key extractor so
+/// `create_router` can pick `PeerIpKeyExtractor` (the default — peer socket IP)
+/// or `SmartIpKeyExtractor` (X-Forwarded-For aware, for trust-proxy mode) without
+/// duplicating the route/limiter setup; the resulting `MethodRouter<AppState>`
+/// type is identical either way. See `auth::rate_limit` for the tuning constants
+/// and `on_governor_error` for the error envelope.
+fn login_route<K>(extractor: K) -> MethodRouter<AppState>
+where
+    // axum's `MethodRouter::layer` requires the layered service to be
+    // `Send + Sync + 'static`; the governor layer holds the extractor and an
+    // `Arc<RateLimiter<K::Key, ...>>`, so both `K` and its key type inherit those
+    // bounds. Both concrete extractors we use (Peer/Smart) and their `IpAddr` key
+    // satisfy them.
+    K: KeyExtractor + Send + Sync + 'static,
+    K::Key: Send + Sync,
+{
+    let limiter = GovernorLayer::new(
+        GovernorConfigBuilder::default()
+            .burst_size(rate_limit::LOGIN_BURST_SIZE)
+            .per_second(rate_limit::LOGIN_REPLENISH_SECONDS)
+            .key_extractor(extractor)
+            .finish()
+            .expect("login rate-limit config is valid"),
+    )
+    .error_handler(rate_limit::on_governor_error);
+
+    post(handlers::login).layer(limiter)
 }
 
 async fn health() -> Json<Value> {
