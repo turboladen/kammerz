@@ -1,15 +1,15 @@
+use axum::Router;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::get;
-use axum::Router;
 use serde::Deserialize;
 
+use crate::AppState;
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult};
 use crate::extract::{Json, Path};
 use crate::routes::friendly_err;
 use crate::services::settings_service::SettingsService;
-use crate::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct SetSettingDto {

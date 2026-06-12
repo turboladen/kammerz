@@ -13,13 +13,13 @@
 
 use std::sync::Arc;
 
+use axum::Router;
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::header::{CACHE_CONTROL, CONTENT_TYPE, ETAG, IF_NONE_MATCH};
 use axum::http::{HeaderMap, Request, StatusCode};
 use axum::response::Response;
 use axum::routing::get;
-use axum::Router;
 use http_body_util::BodyExt;
 use kammerz::compression::compression_layer;
 use kammerz::spa::asset_response;

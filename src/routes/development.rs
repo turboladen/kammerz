@@ -1,20 +1,21 @@
 use std::collections::HashMap;
 
+use axum::Router;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::get;
-use axum::Router;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, PaginatorTrait,
     QueryFilter, Set, TransactionTrait,
 };
 use serde::Deserialize;
 
+use crate::AppState;
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, DbOptionExt, OptionExt};
 use crate::extract::{Json, Path};
 use crate::patch::{double_option, now_string, trim_opt};
-use crate::routes::{friendly_err, friendly_txn_err, Op};
+use crate::routes::{Op, friendly_err, friendly_txn_err};
 use crate::services::development_service::{
     DevelopmentService, LabDevListItem, SelfDevWithStages, StageInput,
 };
@@ -22,7 +23,6 @@ use crate::services::roll_service::RollService;
 use crate::validate::{
     require_nonempty, validate_date_opt, validate_non_negative_f64, validate_non_negative_i32,
 };
-use crate::AppState;
 use entity::roll::RollStatus;
 use entity::{dev_stage, development_lab, development_self};
 

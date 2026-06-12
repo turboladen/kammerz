@@ -1,5 +1,5 @@
 use axum::http::StatusCode;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tower::ServiceExt;
 
 mod common;
@@ -276,10 +276,12 @@ async fn import_roll_rejects_whitespace_roll_id() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body: Value = json_body(res).await;
-    assert!(body["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("roll_id"));
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("roll_id")
+    );
 }
 
 #[tokio::test]
@@ -304,8 +306,10 @@ async fn import_roll_rejects_negative_frame_count() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body: Value = json_body(res).await;
-    assert!(body["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("frame_count"));
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("frame_count")
+    );
 }

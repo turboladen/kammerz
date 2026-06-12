@@ -7,14 +7,14 @@ use rust_embed::Embed;
 use sqlx::sqlite::SqliteConnectOptions;
 use time::Duration as TimeDuration;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
-use tower_sessions::{cookie::SameSite, Expiry, SessionManagerLayer};
+use tower_sessions::{Expiry, SessionManagerLayer, cookie::SameSite};
 use tower_sessions_sqlx_store::SqliteStore;
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
 
 use kammerz::config::AppConfig;
 use kammerz::error::AppError;
-use kammerz::{db, routes, AppState};
+use kammerz::{AppState, db, routes};
 
 #[derive(Embed)]
 #[folder = "frontend/build"]
@@ -31,7 +31,9 @@ async fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(|s| s.as_str()) == Some("hash-password") {
         if args.get(2).is_some_and(|a| a != "-") {
-            eprintln!("error: do not pass the password as an argument (it leaks into shell history / ps).");
+            eprintln!(
+                "error: do not pass the password as an argument (it leaks into shell history / ps)."
+            );
             eprintln!("usage: kammerz hash-password            # prompts on a TTY");
             eprintln!("       echo -n <pw> | kammerz hash-password");
             std::process::exit(2);
@@ -113,7 +115,9 @@ async fn main() {
              Only safe behind a reverse proxy that overwrites that header."
         );
     } else {
-        tracing::info!("login rate limiter keys on the peer socket IP (set KAMMERZ_TRUST_PROXY=true when behind a trusted reverse proxy)");
+        tracing::info!(
+            "login rate limiter keys on the peer socket IP (set KAMMERZ_TRUST_PROXY=true when behind a trusted reverse proxy)"
+        );
     }
 
     // Session store: a separate sqlx pool against the same SQLite file (path

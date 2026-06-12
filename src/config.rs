@@ -109,7 +109,7 @@ fn parse_flag(value: String) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_bind_addr, parse_flag, DEFAULT_BIND_ADDR};
+    use super::{DEFAULT_BIND_ADDR, parse_bind_addr, parse_flag};
     use std::net::IpAddr;
 
     #[test]

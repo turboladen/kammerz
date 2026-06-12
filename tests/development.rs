@@ -3,7 +3,7 @@ mod common;
 use axum::http::StatusCode;
 use common::{delete, get, json_body, open_app, open_app_with_db, post_json, put_json};
 use sea_orm::{ActiveModelTrait, Set};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tower::ServiceExt;
 
 /// Seed a self dev directly in the DB, bypassing the API's lab/self
@@ -1166,10 +1166,12 @@ async fn create_self_dev_rejects_whitespace_stage_name() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body: Value = json_body(res).await;
-    assert!(body["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("stage_name"));
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("stage_name")
+    );
 
     // Validation failed before the transaction — no self dev persisted.
     let res = app
@@ -1199,10 +1201,12 @@ async fn create_self_dev_rejects_negative_stage_duration() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body: Value = json_body(res).await;
-    assert!(body["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("duration_seconds"));
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("duration_seconds")
+    );
 
     // Validation failed before the transaction — no self dev persisted.
     let res = app
