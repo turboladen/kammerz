@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::str::FromStr;
 
-use axum::http::{header, StatusCode, Uri};
+use axum::http::{HeaderMap, StatusCode, Uri};
 use axum::response::IntoResponse;
 use rust_embed::Embed;
 use sqlx::sqlite::SqliteConnectOptions;
@@ -221,20 +221,24 @@ fn is_route_like(path: &str) -> bool {
     !last.contains('.')
 }
 
-async fn serve_spa(uri: Uri) -> impl IntoResponse {
+async fn serve_spa(headers: HeaderMap, uri: Uri) -> impl IntoResponse {
     let path = uri.path().trim_start_matches('/');
     if path.starts_with("api/") {
         // Reuse the shared error envelope so unmatched /api/* 404s are byte-identical
         // to every handler error (frontend reads `error.code` / `error.message`).
         return AppError::NotFound("not found".to_string()).into_response();
     }
-    let (asset, mime_path) = if path.is_empty() {
-        (Assets::get("index.html"), "index.html")
+    // `cache_path` is the URL path (drives the immutable-vs-revalidate
+    // Cache-Control choice); `mime_path` is the file actually served (an unknown
+    // route falls back to index.html, so its content type is text/html). They
+    // differ only on the SPA-fallback branch.
+    let (asset, mime_path, cache_path) = if path.is_empty() {
+        (Assets::get("index.html"), "index.html", "index.html")
     } else {
         match Assets::get(path) {
-            Some(f) => (Some(f), path),
-            None if is_route_like(path) => (Assets::get("index.html"), "index.html"),
-            None => (None, path),
+            Some(f) => (Some(f), path, path),
+            None if is_route_like(path) => (Assets::get("index.html"), "index.html", path),
+            None => (None, path, path),
         }
     };
     match asset {
@@ -243,19 +247,17 @@ async fn serve_spa(uri: Uri) -> impl IntoResponse {
                 .first_or_octet_stream()
                 .as_ref()
                 .to_string();
-            let cache = if path.starts_with("_app/immutable/") {
-                "public, max-age=31536000, immutable"
-            } else {
-                "no-cache"
-            };
-            (
-                [
-                    (header::CONTENT_TYPE, mime),
-                    (header::CACHE_CONTROL, cache.to_string()),
-                ],
+            // Attach a strong, sha256-derived ETag and honor If-None-Match (304).
+            // rust-embed precomputes the hash per embedded file. The SPA-fallback
+            // path lands here too, so unknown routes revalidate index.html.
+            kammerz::spa::asset_response(
+                &headers,
+                cache_path,
                 content.data,
+                &content.metadata.sha256_hash(),
+                &mime,
             )
-                .into_response()
+            .into_response()
         }
         None => StatusCode::NOT_FOUND.into_response(),
     }
