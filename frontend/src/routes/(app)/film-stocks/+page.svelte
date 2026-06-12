@@ -14,13 +14,20 @@
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
 	import { Film } from 'lucide-svelte';
-	import { listFilmStocks, createFilmStock, deleteFilmStock, listDistinctFilmBrands } from '$lib/api/film-stocks';
+	import {
+		listFilmStocks,
+		createFilmStock,
+		updateFilmStock,
+		deleteFilmStock,
+		listDistinctFilmBrands
+	} from '$lib/api/film-stocks';
 	import { filterBySearch, groupItems, sortByString, sortByNumber, sortByDate } from '$lib/utils/list';
 	import type { FilmStock, FilmFormat, FilmStockType, FilmStockInsert } from '$lib/types';
 
 	let stocks: FilmStock[] = $state([]);
 	let loading = $state(true);
 	let showAddDialog = $state(false);
+	let editingStock: FilmStock | null = $state(null);
 	let filterType = $state('all');
 	let filterFormat = $state('all');
 	let deletingStock: FilmStock | null = $state(null);
@@ -37,7 +44,12 @@
 	// Pipeline: tab filter → search → sort → group
 	const afterTabFilter = $derived(
 		stocks.filter((s) => {
-			if (filterType !== 'all' && s.stock_type !== filterType) return false;
+			// The 'slide' tab spans both slide types so bw-slide stocks stay reachable.
+			if (filterType === 'slide') {
+				if (s.stock_type !== 'color-slide' && s.stock_type !== 'bw-slide') return false;
+			} else if (filterType !== 'all' && s.stock_type !== filterType) {
+				return false;
+			}
 			if (filterFormat !== 'all' && s.format !== filterFormat) return false;
 			return true;
 		})
@@ -143,6 +155,18 @@
 		notes = '';
 	}
 
+	function buildInsert(): FilmStockInsert {
+		return {
+			brand,
+			name,
+			format: format as FilmFormat,
+			exposure_count: exposureCount ? parseInt(exposureCount) : null,
+			stock_type: stockType as FilmStockType,
+			iso: iso ? parseInt(iso) : null,
+			notes: notes || null
+		};
+	}
+
 	async function handleAdd() {
 		error = '';
 		if (!brand.trim()) {
@@ -154,17 +178,41 @@
 			return;
 		}
 		try {
-			const stock: FilmStockInsert = {
-				brand,
-				name,
-				format: format as FilmFormat,
-				exposure_count: exposureCount ? parseInt(exposureCount) : null,
-				stock_type: stockType as FilmStockType,
-				iso: iso ? parseInt(iso) : null,
-				notes: notes || null
-			};
-			await createFilmStock(stock);
+			await createFilmStock(buildInsert());
 			showAddDialog = false;
+			resetForm();
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	function startEdit(stock: FilmStock) {
+		error = '';
+		editingStock = stock;
+		brand = stock.brand;
+		name = stock.name;
+		format = stock.format;
+		exposureCount = stock.exposure_count?.toString() ?? '';
+		stockType = stock.stock_type;
+		iso = stock.iso?.toString() ?? '';
+		notes = stock.notes ?? '';
+	}
+
+	async function handleEdit() {
+		if (!editingStock) return;
+		error = '';
+		if (!brand.trim()) {
+			error = 'Brand is required.';
+			return;
+		}
+		if (!name.trim()) {
+			error = 'Name is required.';
+			return;
+		}
+		try {
+			await updateFilmStock(editingStock.id, buildInsert());
+			editingStock = null;
 			resetForm();
 			await load();
 		} catch (err) {
@@ -233,10 +281,8 @@
 				variant={filterType === 'bw-negative' ? 'primary' : 'ghost'}
 				onclick={() => (filterType = 'bw-negative')}>B&W</Button
 			>
-			<Button
-				size="sm"
-				variant={filterType === 'color-slide' ? 'primary' : 'ghost'}
-				onclick={() => (filterType = 'color-slide')}>Slide</Button
+			<Button size="sm" variant={filterType === 'slide' ? 'primary' : 'ghost'} onclick={() => (filterType = 'slide')}
+				>Slide</Button
 			>
 		</div>
 		<div class="flex gap-2">
@@ -297,12 +343,12 @@
 									<span class="text-xs text-text-faint">{stock.exposure_count} exp</span>
 								{/if}
 							</div>
-							<Button
-								size="sm"
-								variant="ghost"
-								class="opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 pointer-coarse:opacity-100"
-								onclick={() => handleDelete(stock)}>&times;</Button
+							<div
+								class="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
 							>
+								<Button size="sm" variant="ghost" onclick={() => startEdit(stock)}>Edit</Button>
+								<Button size="sm" variant="ghost" onclick={() => handleDelete(stock)}>&times;</Button>
+							</div>
 						</div>
 					</FadeIn>
 				{/each}
@@ -347,6 +393,52 @@
 		</div>
 	</div>
 </Dialog>
+
+{#if editingStock}
+	<Dialog
+		open={true}
+		title="Edit Film Stock"
+		onclose={() => {
+			editingStock = null;
+			resetForm();
+		}}
+	>
+		<div class="space-y-4">
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+				<ComboInput label="Brand" bind:value={brand} placeholder="Kodak" options={filmBrandOptions} />
+				<Input label="Name" bind:value={name} placeholder="Portra 400" />
+			</div>
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+				<Select label="Format" bind:value={format} options={formatOptions} />
+				<Select label="Type" bind:value={stockType} options={typeOptions} />
+			</div>
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+				<Input label="ISO" bind:value={iso} type="number" placeholder="400" />
+				<Input
+					label="Exposure Count"
+					bind:value={exposureCount}
+					type="number"
+					placeholder="36"
+					hint="Leave empty for variable (120 film)"
+				/>
+			</div>
+			<Textarea label="Notes" bind:value={notes} />
+			{#if error}
+				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+			{/if}
+			<div class="flex justify-end gap-2 pt-2">
+				<Button
+					variant="ghost"
+					onclick={() => {
+						editingStock = null;
+						resetForm();
+					}}>Cancel</Button
+				>
+				<Button variant="primary" onclick={handleEdit}>Save</Button>
+			</div>
+		</div>
+	</Dialog>
+{/if}
 
 {#if deletingStock}
 	<ConfirmDialog
