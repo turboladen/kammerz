@@ -6,9 +6,11 @@ use axum::response::IntoResponse;
 use rust_embed::Embed;
 use sqlx::sqlite::SqliteConnectOptions;
 use time::Duration as TimeDuration;
-use tower_http::trace::TraceLayer;
+use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tower_sessions::{cookie::SameSite, Expiry, SessionManagerLayer};
 use tower_sessions_sqlx_store::SqliteStore;
+use tracing::Level;
+use tracing_subscriber::EnvFilter;
 
 use kammerz::config::AppConfig;
 use kammerz::error::AppError;
@@ -48,7 +50,16 @@ async fn main() {
         return;
     }
 
-    tracing_subscriber::fmt::init();
+    // Default to INFO so failed-login warnings and per-request access logs appear
+    // out of the box. `fmt::init()` would use `EnvFilter::from_default_env()`, which
+    // falls back to ERROR when RUST_LOG is unset (the shipped default — .env.example
+    // leaves it commented), silencing the entire operability log. RUST_LOG still
+    // overrides this when set (e.g. `tower_http=debug` for full request spans).
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
+        .init();
 
     // Surface the build version first thing so any deployed binary (NAS or dev)
     // identifies itself in the log even if boot fails later. Also reported by
@@ -142,7 +153,17 @@ async fn main() {
     let app = routes::create_router(state)
         .fallback(serve_spa)
         .layer(session_layer)
-        .layer(TraceLayer::new_for_http())
+        // Per-request access log at INFO. Both halves must be raised to INFO: the
+        // span (carrying method + uri) and `on_response` (carrying status + latency)
+        // each default to DEBUG, which the INFO-default subscriber drops — so a
+        // status-only line, or no line at all, would leave a 404/422 untraceable.
+        // Raising both makes each request log `request{method=… uri=…}: … status=…
+        // latency=…`. Set RUST_LOG (e.g. `tower_http=debug`) for the full spans.
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+        )
         .layer(kammerz::compression::compression_layer());
 
     let port: u16 = std::env::var("PORT")
