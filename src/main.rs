@@ -6,6 +6,8 @@ use axum::response::IntoResponse;
 use rust_embed::Embed;
 use sqlx::sqlite::SqliteConnectOptions;
 use time::Duration as TimeDuration;
+use tower_http::compression::predicate::{NotForContentType, Predicate};
+use tower_http::compression::{CompressionLayer, DefaultPredicate};
 use tower_http::trace::TraceLayer;
 use tower_sessions::{cookie::SameSite, Expiry, SessionManagerLayer};
 use tower_sessions_sqlx_store::SqliteStore;
@@ -129,10 +131,28 @@ async fn main() {
         config,
     };
 
+    // gzip/brotli negotiation on the way out. The primary remote path is a phone
+    // over the field VPN; the ~568KB first-load JS/CSS bundle and the unbounded
+    // GET /api/rolls JSON compress 5-10x. A client that omits Accept-Encoding
+    // (curl, the deploy health grep) gets an identity response untouched.
+    //
+    // DefaultPredicate already skips images, already-compressed bodies, and
+    // anything under its SizeAbove(32) floor — but NOT fonts. woff2 is itself a
+    // compressed container: brotli over our DM Sans face yields 36984 bytes from
+    // 36980 (gzip 36912), i.e. zero-to-negative gain for the CPU. Exclude woff2
+    // explicitly so we don't pay that on every cold cache fill.
+    //
+    // Layered last so it sits *outside* TraceLayer: trace then observes the
+    // pre-compression response, keeping logged body sizes meaningful. It wraps
+    // both create_router's /api routes and the serve_spa fallback because every
+    // layer here applies after `.fallback(...)`.
+    let compression = CompressionLayer::new()
+        .compress_when(DefaultPredicate::new().and(NotForContentType::const_new("font/woff2")));
     let app = routes::create_router(state)
         .fallback(serve_spa)
         .layer(session_layer)
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        .layer(compression);
 
     let port: u16 = std::env::var("PORT")
         .ok()
