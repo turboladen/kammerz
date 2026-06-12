@@ -9,10 +9,25 @@ use sea_orm::ConnectionTrait;
 ///
 /// Also forces snapshots ON: they default OFF in debug builds (which tests
 /// are), and folding the override into the fixture means a future test can't
-/// forget it and pass vacuously. Every test sets the same value, so the
-/// process-global env var cannot race.
+/// forget it and pass vacuously.
 fn temp_db(name: &str) -> (std::path::PathBuf, std::path::PathBuf, String) {
-    std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "1");
+    // The tests in this binary run concurrently on tokio's multi-threaded
+    // runtime, and `db::init` reads KAMMERZ_MIGRATION_SNAPSHOTS via
+    // `env::var`. A bare `set_var` would be a data race against those reads
+    // (on glibc, `setenv` can realloc/free the `environ` array mid-`getenv` —
+    // a use-after-free regardless of the value written). `Once::call_once`
+    // performs the write exactly once and establishes a happens-before edge to
+    // every later `call_once` return on any thread, so the single write is
+    // ordered before any read that could observe it: a genuine single-writer
+    // argument, which is what makes the `unsafe` set_var sound.
+    static SET_SNAPSHOTS_ENV: std::sync::Once = std::sync::Once::new();
+    SET_SNAPSHOTS_ENV.call_once(|| {
+        // SAFETY: runs exactly once, before any concurrent `env::var` read can
+        // observe it; no other code in the test binary mutates the environment.
+        unsafe {
+            std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "1");
+        }
+    });
     let dir = std::env::temp_dir().join(format!(
         "kammerz-snapshot-test-{name}-{}",
         std::process::id()

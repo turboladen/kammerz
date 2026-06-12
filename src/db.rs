@@ -267,35 +267,52 @@ mod tests {
         // Asserted against cfg! rather than a literal so the test also holds
         // under `cargo test --release` (where the default flips to ON).
         let default = !cfg!(debug_assertions);
-        std::env::remove_var("KAMMERZ_MIGRATION_SNAPSHOTS");
+        // SAFETY: edition 2024 makes env mutation unsafe because it races with
+        // concurrent readers. This is the single test that touches
+        // KAMMERZ_MIGRATION_SNAPSHOTS (deliberately not split, per the comment
+        // above), and no other thread reads it during the test run, so these
+        // mutations cannot race.
+        unsafe {
+            std::env::remove_var("KAMMERZ_MIGRATION_SNAPSHOTS");
+        }
         assert_eq!(
             snapshots_enabled(),
             default,
             "unset env must fall back to the build-profile default"
         );
-        std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "1");
+        unsafe {
+            std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "1");
+        }
         assert!(
             snapshots_enabled(),
             "explicit opt-in must win over the default"
         );
-        std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "off");
+        unsafe {
+            std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "off");
+        }
         assert!(
             !snapshots_enabled(),
             "explicit opt-out must force snapshots off"
         );
-        std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "");
+        unsafe {
+            std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "");
+        }
         assert_eq!(
             snapshots_enabled(),
             default,
             "empty value must mean unset, matching config.rs convention"
         );
-        std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "definitely-not-a-bool");
+        unsafe {
+            std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "definitely-not-a-bool");
+        }
         assert_eq!(
             snapshots_enabled(),
             default,
             "unrecognized value must keep the default (with a warning), not silently disable"
         );
-        std::env::remove_var("KAMMERZ_MIGRATION_SNAPSHOTS");
+        unsafe {
+            std::env::remove_var("KAMMERZ_MIGRATION_SNAPSHOTS");
+        }
     }
 
     #[test]

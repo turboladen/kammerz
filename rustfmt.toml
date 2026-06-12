@@ -1,3 +1,6 @@
 # Pin rustfmt behavior to stable defaults so local runs (which may otherwise
 # pick up a user-level rustfmt config) agree with CI's `cargo fmt --check`.
-edition = "2021"
+edition = "2024"
+# Style-edition reflow (case-sensitive import sorting, etc.) is applied
+# separately; pin it to 2021 here so this commit carries no mass reformat.
+style_edition = "2021"
