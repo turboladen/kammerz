@@ -17,6 +17,9 @@ async fn health_reports_ok_and_version() {
     // the same version the binary embeds — guards against the field being
     // dropped or drifting from Cargo.toml.
     assert_eq!(body["version"], env!("CARGO_PKG_VERSION"));
+    // The exact SHA depends on the checkout; assert the field is a non-empty
+    // string so a dropped build.rs env var fails loudly.
+    assert!(!body["build"].as_str().unwrap_or("").is_empty());
 }
 
 #[tokio::test]

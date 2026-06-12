@@ -64,7 +64,11 @@ pub fn create_router(state: AppState) -> Router {
 async fn health() -> Json<Value> {
     // `version` identifies which build a deployment is running (the binary is
     // installed on a remote NAS, so the log line alone isn't always reachable).
-    Json(json!({ "ok": true, "version": env!("CARGO_PKG_VERSION") }))
+    Json(json!({
+        "ok": true,
+        "version": env!("CARGO_PKG_VERSION"),
+        "build": env!("KAMMERZ_BUILD_SHA"),
+    }))
 }
 
 /// Map a DB error to a user-friendly message. Recognizes common SQLite constraint
@@ -83,11 +87,7 @@ pub fn friendly_err(context: &str, e: impl std::fmt::Display) -> String {
         let rest = &raw[pos + "UNIQUE constraint failed: ".len()..];
         // Strip any trailing quote/paren that SeaORM's wrapping may add
         let rest = rest.trim_end_matches(|c: char| c == '"' || c == ')' || c.is_whitespace());
-        let col = rest
-            .split('.')
-            .last()
-            .unwrap_or("value")
-            .replace('_', " ");
+        let col = rest.split('.').last().unwrap_or("value").replace('_', " ");
         return format!("A {context} with that {col} already exists.");
     }
     if raw.contains("UNIQUE constraint failed") {
@@ -105,11 +105,7 @@ pub fn friendly_err(context: &str, e: impl std::fmt::Display) -> String {
     if let Some(pos) = raw.find("NOT NULL constraint failed: ") {
         let rest = &raw[pos + "NOT NULL constraint failed: ".len()..];
         let rest = rest.trim_end_matches(|c: char| c == '"' || c == ')' || c.is_whitespace());
-        let col = rest
-            .split('.')
-            .last()
-            .unwrap_or("field")
-            .replace('_', " ");
+        let col = rest.split('.').last().unwrap_or("field").replace('_', " ");
         return format!("The {col} field is required.");
     }
 

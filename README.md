@@ -75,20 +75,24 @@ rustup target add aarch64-unknown-linux-gnu
 brew install messense/macos-cross-toolchains/aarch64-unknown-linux-gnu
 ```
 
-First-time setup on the server, as a dedicated `kammerz` user:
+First-time setup — create the service user and directories on the server, then push your filled-in `.env` from the Mac (the systemd unit hard-requires `/opt/kammerz/.env`, so this **must happen before the first deploy**; a premature start crash-loops the unit until `sudo systemctl reset-failed kammerz`):
 
 ```bash
+# on the server
+sudo useradd --system --home-dir /opt/kammerz --no-create-home --shell /usr/sbin/nologin kammerz
 sudo install -d -o kammerz -g kammerz /opt/kammerz /opt/kammerz/data
-sudo install -o kammerz -g kammerz .env /opt/kammerz/.env       # your filled-in .env
+
+# from the Mac (filled-in .env in the repo root)
+ssh <user>@<server> "sudo tee /opt/kammerz/.env > /dev/null && sudo chown kammerz:kammerz /opt/kammerz/.env && sudo chmod 600 /opt/kammerz/.env" < .env
 ```
 
 Then every release is one command from the Mac:
 
 ```bash
-just deploy <user>@<server>
+just deploy <user>@<server>          # add a port arg if your .env overrides PORT, e.g. just deploy box 8080
 ```
 
-This cross-compiles the binary (frontend embedded via rust-embed — a fresh SPA build is part of the recipe), streams it to `/opt/kammerz/kammerz`, installs `deploy/kammerz.service` into `/etc/systemd/system/` (so unit-file edits always propagate), restarts the service, and verifies the deploy by polling `GET /api/health` until it answers with the running version (also logged at startup: `kammerz vX.Y.Z starting`). After the first deploy, enable boot startup once: `ssh <user>@<server> 'sudo systemctl enable kammerz'`.
+The deploy user needs **passwordless sudo** on the server (the recipe runs `sudo -n` over non-interactive ssh). The recipe runs the backend test suite, cross-compiles the binary (fresh SPA embedded via rust-embed), uploads it alongside the live one and swaps it in atomically, installs `deploy/kammerz.service` into `/etc/systemd/system/` (so unit-file edits always propagate), restarts the service, and then polls `GET /api/health` until it reports the **build SHA that was just compiled** — a green deploy means the new binary is the one serving, not merely that something answered. After the first deploy, enable boot startup once: `ssh <user>@<server> 'sudo systemctl enable kammerz'`.
 
 The provided `deploy/kammerz.service` is hardened (`ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `NoNewPrivileges`) and only grants write access to `/opt/kammerz/data`, where the SQLite catalog lives.
 
