@@ -11,7 +11,7 @@ use serde::Deserialize;
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, DbOptionExt, OptionExt};
 use crate::patch::{double_option, now_string, trim, trim_opt};
-use crate::routes::{friendly_err, friendly_txn_err};
+use crate::routes::{friendly_err, friendly_txn_err, Op};
 use crate::services::roll_service::RollService;
 use crate::services::shot_service::ShotService;
 use crate::validate::validate_date_opt;
@@ -248,7 +248,7 @@ async fn delete_one(
         })
     })
     .await
-    .map_err(|e| friendly_txn_err("shot", e))?;
+    .map_err(|e| friendly_txn_err("shot", Op::Delete, e))?;
 
     Ok(StatusCode::NO_CONTENT)
 }

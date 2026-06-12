@@ -190,3 +190,36 @@ async fn delete_missing_shot_returns_404() {
     assert_eq!(body["error"]["code"], "NOT_FOUND");
     assert_eq!(body["error"]["message"], "Shot 999999 not found");
 }
+
+// kammerz-956: creating a shot against a roll that doesn't exist (e.g. a stale
+// roll id after the roll was deleted on another device) trips the shots.roll_id
+// FK on INSERT. The 422 message must describe the missing reference — not claim
+// the user tried to delete the shot, which is the operation they didn't perform.
+#[tokio::test]
+async fn create_shot_for_missing_roll_is_friendly_422_not_delete_wording() {
+    let app = open_app().await;
+
+    let payload = json!({
+        "roll_id": 999999,
+        "frame_number": "1",
+    });
+    let res = app
+        .oneshot(post_json("/api/shots", &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    let msg = body["error"]["message"].as_str().unwrap_or_default();
+    assert!(
+        !msg.contains("FOREIGN KEY"),
+        "friendly_err should rewrite the raw constraint error, got: {msg}"
+    );
+    assert!(
+        !msg.to_lowercase().contains("delete"),
+        "create-path FK violation must not use delete wording, got: {msg}"
+    );
+    assert!(
+        msg.contains("no longer exists"),
+        "create-path FK violation should say the referenced record is missing, got: {msg}"
+    );
+}

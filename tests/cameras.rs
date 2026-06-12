@@ -364,6 +364,16 @@ async fn link_lens_to_missing_camera_is_friendly_422() {
         !msg.contains("FOREIGN KEY"),
         "friendly_err should rewrite the raw constraint error, got: {msg}"
     );
+    // This is a create/link path, not a delete — the message must not blame a
+    // delete the user never performed (kammerz-956).
+    assert!(
+        !msg.to_lowercase().contains("delete"),
+        "write-path FK violation must not use delete wording, got: {msg}"
+    );
+    assert!(
+        msg.contains("no longer exists"),
+        "write-path FK violation should say the referenced record is missing, got: {msg}"
+    );
 }
 
 // --- Maintenance CRUD (kammerz-6l5) ---
