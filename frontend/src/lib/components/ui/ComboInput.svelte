@@ -13,9 +13,26 @@
 	let highlightIndex = $state(-1);
 	let inputEl: HTMLInputElement | undefined = $state();
 
+	// Unique per-instance id base so listbox/option ids don't collide when
+	// multiple ComboInputs render on one page (e.g. Brand + Purchased From).
+	const uid = $props.id();
+	const listboxId = `${uid}-listbox`;
+	const optionId = (i: number) => `${uid}-option-${i}`;
+
 	const filtered = $derived(
 		value ? options.filter((o) => o.toLowerCase().includes(value.toLowerCase()) && o !== value) : options
 	);
+
+	const expanded = $derived(showDropdown && filtered.length > 0);
+
+	// Keep the highlight in range as the filtered list shrinks while typing —
+	// otherwise aria-activedescendant points at an option that's no longer
+	// rendered and the visual highlight lands on nothing.
+	$effect(() => {
+		if (highlightIndex >= filtered.length) {
+			highlightIndex = filtered.length - 1;
+		}
+	});
 
 	function handleFocus() {
 		showDropdown = true;
@@ -73,7 +90,7 @@
 	}
 </script>
 
-<div class="relative flex flex-col gap-1.5">
+<label class="relative flex flex-col gap-1.5">
 	{#if label}
 		<span class="text-xs font-medium text-text-muted">{label}</span>
 	{/if}
@@ -85,16 +102,26 @@
 		onblur={handleBlur}
 		onkeydown={handleKeydown}
 		autocomplete="off"
+		role="combobox"
+		aria-expanded={expanded}
+		aria-autocomplete="list"
+		aria-controls={listboxId}
+		aria-activedescendant={highlightIndex >= 0 ? optionId(highlightIndex) : undefined}
 		class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder-text-faint
 			transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 	/>
-	{#if showDropdown && filtered.length > 0}
+	{#if expanded}
 		<div
+			id={listboxId}
+			role="listbox"
 			class="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-surface-raised shadow-xl"
 		>
 			{#each filtered as option, i}
 				<button
 					type="button"
+					id={optionId(i)}
+					role="option"
+					aria-selected={i === highlightIndex}
 					class="w-full px-3 py-2 text-left text-sm transition-colors
 						{i === highlightIndex ? 'bg-accent/15 text-accent' : 'text-text hover:bg-surface-overlay'}"
 					onmousedown={() => selectOption(option)}
@@ -107,4 +134,4 @@
 	{#if hint}
 		<span class="text-xs text-text-faint">{hint}</span>
 	{/if}
-</div>
+</label>
