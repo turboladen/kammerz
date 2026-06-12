@@ -50,19 +50,38 @@ pub async fn init(db_url: &str) -> Result<DatabaseConnection, DbErr> {
     let db = sea_orm::SqlxSqliteConnector::from_sqlx_sqlite_pool(pool);
 
     db.execute_unprepared("PRAGMA journal_mode=WAL").await?;
-    snapshot_before_migrations(&db, base).await?;
+    let snapshots = snapshots_enabled();
+    if snapshots {
+        snapshot_before_migrations(&db, base).await?;
+    }
     db.execute_unprepared("PRAGMA foreign_keys=OFF").await?; // critical during migrations
     Migrator::up(&db, None).await?;
     db.execute_unprepared("PRAGMA foreign_keys=ON").await?; // enforce at runtime
+
     // Prune only AFTER the migration succeeded. If a migration crashes midway
     // under a restart-on-failure supervisor, every restart sees it still
     // pending and takes a fresh snapshot of the now-corrupted DB — pruning
     // before `Migrator::up` would rotate out the one pristine pre-failure
     // snapshot after a few restarts.
-    if !base.contains(":memory:") {
+    if snapshots && !base.contains(":memory:") {
         prune_old_snapshots(base);
     }
     Ok(db)
+}
+
+/// Whether pre-migration snapshots are taken at startup.
+///
+/// Snapshots protect a deployed catalog across binary upgrades, so they
+/// default to ON in release builds (the NAS deployment) and OFF in debug
+/// builds — otherwise every local `cargo run` against a dev DB with pending
+/// migrations would litter the working directory with snapshot files.
+/// `KAMMERZ_MIGRATION_SNAPSHOTS` overrides in either direction
+/// (`1`/`true`/`on`/`yes` to force on, anything else to force off).
+fn snapshots_enabled() -> bool {
+    match std::env::var("KAMMERZ_MIGRATION_SNAPSHOTS") {
+        Ok(v) => matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "on" | "yes"),
+        Err(_) => !cfg!(debug_assertions),
+    }
 }
 
 /// How many pre-migration snapshots to keep next to the DB file.
@@ -77,10 +96,12 @@ const SNAPSHOTS_TO_KEEP: usize = 5;
 /// SQL gotcha"; migration 020 exists because a past migration destroyed data).
 /// This turns a botched future migration from data loss into a file rename.
 ///
-/// Skipped for in-memory DBs (tests) and for a fresh DB with no applied
-/// migrations (nothing to lose). Uses `VACUUM INTO` via the open connection —
-/// unlike a bare `fs::copy`, it produces a consistent snapshot even when a
-/// prior crash left an un-checkpointed `-wal` file. A snapshot failure aborts
+/// Only called when [`snapshots_enabled`] says so (release builds / explicit
+/// opt-in). Additionally skipped for in-memory DBs (tests) and for a fresh DB
+/// with no applied migrations (nothing to lose). Uses `VACUUM INTO` via the
+/// open connection — unlike a bare `fs::copy`, it produces a consistent
+/// snapshot even when a prior crash left an un-checkpointed `-wal` file. A
+/// snapshot failure aborts
 /// startup: migrating the only copy of the catalog without a safety net is
 /// exactly what this guard exists to prevent.
 async fn snapshot_before_migrations(db: &DatabaseConnection, path: &str) -> Result<(), DbErr> {
@@ -149,6 +170,29 @@ fn prune_old_snapshots(db_path: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Single test for all KAMMERZ_MIGRATION_SNAPSHOTS states: env vars are
+    // process-global, so splitting these assertions into separate #[test]s
+    // would race under the parallel test runner.
+    #[test]
+    fn snapshots_enabled_honors_build_profile_and_env_override() {
+        std::env::remove_var("KAMMERZ_MIGRATION_SNAPSHOTS");
+        assert!(
+            !snapshots_enabled(),
+            "debug builds (cargo test runs as one) must default snapshots OFF"
+        );
+        std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "1");
+        assert!(
+            snapshots_enabled(),
+            "explicit opt-in must win over the debug default"
+        );
+        std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "0");
+        assert!(
+            !snapshots_enabled(),
+            "explicit opt-out must force snapshots off"
+        );
+        std::env::remove_var("KAMMERZ_MIGRATION_SNAPSHOTS");
+    }
 
     #[test]
     fn prune_keeps_newest_snapshots() {

@@ -4,6 +4,13 @@
 
 use migration::{Migrator, MigratorTrait};
 
+/// Snapshots default OFF in debug builds (which tests are); force them on so
+/// these tests exercise the deployed-mode behavior. Every test in this file
+/// sets the same value, so the process-global env var cannot race.
+fn force_snapshots_on() {
+    std::env::set_var("KAMMERZ_MIGRATION_SNAPSHOTS", "1");
+}
+
 /// Fresh temp dir + DB path for an isolated file-backed SQLite database.
 fn temp_db(name: &str) -> (std::path::PathBuf, std::path::PathBuf, String) {
     let dir = std::env::temp_dir().join(format!(
@@ -36,6 +43,7 @@ fn snapshots_in(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
 
 #[tokio::test]
 async fn fresh_db_takes_no_snapshot() {
+    force_snapshots_on();
     let (dir, _db_path, url) = temp_db("fresh");
 
     let db = kammerz::db::init(&url).await.unwrap();
@@ -50,6 +58,7 @@ async fn fresh_db_takes_no_snapshot() {
 
 #[tokio::test]
 async fn up_to_date_db_takes_no_snapshot() {
+    force_snapshots_on();
     let (dir, _db_path, url) = temp_db("up-to-date");
 
     let db = kammerz::db::init(&url).await.unwrap();
@@ -82,6 +91,7 @@ async fn applied_migration_count(db_file: &std::path::Path) -> i64 {
 
 #[tokio::test]
 async fn pending_migration_on_existing_db_takes_snapshot() {
+    force_snapshots_on();
     let (dir, db_path, url) = temp_db("pending");
 
     // First boot: apply all migrations, then roll the last one back so the
@@ -95,7 +105,11 @@ async fn pending_migration_on_existing_db_takes_snapshot() {
     db.close().await.unwrap();
 
     let snaps = snapshots_in(&dir);
-    assert_eq!(snaps.len(), 1, "expected exactly one pre-migration snapshot");
+    assert_eq!(
+        snaps.len(),
+        1,
+        "expected exactly one pre-migration snapshot"
+    );
 
     // The snapshot must be a valid SQLite DB capturing PRE-migration state.
     // Assert generically (no hard-coded knowledge of the latest migration):
