@@ -3,7 +3,7 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 mod common;
-use common::{app_with_password, get, json_body, open_app};
+use common::{app_with_password, get, json_body, open_app, open_app_with_db};
 
 #[tokio::test]
 async fn health_reports_ok_and_version() {
@@ -33,4 +33,22 @@ async fn health_is_public_when_password_set() {
     let body: Value = json_body(res).await;
     assert_eq!(body["ok"], true);
     assert_eq!(body["version"], env!("CARGO_PKG_VERSION"));
+}
+
+#[tokio::test]
+async fn health_reports_503_when_db_is_dead() {
+    // The bead's headline scenario: the DB becomes unreachable (file deleted, NAS
+    // dir unmounted) while the process stays up. Simulated here by closing the
+    // pool out from under the router — the health handler's `SELECT 1` then fails
+    // and must surface a 503 with the standard error envelope, NOT a healthy 200.
+    // (This is why `ping()` was insufficient: its sqlx-sqlite handler only checks
+    // the worker thread is alive and would still report healthy here.)
+    let (app, db) = open_app_with_db().await;
+    db.close().await.unwrap();
+
+    let res = app.oneshot(get("/api/health")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "SERVICE_UNAVAILABLE");
 }
