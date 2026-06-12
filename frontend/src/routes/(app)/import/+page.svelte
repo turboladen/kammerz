@@ -120,7 +120,10 @@
 		}))
 	);
 
-	const hasApiKey = $derived(apiKey.length > 0);
+	// A key is usable when one is saved server-side (the backend resolves it
+	// for parsing/model listing — the cleartext never reaches the browser) or
+	// the user has typed a new one that handleParse will save first.
+	const hasApiKey = $derived(keySaved || apiKey.trim().length > 0);
 
 	const lensOptions = $derived.by(() => {
 		const owned = allLenses.filter((l) => !l.date_sold);
@@ -154,7 +157,8 @@
 				getSetting('claude_model')
 			]);
 			if (key) {
-				apiKey = key;
+				// The backend returns a masked sentinel for secrets — only presence
+				// matters here; the cleartext key is never sent to the browser.
 				keySaved = true;
 				// Auto-fetch models if we have a saved key
 				fetchModels();
@@ -179,6 +183,7 @@
 		try {
 			await setSetting('claude_api_key', apiKey.trim());
 			keySaved = true;
+			apiKey = ''; // write-only: clear the field, the saved key stays server-side
 			// Automatically fetch models after saving key
 			await fetchModels();
 		} catch (err) {
@@ -228,6 +233,7 @@
 			if (!keySaved) {
 				await setSetting('claude_api_key', apiKey.trim());
 				keySaved = true;
+				apiKey = '';
 			}
 
 			// Load cameras, film stocks, and lenses for the preview
@@ -381,7 +387,7 @@
 								<input
 									bind:value={apiKey}
 									type={showApiKey ? 'text' : 'password'}
-									placeholder="sk-ant-..."
+									placeholder={keySaved ? 'Key saved — enter a new key to replace' : 'sk-ant-...'}
 									class="w-full rounded-lg border border-border bg-surface px-3 py-2 pr-10 text-sm text-text placeholder-text-faint
 										transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 								/>
@@ -419,7 +425,7 @@
 							</div>
 							<button
 								onclick={fetchModels}
-								disabled={loadingModels || !hasApiKey}
+								disabled={loadingModels || !keySaved}
 								class="rounded-lg border border-border bg-surface px-2.5 py-2 text-text-faint transition-colors
 									hover:border-accent/40 hover:text-accent disabled:opacity-40 disabled:cursor-not-allowed"
 								title="Refresh model list from API"
@@ -431,7 +437,7 @@
 							<span class="mt-1 block text-xs text-red-400">{modelsError}</span>
 						{:else if models.length > 0}
 							<span class="mt-1 block text-xs text-text-faint">{models.length} models available</span>
-						{:else if !hasApiKey}
+						{:else if !keySaved}
 							<span class="mt-1 block text-xs text-text-faint">Save your API key to load available models</span>
 						{/if}
 					</div>
