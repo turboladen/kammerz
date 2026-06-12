@@ -37,12 +37,15 @@ async fn health_is_public_when_password_set() {
 
 #[tokio::test]
 async fn health_reports_503_when_db_is_dead() {
-    // The bead's headline scenario: the DB becomes unreachable (file deleted, NAS
-    // dir unmounted) while the process stays up. Simulated here by closing the
-    // pool out from under the router — the health handler's `SELECT 1` then fails
-    // and must surface a 503 with the standard error envelope, NOT a healthy 200.
-    // (This is why `ping()` was insufficient: its sqlx-sqlite handler only checks
-    // the worker thread is alive and would still report healthy here.)
+    // Guards that the handler 503s (with the standard error envelope) when its DB
+    // probe fails, rather than reporting a healthy 200. Simulated by closing the
+    // pool out from under the router so `SELECT 1` errors.
+    //
+    // NOTE: this does NOT prove the `SELECT 1`-over-`ping()` switch — a closed
+    // pool fails `acquire()`, so `ping()` would 503 here too. The genuine
+    // ping-vs-query gap (an OPEN pool whose underlying DB file/engine is gone,
+    // where ping's worker-thread check still passes) isn't reproducible
+    // in-process; that distinction is argued from the sqlx source in the commit.
     let (app, db) = open_app_with_db().await;
     db.close().await.unwrap();
 
