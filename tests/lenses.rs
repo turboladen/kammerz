@@ -135,3 +135,15 @@ async fn delete_lens_removes_it() {
     let lens: Value = json_body(res).await;
     assert!(lens.is_null(), "deleted lens reads back as null");
 }
+
+// kammerz-o0l: deleting a missing lens returns 404 NOT_FOUND, not a no-op 204.
+#[tokio::test]
+async fn delete_missing_lens_returns_404() {
+    let app = open_app().await;
+
+    let res = app.oneshot(delete("/api/lenses/999999")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "NOT_FOUND");
+    assert_eq!(body["error"]["message"], "Lens 999999 not found");
+}

@@ -130,3 +130,17 @@ pub fn friendly_txn_err(context: &str, e: TransactionError<DbErr>) -> AppError {
         other => AppError::UnprocessableEntity(friendly_err(context, other)),
     }
 }
+
+/// Classify a non-transactional delete error. The `delete` services signal an
+/// already-deleted id by returning `DbErr::RecordNotFound` (when
+/// `rows_affected == 0`); map that to a 404 so a stale-tab / double-tap delete
+/// surfaces "already deleted" instead of a no-op 204, matching the transactional
+/// delete handlers via [`friendly_txn_err`]. Every other `DbErr` (e.g. an FK
+/// constraint) stays a friendly 422. The message is taken directly to avoid
+/// SeaORM's "RecordNotFound Error: " prefix.
+pub fn friendly_delete_err(context: &str, e: DbErr) -> AppError {
+    match e {
+        DbErr::RecordNotFound(m) => AppError::NotFound(m),
+        other => AppError::UnprocessableEntity(friendly_err(context, other)),
+    }
+}

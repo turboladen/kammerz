@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, OptionExt};
 use crate::patch::{double_option, now_string, trim, trim_opt};
-use crate::routes::friendly_err;
+use crate::routes::{friendly_delete_err, friendly_err};
 use crate::services::development_service::DevelopmentService;
 use crate::services::roll_service::{RollService, RollWithDetails};
 use crate::services::shot_service::ShotService;
@@ -232,7 +232,7 @@ async fn delete_one(
 ) -> AppResult<StatusCode> {
     RollService::delete(&db, id)
         .await
-        .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
+        .map_err(|e| friendly_delete_err("roll", e))?;
     Ok(StatusCode::NO_CONTENT)
 }
 

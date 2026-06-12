@@ -297,3 +297,15 @@ async fn delete_roll_cascades_shots() {
     let shots: Vec<Value> = json_body(res).await;
     assert!(shots.is_empty(), "shots are cascade-deleted with the roll");
 }
+
+// kammerz-o0l: deleting a missing roll returns 404 NOT_FOUND, not a no-op 204.
+#[tokio::test]
+async fn delete_missing_roll_returns_404() {
+    let app = open_app().await;
+
+    let res = app.oneshot(delete("/api/rolls/999999")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "NOT_FOUND");
+    assert_eq!(body["error"]["message"], "Roll 999999 not found");
+}

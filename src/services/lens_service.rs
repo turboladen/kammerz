@@ -33,7 +33,10 @@ impl LensService {
     }
 
     pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
-        Lens::delete_by_id(id).exec(db).await?;
+        let res = Lens::delete_by_id(id).exec(db).await?;
+        if res.rows_affected == 0 {
+            return Err(DbErr::RecordNotFound(format!("Lens {id} not found")));
+        }
         Ok(())
     }
 

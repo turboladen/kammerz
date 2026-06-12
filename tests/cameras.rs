@@ -162,6 +162,20 @@ async fn delete_camera_removes_it() {
     assert!(cam.is_null(), "deleted camera reads back as null");
 }
 
+// kammerz-o0l: deleting a missing camera (e.g. a stale tab / double-tap) returns
+// 404 NOT_FOUND, matching the transactional delete handlers rather than the old
+// 204 from a no-op delete_by_id.
+#[tokio::test]
+async fn delete_missing_camera_returns_404() {
+    let app = open_app().await;
+
+    let res = app.oneshot(delete("/api/cameras/999999")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "NOT_FOUND");
+    assert_eq!(body["error"]["message"], "Camera 999999 not found");
+}
+
 // --- Fixed-lens create (4-step transaction, kammerz-6l5) ---
 
 #[tokio::test]
@@ -437,6 +451,24 @@ async fn update_missing_maintenance_is_404() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+// kammerz-o0l: deleting a missing maintenance record returns 404 NOT_FOUND.
+#[tokio::test]
+async fn delete_missing_maintenance_returns_404() {
+    let app = open_app().await;
+
+    let res = app
+        .oneshot(delete("/api/maintenance/999999"))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "NOT_FOUND");
+    assert_eq!(
+        body["error"]["message"],
+        "Maintenance record 999999 not found"
+    );
 }
 
 #[tokio::test]

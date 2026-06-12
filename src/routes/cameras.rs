@@ -8,7 +8,7 @@ use serde::Deserialize;
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, OptionExt};
 use crate::patch::{double_option, now_string, trim, trim_opt};
-use crate::routes::friendly_err;
+use crate::routes::{friendly_delete_err, friendly_err};
 use crate::services::camera_service::CameraService;
 use crate::services::lens_service::LensService;
 use crate::validate::validate_date_opt;
@@ -234,7 +234,7 @@ async fn delete_one(
 ) -> AppResult<StatusCode> {
     CameraService::delete(&db, id)
         .await
-        .map_err(|e| AppError::UnprocessableEntity(friendly_err("camera", e)))?;
+        .map_err(|e| friendly_delete_err("camera", e))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -458,6 +458,6 @@ async fn delete_maintenance(
 ) -> AppResult<StatusCode> {
     CameraService::delete_maintenance(&db, id)
         .await
-        .map_err(|e| AppError::UnprocessableEntity(friendly_err("maintenance record", e)))?;
+        .map_err(|e| friendly_delete_err("maintenance record", e))?;
     Ok(StatusCode::NO_CONTENT)
 }

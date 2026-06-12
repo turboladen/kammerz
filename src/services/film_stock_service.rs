@@ -36,7 +36,10 @@ impl FilmStockService {
     }
 
     pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
-        FilmStock::delete_by_id(id).exec(db).await?;
+        let res = FilmStock::delete_by_id(id).exec(db).await?;
+        if res.rows_affected == 0 {
+            return Err(DbErr::RecordNotFound(format!("Film stock {id} not found")));
+        }
         Ok(())
     }
 
