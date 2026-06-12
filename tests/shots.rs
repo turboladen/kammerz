@@ -12,11 +12,16 @@ async fn first_camera_id(app: &axum::Router) -> i32 {
 }
 
 async fn create_loaded_roll(app: &axum::Router, roll_id: &str) -> i32 {
+    create_roll_at_status(app, roll_id, "loaded").await
+}
+
+/// Create a roll directly at a given status (mirrors tests/development.rs).
+async fn create_roll_at_status(app: &axum::Router, roll_id: &str, status: &str) -> i32 {
     let camera_id = first_camera_id(app).await;
     let payload = json!({
         "roll_id": roll_id,
         "camera_id": camera_id,
-        "status": "loaded",
+        "status": status,
         "date_loaded": "2026-05-01"
     });
     let res = app
@@ -124,6 +129,45 @@ async fn delete_last_shot_reverts_status() {
         .unwrap();
     let roll: Value = json_body(res).await;
     assert_eq!(roll["status"], "loaded", "auto_sync_status reverted the roll");
+}
+
+// kammerz-8rh no-regression: the delete-last-shot revert is scoped to
+// shooting/shot → loaded. A roll already past 'shot' (e.g. at-lab) that has its
+// only shot deleted must NOT be pulled back to loaded — the dev pipeline status
+// outranks shot bookkeeping.
+#[tokio::test]
+async fn delete_last_shot_past_shot_leaves_status_untouched() {
+    let app = open_app().await;
+    let roll_pk = create_roll_at_status(&app, "SHOT-DEL-ATLAB", "at-lab").await;
+
+    // Adding a shot is sync'd only for loaded → shooting; at-lab is unchanged.
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/shots",
+            &json!({ "roll_id": roll_pk, "frame_number": "1" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let shot_id: i32 = json_body(res).await;
+
+    let res = app
+        .clone()
+        .oneshot(delete(&format!("/api/shots/{shot_id}")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    let res = app
+        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
+        .await
+        .unwrap();
+    let roll: Value = json_body(res).await;
+    assert_eq!(
+        roll["status"], "at-lab",
+        "deleting the last shot of an at-lab roll must not revert it to loaded"
+    );
 }
 
 // kammerz-rwa: deleting a shot that doesn't exist (e.g. a stale-id double-delete

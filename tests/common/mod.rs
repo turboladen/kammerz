@@ -26,6 +26,23 @@ pub async fn open_app() -> axum::Router {
     kammerz::routes::create_router(AppState { db, config })
 }
 
+/// Like [`open_app`] but also returns the DB connection, for tests that must
+/// seed state the API no longer allows (e.g. legacy rows that predate newer
+/// invariants such as the lab/self dev mutual-exclusion guard).
+pub async fn open_app_with_db() -> (axum::Router, sea_orm::DatabaseConnection) {
+    let db = kammerz::db::init("sqlite::memory:").await.unwrap();
+    let config = AppConfig {
+        password_hash: None,
+        anthropic_api_key: None,
+        secure_cookies: false,
+    };
+    let app = kammerz::routes::create_router(AppState {
+        db: db.clone(),
+        config,
+    });
+    (app, db)
+}
+
 /// Build an app with a single password configured, backed by a fresh in-memory
 /// DB and a `tower-sessions` session layer (required because `RequireAuth`
 /// consults the session when a password hash is set). `min_connections(1)` keeps

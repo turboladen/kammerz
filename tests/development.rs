@@ -1,9 +1,38 @@
 mod common;
 
 use axum::http::StatusCode;
-use common::{delete, get, json_body, open_app, post_json, put_json};
+use common::{delete, get, json_body, open_app, open_app_with_db, post_json, put_json};
+use sea_orm::{ActiveModelTrait, Set};
 use serde_json::{json, Value};
 use tower::ServiceExt;
+
+/// Seed a self dev directly in the DB, bypassing the API's lab/self
+/// mutual-exclusion guard (kammerz-ysw) — simulates legacy both-dev data.
+async fn insert_self_dev_directly(db: &sea_orm::DatabaseConnection, roll_pk: i32) {
+    entity::development_self::ActiveModel {
+        roll_id: Set(roll_pk),
+        developer: Set(Some("Rodinal".into())),
+        created_at: Set("2026-05-01T00:00:00Z".into()),
+        updated_at: Set("2026-05-01T00:00:00Z".into()),
+        ..Default::default()
+    }
+    .insert(db)
+    .await
+    .unwrap();
+}
+
+/// Lab-side twin of [`insert_self_dev_directly`].
+async fn insert_lab_dev_directly(db: &sea_orm::DatabaseConnection, roll_pk: i32) {
+    entity::development_lab::ActiveModel {
+        roll_id: Set(roll_pk),
+        created_at: Set("2026-05-01T00:00:00Z".into()),
+        updated_at: Set("2026-05-01T00:00:00Z".into()),
+        ..Default::default()
+    }
+    .insert(db)
+    .await
+    .unwrap();
+}
 
 async fn create_shot_roll(app: &axum::Router, roll_id: &str) -> i32 {
     create_roll_at_status(app, roll_id, "shot").await
@@ -523,4 +552,248 @@ async fn delete_missing_self_dev_returns_404() {
     let body: Value = json_body(res).await;
     assert_eq!(body["error"]["code"], "NOT_FOUND");
     assert_eq!(body["error"]["message"], "Self development 999999 not found");
+}
+
+// --- kammerz-8rh: delete-side status reverts + sibling/no-regression branches ---
+
+/// POST a lab dev for `roll_id` and return its id. `body` lets callers add
+/// date_received etc. on top of the roll linkage.
+async fn create_lab_dev(app: &axum::Router, roll_id: i32, extra: Value) -> i32 {
+    let mut payload = json!({ "roll_id": roll_id });
+    for (k, v) in extra.as_object().unwrap() {
+        payload[k] = v.clone();
+    }
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/development/lab", &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    json_body(res).await
+}
+
+/// POST a self dev for `roll_id` and return its id.
+async fn create_self_dev(app: &axum::Router, roll_id: i32, extra: Value) -> i32 {
+    let mut payload = json!({ "roll_id": roll_id });
+    for (k, v) in extra.as_object().unwrap() {
+        payload[k] = v.clone();
+    }
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/development/self", &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    json_body(res).await
+}
+
+// kammerz-8rh: deleting the lab dev reverts at-lab → shot (the data that drove
+// the status forward is gone, so the status follows it back).
+#[tokio::test]
+async fn delete_lab_dev_reverts_at_lab_to_shot() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "DEL-LAB-ATLAB").await;
+    let dev_id = create_lab_dev(&app, roll_pk, json!({})).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "at-lab");
+
+    let res = app
+        .clone()
+        .oneshot(delete(&format!("/api/development/lab/{dev_id}")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "shot",
+        "deleting the lab dev reverts at-lab → shot"
+    );
+}
+
+// kammerz-8rh: the revert covers both rungs of the lab range — lab-done → shot.
+#[tokio::test]
+async fn delete_lab_dev_reverts_lab_done_to_shot() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "DEL-LAB-DONE").await;
+    let dev_id = create_lab_dev(&app, roll_pk, json!({ "date_received": "2026-05-10" })).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "lab-done");
+
+    let res = app
+        .clone()
+        .oneshot(delete(&format!("/api/development/lab/{dev_id}")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "shot",
+        "deleting the lab dev reverts lab-done → shot"
+    );
+}
+
+// kammerz-8rh: deleting the self dev reverts developing → shot.
+#[tokio::test]
+async fn delete_self_dev_reverts_developing_to_shot() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "DEL-SELF-DEVING").await;
+    let dev_id = create_self_dev(&app, roll_pk, json!({ "developer": "HC-110" })).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "developing");
+
+    let res = app
+        .clone()
+        .oneshot(delete(&format!("/api/development/self/{dev_id}")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "shot",
+        "deleting the self dev reverts developing → shot"
+    );
+}
+
+// kammerz-8rh: the revert covers both rungs of the self range — developed → shot.
+#[tokio::test]
+async fn delete_self_dev_reverts_developed_to_shot() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "DEL-SELF-DEVED").await;
+    let dev_id = create_self_dev(&app, roll_pk, json!({ "date_processed": "2026-05-12" })).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "developed");
+
+    let res = app
+        .clone()
+        .oneshot(delete(&format!("/api/development/self/{dev_id}")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "shot",
+        "deleting the self dev reverts developed → shot"
+    );
+}
+
+// kammerz-8rh sibling-skip: when BOTH dev records exist, deleting the lab dev
+// must NOT revert the status because the surviving self dev still justifies a
+// post-shot status. The API rejects creating the sibling since kammerz-ysw, so
+// seed it directly in the DB — simulating a roll corrupted before that guard
+// existed; the delete handlers keep the sibling check as defense-in-depth.
+#[tokio::test]
+async fn delete_lab_dev_skips_revert_when_self_dev_exists() {
+    let (app, db) = open_app_with_db().await;
+    let roll_pk = create_shot_roll(&app, "DEL-LAB-SIBLING").await;
+    let lab_id = create_lab_dev(&app, roll_pk, json!({})).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "at-lab");
+    insert_self_dev_directly(&db, roll_pk).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "at-lab");
+
+    let res = app
+        .clone()
+        .oneshot(delete(&format!("/api/development/lab/{lab_id}")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "at-lab",
+        "lab dev delete skips the revert while a sibling self dev exists"
+    );
+}
+
+// kammerz-8rh sibling-skip, mirrored: deleting the self dev while a lab dev
+// survives must not revert. As above, the lab sibling is seeded directly in
+// the DB because the API has rejected sibling creates since kammerz-ysw.
+#[tokio::test]
+async fn delete_self_dev_skips_revert_when_lab_dev_exists() {
+    let (app, db) = open_app_with_db().await;
+    let roll_pk = create_shot_roll(&app, "DEL-SELF-SIBLING").await;
+    let self_id = create_self_dev(&app, roll_pk, json!({ "developer": "HC-110" })).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "developing");
+    insert_lab_dev_directly(&db, roll_pk).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "developing");
+
+    let res = app
+        .clone()
+        .oneshot(delete(&format!("/api/development/self/{self_id}")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "developing",
+        "self dev delete skips the revert while a sibling lab dev exists"
+    );
+}
+
+// kammerz-8rh no-regression: status beyond the dev record's range is untouched —
+// deleting a lab dev from a scanned roll must not pull it back to shot.
+#[tokio::test]
+async fn delete_lab_dev_leaves_scanned_untouched() {
+    let app = open_app().await;
+    let roll_pk = create_roll_at_status(&app, "DEL-LAB-SCANNED", "scanned").await;
+    let dev_id = create_lab_dev(&app, roll_pk, json!({})).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "scanned");
+
+    let res = app
+        .clone()
+        .oneshot(delete(&format!("/api/development/lab/{dev_id}")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "scanned",
+        "deleting a lab dev at scanned leaves the status untouched"
+    );
+}
+
+// kammerz-8rh no-regression, mirrored for the self path.
+#[tokio::test]
+async fn delete_self_dev_leaves_scanned_untouched() {
+    let app = open_app().await;
+    let roll_pk = create_roll_at_status(&app, "DEL-SELF-SCANNED", "scanned").await;
+    let dev_id = create_self_dev(&app, roll_pk, json!({ "developer": "HC-110" })).await;
+    assert_eq!(roll_status(&app, roll_pk).await, "scanned");
+
+    let res = app
+        .clone()
+        .oneshot(delete(&format!("/api/development/self/{dev_id}")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "scanned",
+        "deleting a self dev at scanned leaves the status untouched"
+    );
+}
+
+// kammerz-8rh: the CREATE path is forward-only — POSTing a lab dev (no received
+// date) onto a roll already at 'scanned' must not drag it back to at-lab. (The
+// update path's equivalent is covered at
+// update_lab_dev_clears_received_date_leaves_scanned_untouched.)
+#[tokio::test]
+async fn create_lab_dev_on_scanned_roll_stays_scanned() {
+    let app = open_app().await;
+    let roll_pk = create_roll_at_status(&app, "CREATE-LAB-SCANNED", "scanned").await;
+
+    create_lab_dev(&app, roll_pk, json!({ "lab_name": "The Darkroom" })).await;
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "scanned",
+        "creating a lab dev on a scanned roll is a forward-only no-op"
+    );
+}
+
+// kammerz-8rh: mirrored for the self path — create at 'scanned' stays 'scanned'.
+#[tokio::test]
+async fn create_self_dev_on_scanned_roll_stays_scanned() {
+    let app = open_app().await;
+    let roll_pk = create_roll_at_status(&app, "CREATE-SELF-SCANNED", "scanned").await;
+
+    create_self_dev(&app, roll_pk, json!({ "developer": "Rodinal" })).await;
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "scanned",
+        "creating a self dev on a scanned roll is a forward-only no-op"
+    );
 }
