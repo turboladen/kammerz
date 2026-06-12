@@ -459,7 +459,9 @@
 			{/if}
 		</div>
 	{:else}
-		<p class="text-sm text-text-faint">No development info yet.</p>
+		<p class="text-sm text-text-faint">
+			No development info yet — use the development steps in the status bar above to record lab or self development.
+		</p>
 	{/if}
 </div>
 

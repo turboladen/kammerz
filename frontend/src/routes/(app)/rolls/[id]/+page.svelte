@@ -53,7 +53,7 @@
 		PushPull,
 		LensMount
 	} from '$lib/types';
-	import { Trash2 } from 'lucide-svelte';
+	import { Trash2, CircleHelp } from 'lucide-svelte';
 
 	const id = $derived(Number(page.params.id));
 
@@ -163,6 +163,9 @@
 
 	// Development-path picker popover (the live "Develop" chevron in the undecided flow).
 	let showDevPathMenu = $state(false);
+
+	// Help disclosure on the Status header — explains the chevron bar's click behaviors.
+	let showStatusHelp = $state(false);
 
 	// Status auto-sync (advance on create, revert on delete) is handled by the
 	// backend commands transactionally. The frontend just calls loadRollData()
@@ -566,6 +569,26 @@
 		}
 	}
 
+	// Hover/aria hint for each status chevron, derived from the SAME branches
+	// handleStatusClick takes — so the hint can never describe behavior the click
+	// won't perform. Keep these two in lockstep when changing click logic.
+	function statusHint(status: RollStatus): string {
+		const label = statusConfig[status].label;
+		if (roll?.status === status) return `Current status: ${label}`;
+		const targetIdx = statusFlow.indexOf(status);
+		if (currentStatusIdx !== -1 && targetIdx < currentStatusIdx) {
+			return `Move back to ${label} (asks to confirm)`;
+		}
+		// Forward into a lab/self status with no dev record yet → opens the dev form.
+		const devKind = devKindForStatus(status);
+		if (devKind === 'lab' && !labDev) return `Record lab development to move to ${label}`;
+		if (devKind === 'self' && !selfDev) return `Record self development to move to ${label}`;
+		// Forward into a date-bearing status whose date isn't recorded yet → prompts.
+		const target = STATUS_DATE_TARGET[status];
+		if (target && !targetDate(target)) return `Move to ${label} (asks for a date)`;
+		return `Move to ${label}`;
+	}
+
 	function handleStatusClick(status: RollStatus) {
 		if (!roll) return;
 		statusNotice = '';
@@ -839,10 +862,40 @@
 		<!-- Status Progression -->
 		<FadeIn delay={50}>
 			<div class="mb-6">
-				<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
-					Status
+				<div class="mb-3 flex items-center gap-2">
+					<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Status</h2>
+					<div class="relative inline-flex">
+						<button
+							onclick={() => (showStatusHelp = !showStatusHelp)}
+							title="How the status bar works"
+							aria-label="How the status bar works"
+							aria-expanded={showStatusHelp}
+							class="inline-flex items-center text-text-faint transition-colors hover:text-text"
+						>
+							<CircleHelp size={14} strokeWidth={2} aria-hidden="true" />
+						</button>
+						{#if showStatusHelp}
+							<!-- click-away catcher -->
+							<button
+								class="fixed inset-0 z-10 cursor-default"
+								aria-label="Close status help"
+								onclick={() => (showStatusHelp = false)}
+							></button>
+							<div
+								class="absolute left-0 top-full z-20 mt-1.5 w-72 rounded-lg border border-border bg-surface-overlay p-3 text-xs text-text-muted shadow-lg"
+							>
+								<p class="mb-2 text-text">Click a step to move the roll there.</p>
+								<ul class="space-y-1.5">
+									<li>Forward steps apply instantly.</li>
+									<li>A later step that needs a date asks for one first.</li>
+									<li>An earlier step moves the roll back and asks to confirm.</li>
+									<li>Lab and self steps open a development form when no record exists yet.</li>
+								</ul>
+							</div>
+						{/if}
+					</div>
 					<div class="flex-1 border-b border-border-subtle"></div>
-				</h2>
+				</div>
 				{#if pathLabel}
 					<p class="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-text-faint/70">{pathLabel}</p>
 				{/if}
@@ -857,6 +910,8 @@
 								: 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)'}
 						<button
 							onclick={() => handleStatusClick(status)}
+							title={statusHint(status)}
+							aria-label={statusHint(status)}
 							style="clip-path: {clipPath}"
 							class="whitespace-nowrap py-1.5 text-xs font-medium transition-colors
 							{isFirst ? 'pl-3 pr-4' : isLast ? 'pl-4 pr-3' : 'px-4'}
@@ -875,6 +930,7 @@
 							<div class="relative">
 								<button
 									onclick={() => (showDevPathMenu = !showDevPathMenu)}
+									title="Choose a development path (lab or self) to start tracking development"
 									aria-haspopup="menu"
 									aria-expanded={showDevPathMenu}
 									style="clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)"
