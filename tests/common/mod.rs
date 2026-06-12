@@ -28,9 +28,7 @@ pub async fn open_app_with_url(db_url: &str) -> axum::Router {
     let db = kammerz::db::init(db_url).await.unwrap();
     let config = AppConfig {
         password_hash: None,
-        anthropic_api_key: None,
-        secure_cookies: false,
-        trust_proxy: false,
+        ..AppConfig::default()
     };
     kammerz::routes::create_router(AppState { db, config })
 }
@@ -42,9 +40,7 @@ pub async fn open_app_with_db() -> (axum::Router, sea_orm::DatabaseConnection) {
     let db = kammerz::db::init("sqlite::memory:").await.unwrap();
     let config = AppConfig {
         password_hash: None,
-        anthropic_api_key: None,
-        secure_cookies: false,
-        trust_proxy: false,
+        ..AppConfig::default()
     };
     let app = kammerz::routes::create_router(AppState {
         db: db.clone(),
@@ -61,9 +57,7 @@ pub async fn app_with_password(pw: &str) -> axum::Router {
     let db = kammerz::db::init("sqlite::memory:").await.unwrap();
     let config = AppConfig {
         password_hash: Some(kammerz::auth::password::hash_password(pw).unwrap()),
-        anthropic_api_key: None,
-        secure_cookies: false,
-        trust_proxy: false,
+        ..AppConfig::default()
     };
     let pool = sqlx::sqlite::SqlitePoolOptions::new()
         .min_connections(1)

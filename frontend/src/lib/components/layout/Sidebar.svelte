@@ -13,7 +13,8 @@
 		TestTube2,
 		BarChart3,
 		Plus,
-		LogOut
+		LogOut,
+		Unlock
 	} from 'lucide-svelte';
 
 	// Core data entity navigation
@@ -118,6 +119,21 @@
 				<LogOut size={16} strokeWidth={1.75} class="text-text-faint" />
 				{signingOut ? 'Signing out…' : 'Sign out'}
 			</button>
+		</div>
+	{:else if auth.initialized}
+		<!-- Open-access operator hint: when no password is configured (authRequired
+		false) every visitor has full access. Quiet amber "safelight" treatment —
+		discoverable, not an alarm. Gated on `initialized` so it doesn't flash
+		before the first /api/auth/me resolves. Hidden entirely once a password is
+		set (the sign-out branch above renders instead). -->
+		<div class="border-t border-border-subtle p-3">
+			<div
+				class="flex items-start gap-2.5 rounded-lg border border-accent/20 bg-accent/5 px-3 py-2"
+				title="Set KAMMERZ_PASSWORD_HASH to require a password."
+			>
+				<Unlock size={14} strokeWidth={1.75} class="mt-0.5 shrink-0 text-accent" />
+				<span class="text-xs leading-snug font-medium text-accent"> Open access — no password set </span>
+			</div>
 		</div>
 	{/if}
 </nav>

@@ -73,7 +73,13 @@ async fn main() {
     let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| db::default_db_url());
     let db = db::init(&db_url).await.expect("database init failed");
 
-    let config = AppConfig::from_env();
+    let config = AppConfig::from_env().unwrap_or_else(|e| {
+        // A malformed config value (e.g. BIND_ADDR) is unrecoverable — exit
+        // rather than start with a silently-wrong listener. Mirrors the
+        // bad-hash fail-fast below so all startup config errors exit the same way.
+        eprintln!("error: {e}");
+        std::process::exit(1);
+    });
     match &config.password_hash {
         None => {
             tracing::warn!(
@@ -135,6 +141,9 @@ async fn main() {
         .with_http_only(true)
         .with_expiry(Expiry::OnInactivity(TimeDuration::days(30)));
 
+    // Capture the bind address before `config` moves into AppState below.
+    let bind_addr = config.bind_addr;
+
     let state = AppState {
         db: db.clone(),
         config,
@@ -170,10 +179,14 @@ async fn main() {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(3002);
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
+    // Bind to the configured interface (BIND_ADDR, default 0.0.0.0). Loopback
+    // (127.0.0.1) keeps the catalog off-host — the recommended posture behind a
+    // reverse proxy or when running in OPEN (no-password) mode.
+    let addr = SocketAddr::new(bind_addr, port);
+    let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect("failed to bind");
-    tracing::info!("kammerz listening on http://0.0.0.0:{port}");
+    tracing::info!("kammerz listening on http://{addr}");
     // `into_make_service_with_connect_info` installs `ConnectInfo<SocketAddr>` on
     // each request — the login rate-limiter's `PeerIpKeyExtractor` reads it to key
     // throttling by client IP (and `SmartIpKeyExtractor`, in trust-proxy mode,
