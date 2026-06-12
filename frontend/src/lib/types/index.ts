@@ -280,6 +280,28 @@ export interface SelfDevListItem {
 	stages: DevStage[];
 }
 
+// Lab-development with joined roll/film stock/camera/lab context. Lab devs have
+// no stages, so (unlike SelfDevListItem) there is no stages array.
+export interface LabDevListItem {
+	dev_id: number;
+	roll_pk: number;
+	roll_id: string;
+	roll_status: RollStatus;
+	film_stock_brand: string | null;
+	film_stock_name: string | null;
+	film_stock_iso: number | null;
+	film_stock_type: FilmStockType | null;
+	camera_brand: string | null;
+	camera_model: string | null;
+	lab_name: string | null;
+	date_dropped_off: string | null;
+	date_received: string | null;
+	cost: number | null;
+	notes: string | null;
+	dev_date: string | null;
+	created_at: string;
+}
+
 // --- Search ---
 
 export interface CameraSearchResult {

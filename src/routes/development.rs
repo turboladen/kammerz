@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::routing::{get, post};
+use axum::routing::get;
 use axum::{Json, Router};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, PaginatorTrait,
@@ -14,7 +14,9 @@ use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, DbOptionExt, OptionExt};
 use crate::patch::{double_option, now_string, trim_opt};
 use crate::routes::{friendly_err, friendly_txn_err};
-use crate::services::development_service::{DevelopmentService, SelfDevWithStages, StageInput};
+use crate::services::development_service::{
+    DevelopmentService, LabDevListItem, SelfDevWithStages, StageInput,
+};
 use crate::services::roll_service::RollService;
 use crate::validate::validate_date_opt;
 use crate::AppState;
@@ -117,7 +119,7 @@ fn stages_to_inputs(stages: Vec<StageDto>) -> Vec<StageInput> {
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/lab", post(create_lab_dev))
+        .route("/lab", get(list_all_lab_developments).post(create_lab_dev))
         .route("/lab/for-roll/{roll_id}", get(get_lab_dev_for_roll))
         .route(
             "/lab/{id}",
@@ -136,6 +138,16 @@ pub fn router() -> Router<AppState> {
 }
 
 // --- Lab Development handlers ---
+
+// List every lab dev with joined roll/film stock/camera/lab context. Lab devs
+// carry no stages, so (unlike list_all_self_developments) the rows are returned
+// flat with no batch-merge step.
+async fn list_all_lab_developments(
+    _: RequireAuth,
+    State(db): State<DatabaseConnection>,
+) -> AppResult<Json<Vec<LabDevListItem>>> {
+    Ok(Json(DevelopmentService::list_all_lab_devs(&db).await?))
+}
 
 async fn get_lab_dev_for_roll(
     _: RequireAuth,

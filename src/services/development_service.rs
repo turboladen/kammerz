@@ -44,6 +44,56 @@ pub struct SelfDevListItem {
     pub created_at: String,
 }
 
+/// Flat struct for lab-developments joined with roll, film stock, camera, and
+/// lab data. Lab devs have no stages, so unlike [`SelfDevListItem`] this is
+/// returned directly (no stage merge).
+#[derive(Debug, Serialize, FromQueryResult)]
+pub struct LabDevListItem {
+    pub dev_id: i32,
+    pub roll_pk: i32,
+    pub roll_id: String,
+    pub roll_status: RollStatus,
+    pub film_stock_brand: Option<String>,
+    pub film_stock_name: Option<String>,
+    pub film_stock_iso: Option<i32>,
+    pub film_stock_type: Option<FilmStockType>,
+    pub camera_brand: Option<String>,
+    pub camera_model: Option<String>,
+    pub lab_name: Option<String>,
+    pub date_dropped_off: Option<String>,
+    pub date_received: Option<String>,
+    pub cost: Option<f64>,
+    pub notes: Option<String>,
+    pub dev_date: Option<String>,
+    pub created_at: String,
+}
+
+const LIST_LAB_DEVS_SQL: &str = "\
+    SELECT \
+        dl.id AS dev_id, \
+        r.id AS roll_pk, \
+        r.roll_id, \
+        r.status AS roll_status, \
+        fs.brand AS film_stock_brand, \
+        fs.name AS film_stock_name, \
+        fs.iso AS film_stock_iso, \
+        fs.stock_type AS film_stock_type, \
+        c.brand AS camera_brand, \
+        c.model AS camera_model, \
+        l.name AS lab_name, \
+        dl.date_dropped_off, \
+        dl.date_received, \
+        dl.cost, \
+        dl.notes, \
+        COALESCE(dl.date_received, dl.date_dropped_off, dl.created_at) AS dev_date, \
+        dl.created_at \
+    FROM development_labs dl \
+    JOIN rolls r ON dl.roll_id = r.id \
+    LEFT JOIN film_stocks fs ON r.film_stock_id = fs.id \
+    LEFT JOIN cameras c ON r.camera_id = c.id \
+    LEFT JOIN labs l ON dl.lab_id = l.id \
+    ORDER BY dev_date DESC, dl.created_at DESC";
+
 const LIST_SELF_DEVS_SQL: &str = "\
     SELECT \
         ds.id AS dev_id, \
@@ -122,6 +172,18 @@ impl DevelopmentService {
     pub async fn delete_lab_dev(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
         DevelopmentLab::delete_by_id(id).exec(db).await?;
         Ok(())
+    }
+
+    /// List every lab-development with its joined roll, film stock, camera, and
+    /// lab context. Lab devs have no stages, so this returns the flat rows
+    /// directly (no batch-merge step like the self-dev list).
+    pub async fn list_all_lab_devs(db: &DatabaseConnection) -> Result<Vec<LabDevListItem>, DbErr> {
+        LabDevListItem::find_by_statement(Statement::from_string(
+            db.get_database_backend(),
+            LIST_LAB_DEVS_SQL.to_string(),
+        ))
+        .all(db)
+        .await
     }
 
     // --- Self Development ---
