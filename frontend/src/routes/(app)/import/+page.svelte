@@ -69,12 +69,19 @@
 		notes: string;
 	}[] = $state([]);
 
-	// Block import while any roll or per-shot date is malformed. The shot dates use
-	// plain text inputs (not DateInput), so this is their only validation gate.
-	const importDateError = $derived(
-		dateFieldError(dateLoaded) ||
-			dateFieldError(dateFinished) ||
-			(shots.some((s) => dateFieldError(s.date)) ? 'A shot date is invalid' : '')
+	// Block import while a required field is empty or any roll/per-shot date is
+	// malformed. roll_id and shot frame_number are TEXT NOT NULL (and roll_id is
+	// UNIQUE), but they're LLM-prefilled and user-editable, so guard them here.
+	// The shot dates use plain text inputs (not DateInput), so this is also their
+	// only validation gate.
+	const importBlocker = $derived(
+		!rollId.trim()
+			? 'Roll ID is required.'
+			: shots.some((s) => !s.frame_number.trim())
+				? 'Every shot needs a frame number.'
+				: dateFieldError(dateLoaded) ||
+					dateFieldError(dateFinished) ||
+					(shots.some((s) => dateFieldError(s.date)) ? 'A shot date is invalid' : '')
 	);
 
 	// Derived
@@ -305,12 +312,18 @@
 	}
 
 	async function handleImport() {
+		// The Import button is disabled while importBlocker is set, but guard here
+		// too so the required-field invariant doesn't depend on the button's state.
+		if (importBlocker) {
+			error = importBlocker;
+			return;
+		}
 		step = 'importing';
 		error = '';
 
 		try {
 			const data: ImportRollDto = {
-				roll_id: rollId,
+				roll_id: rollId.trim(),
 				camera_id: cameraId ? parseInt(cameraId) : null,
 				film_stock_id: filmStockId ? parseInt(filmStockId) : null,
 				lens_id: lensId ? parseInt(lensId) : null,
@@ -322,7 +335,7 @@
 				push_pull: null,
 				notes: rollNotes || null,
 				shots: shots.map((s) => ({
-					frame_number: s.frame_number,
+					frame_number: s.frame_number.trim(),
 					aperture: s.aperture || null,
 					shutter_speed: s.shutter_speed || null,
 					date: s.date || null,
@@ -604,11 +617,11 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 
 			<!-- Import Button -->
 			<FadeIn delay={100}>
-				<Button variant="primary" disabled={!!importDateError} onclick={handleImport}>
+				<Button variant="primary" disabled={!!importBlocker} onclick={handleImport}>
 					Import Roll & {shots.length} Shot{shots.length !== 1 ? 's' : ''}
 				</Button>
-				{#if importDateError}
-					<p class="mt-1.5 text-xs text-red-400">{importDateError}</p>
+				{#if importBlocker}
+					<p class="mt-1.5 text-xs text-red-400">{importBlocker}</p>
 				{/if}
 			</FadeIn>
 		</div>

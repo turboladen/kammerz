@@ -271,9 +271,17 @@
 
 	async function handleSaveSelfDev() {
 		devSelfError = '';
+		// stage_name is TEXT NOT NULL. Drop rows the user added but left entirely
+		// blank (a stray trailing "+ Add"), but reject a row that has timing/notes
+		// yet no name — silently dropping it would lose data the user clearly entered.
+		const keptStages = devFormStages.filter((s) => s.stage_name.trim() || s.duration.trim() || s.notes.trim());
+		if (keptStages.some((s) => !s.stage_name.trim())) {
+			devSelfError = 'Stage name is required.';
+			return;
+		}
 		try {
-			const stages = devFormStages.map((s, i) => ({
-				stage_name: s.stage_name,
+			const stages = keptStages.map((s, i) => ({
+				stage_name: s.stage_name.trim(),
 				duration_seconds: mmSsToSeconds(s.duration),
 				notes: s.notes || null,
 				sort_order: i
