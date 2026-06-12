@@ -75,10 +75,7 @@ pub async fn app_with_password(pw: &str) -> axum::Router {
 
 /// Build a GET request with an empty body.
 pub fn get(path: &str) -> Request<Body> {
-    Request::builder()
-        .uri(path)
-        .body(Body::empty())
-        .unwrap()
+    Request::builder().uri(path).body(Body::empty()).unwrap()
 }
 
 /// Build a DELETE request (no body).

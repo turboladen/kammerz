@@ -85,10 +85,7 @@ pub struct SearchResults {
 }
 
 impl SearchService {
-    pub async fn search(
-        db: &DatabaseConnection,
-        query: &str,
-    ) -> Result<SearchResults, DbErr> {
+    pub async fn search(db: &DatabaseConnection, query: &str) -> Result<SearchResults, DbErr> {
         let pattern = format!("%{query}%");
         let backend = db.get_database_backend();
 

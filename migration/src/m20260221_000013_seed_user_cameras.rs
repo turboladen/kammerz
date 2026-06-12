@@ -375,7 +375,8 @@ impl MigrationTrait for Migration {
             "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Diana' AND model = 'F'),
                  (SELECT id FROM lenses WHERE brand = 'Diana' AND name_on_lens = '75mm f/11'))",
-        ).await?;
+        )
+        .await?;
         db.execute_unprepared(
             "UPDATE cameras SET default_lens_id = (SELECT id FROM lenses WHERE brand = 'Diana' AND name_on_lens = '75mm f/11')
              WHERE brand = 'Diana' AND model = 'F'",

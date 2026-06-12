@@ -13,6 +13,7 @@
 ## Reference Conventions (read once before starting)
 
 **Target directory layout (after Phase 1):**
+
 ```
 kammerz/
   Cargo.toml              # [workspace] members: [".", "entity", "migration"]
@@ -51,6 +52,7 @@ kammerz/
 **Ports & dev flow:** axum binds `0.0.0.0:${PORT:-3001}`. Vite dev server runs on `5173` and proxies `/api` → `http://localhost:3001`. In production the binary serves the embedded `frontend/build` and all `/api/*` itself.
 
 **Verification commands used throughout:**
+
 - Backend compile: `cargo build` (from repo root)
 - Backend tests: `cargo test -p kammerz` (or `cargo test` for all crates)
 - Frontend compile: `cd frontend && bun run build`
@@ -88,6 +90,7 @@ Expected: either a schema dump (keep it) or confirmation there's no local DB (th
 ### Task 1: Extract the `entity` crate
 
 **Files:**
+
 - Create: `entity/Cargo.toml`
 - Create: `entity/src/lib.rs`
 - Move: `src-tauri/src/entities/*.rs` → `entity/src/*.rs` (drop the `entities/` nesting; `mod.rs` becomes `lib.rs`)
@@ -153,6 +156,7 @@ git commit -m "refactor: extract entities into standalone entity crate"
 ### Task 2: Relocate the `migration` crate to repo root
 
 **Files:**
+
 - Move: `src-tauri/migration/` → `migration/`
 
 The migration crate is standalone (depends only on `sea-orm-migration`, no entity/binary dependency — confirmed: all migrations `use sea_orm_migration::prelude::*` only). It moves with zero content changes.
@@ -166,6 +170,7 @@ git mv src-tauri/migration migration
 - [ ] **Step 2: Confirm its Cargo.toml is unchanged and correct**
 
 Read `migration/Cargo.toml`. Expected contents (no edits needed):
+
 ```toml
 [package]
 name = "migration"
@@ -186,6 +191,7 @@ git commit -m "refactor: move migration crate to repo root"
 ### Task 3: Create the root binary crate skeleton
 
 **Files:**
+
 - Create: `Cargo.toml` (workspace + binary package)
 - Move: `src-tauri/src/services/` → `src/services/`
 - Move: `src-tauri/src/patch.rs` → `src/patch.rs`
@@ -204,12 +210,14 @@ git mv src-tauri/src/patch.rs src/patch.rs
 
 Run: `grep -rln "crate::entities" src/services`
 For each file, replace `crate::entities::` with `entity::`. Example in `src/services/camera_service.rs`:
+
 ```rust
 // before
 use crate::entities::camera::{self, Entity as Camera};
 // after
 use entity::camera::{self, Entity as Camera};
 ```
+
 Do this for every service file. Re-run the grep until it returns nothing.
 
 - [ ] **Step 3: Create the root `Cargo.toml`**
@@ -444,14 +452,17 @@ impl FromRef<AppState> for config::AppConfig {
 - [ ] **Step 8: Create minimal stubs for `auth` and `routes`**
 
 `src/auth/mod.rs`:
+
 ```rust
 pub mod handlers;
 pub mod middleware;
 pub mod password;
 ```
+
 `src/auth/password.rs`, `src/auth/handlers.rs`, `src/auth/middleware.rs`: empty for now (`// placeholder` — filled in Phase 2). Create them as empty files so the `pub mod` lines compile.
 
 `src/routes/mod.rs`:
+
 ```rust
 use axum::routing::get;
 use axum::{Json, Router};
@@ -598,6 +609,7 @@ git commit -m "feat: axum binary crate skeleton (health + SPA serve), drop Tauri
 ### Task 4: Password hashing CLI helper + password module
 
 **Files:**
+
 - Modify: `src/auth/password.rs`
 - Modify: `src/main.rs` (add a `hash-password` subcommand path)
 - Test: `src/auth/password.rs` (`#[cfg(test)]`)
@@ -605,6 +617,7 @@ git commit -m "feat: axum binary crate skeleton (health + SPA serve), drop Tauri
 - [ ] **Step 1: Write the failing test**
 
 In `src/auth/password.rs`:
+
 ```rust
 use argon2::password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use argon2::Argon2;
@@ -640,6 +653,7 @@ Expected: PASS (this module is self-contained; the "failing" stage was the empty
 - [ ] **Step 3: Add a `hash-password` CLI path to `main.rs` (reads stdin, never argv)**
 
 Add `rpassword = "7"` to `[dependencies]` in the root `Cargo.toml`. At the top of `main()`, before binding the server, handle a one-shot arg so the operator can generate the hash for `.env`. **The password is read from stdin, never from argv** (argv leaks into shell history and `ps`):
+
 ```rust
 // interactive: `kammerz hash-password`  (prompts, echo off)
 // piped:       `echo -n <pw> | kammerz hash-password`  or  `kammerz hash-password < secret.txt`
@@ -681,6 +695,7 @@ git commit -m "feat(auth): argon2 password hashing + hash-password CLI"
 ### Task 5: Session layer + login/logout/me handlers + RequireAuth
 
 **Files:**
+
 - Modify: `src/main.rs` (session store + layer)
 - Modify: `src/auth/middleware.rs`, `src/auth/handlers.rs`
 - Modify: `src/routes/mod.rs` (mount `/api/auth`, apply RequireAuth to business routes later)
@@ -792,6 +807,7 @@ pub async fn me(State(config): State<AppConfig>, session: Session) -> Json<Value
 - [ ] **Step 3: Wire the session store + layer in `main.rs`**
 
 After building `db` and before `routes::create_router`, add:
+
 ```rust
 use std::str::FromStr;
 use sqlx::sqlite::SqliteConnectOptions;
@@ -812,6 +828,7 @@ let session_layer = SessionManagerLayer::new(session_store)
     .with_http_only(true)
     .with_expiry(Expiry::OnInactivity(TimeDuration::days(30)));
 ```
+
 Then add `.layer(session_layer)` to the app builder (after `.fallback(serve_spa)`, before `TraceLayer`).
 
 - [ ] **Step 4: Mount the auth routes in `routes/mod.rs`**
@@ -829,6 +846,7 @@ use crate::auth::handlers;
 - [ ] **Step 5: Write the failing integration test**
 
 `tests/auth.rs`:
+
 ```rust
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -878,6 +896,7 @@ Expected: PASS. (If `SessionStore::migrate` trait path differs in tower-sessions
 - [ ] **Step 7: Manual smoke test of the login cookie flow**
 
 Run:
+
 ```bash
 HASH=$(echo -n secret | cargo run -q -- hash-password)
 KAMMERZ_PASSWORD_HASH="$HASH" DATABASE_URL="sqlite:/tmp/kz-test.db?mode=rwc" cargo run &
@@ -887,6 +906,7 @@ curl -s -c /tmp/jar -b /tmp/jar -XPOST localhost:3001/api/auth/login -H 'content
 curl -s -b /tmp/jar localhost:3001/api/auth/me
 kill %1; rm -f /tmp/kz-test.db /tmp/jar
 ```
+
 Expected: first `me` → `authenticated:false`; login → `authenticated:true`; second `me` → `authenticated:true`.
 
 - [ ] **Step 8: Commit**
@@ -911,6 +931,7 @@ Each handler: takes `RequireAuth` first (enforces auth), then `State<DatabaseCon
 ### Task 6: Cameras routes (fully-worked exemplar)
 
 **Files:**
+
 - Create: `src/routes/cameras.rs`
 - Modify: `src/routes/mod.rs` (move `friendly_err` here; nest the cameras router)
 - Test: `tests/cameras.rs`
@@ -1051,6 +1072,7 @@ Put `create_maintenance`, `update_maintenance`, `delete_maintenance` in `src/rou
 - [ ] **Step 5: Write the failing integration test**
 
 `tests/cameras.rs` — reuse the `test_app` helper pattern from `tests/auth.rs` (factor it into `tests/common/mod.rs`). With open-auth mode (`password_hash: None`) to skip session setup:
+
 ```rust
 #[tokio::test]
 async fn list_cameras_returns_seeded_gear() {
@@ -1158,6 +1180,7 @@ git commit -m "feat(api): port all CRUD route modules from Tauri commands"
 ### Task 8: Import routes (Anthropic via reqwest, server-side key)
 
 **Files:**
+
 - Create: `src/routes/import.rs`
 - Modify: `src/routes/mod.rs`
 - Note: `src/services/import_service.rs` already moved in Phase 1 (uses `reqwest`).
@@ -1177,7 +1200,9 @@ async fn resolve_key(db: &DatabaseConnection, config: &AppConfig) -> AppResult<S
             "No Anthropic API key configured. Set it in Settings or the ANTHROPIC_API_KEY env var.".into()))
 }
 ```
+
 Routes (nest at `/api/import`):
+
 - GET `/models` · list_models · `ImportService::list_models(&key)` · → `Vec<ModelInfo>`
 - POST `/parse` · parse_note · body `{ note_text: String, model: Option<String> }`; resolve model = body.model OR settings `claude_model` OR `DEFAULT_MODEL` (keep the `DEFAULT_MODEL` const from the old command file) · `ImportService::parse_note(&key, &model, &note_text)` · → `ParsedRoll`
 - POST `/roll` · import_parsed_roll · body `ImportRollDto` (move it + `ImportShotDto` here) · `RollService::import_roll` (txn) → 201 `i32`
@@ -1201,6 +1226,7 @@ git commit -m "feat(api): import routes with server-side Anthropic key resolutio
 ### Task 9: Apply `RequireAuth` consistently + a guard regression test
 
 **Files:**
+
 - Test: `tests/auth_guard.rs`
 
 Every business handler already takes `_: RequireAuth`. Add a test proving the guard actually blocks.
@@ -1226,6 +1252,7 @@ async fn business_routes_open_when_no_password() {
 - [ ] **Step 2: Run + commit**
 
 Run: `cargo test -p kammerz --test auth_guard` → PASS.
+
 ```bash
 git add -A && git commit -m "test(api): assert RequireAuth gates business routes"
 ```
@@ -1296,6 +1323,7 @@ git commit -m "refactor(frontend): relocate SvelteKit app under frontend/"
 ### Task 11: Shared fetch helper + rewrite the 13 api wrappers
 
 **Files:**
+
 - Create: `frontend/src/lib/api/client.ts`
 - Modify: all `frontend/src/lib/api/*.ts`
 
@@ -1445,6 +1473,7 @@ git commit -m "refactor(frontend): replace Tauri invoke with shared fetch client
 ### Task 12: Auth UI — store, login page, route guard
 
 **Files:**
+
 - Create: `frontend/src/lib/api/auth.ts`
 - Create: `frontend/src/lib/stores/auth.svelte.ts`
 - Create: `frontend/src/routes/login/+page.svelte`
@@ -1456,6 +1485,7 @@ git commit -m "refactor(frontend): replace Tauri invoke with shared fetch client
 - [ ] **Step 1: Auth API + store**
 
 `frontend/src/lib/api/auth.ts`:
+
 ```typescript
 import { request } from './client';
 export interface AuthStatus { authenticated: boolean; auth_required: boolean; }
@@ -1466,6 +1496,7 @@ export const logout = () => request<{ authenticated: boolean }>('POST', '/api/au
 ```
 
 `frontend/src/lib/stores/auth.svelte.ts`:
+
 ```typescript
 import { getAuthStatus, login as apiLogin, logout as apiLogout } from '$lib/api/auth';
 import { setUnauthorizedHandler } from '$lib/api/client';
@@ -1506,11 +1537,13 @@ done
 test -e +page.svelte && git mv +page.svelte '(app)/+page.svelte' || true
 cd ../../..
 ```
+
 (Adjust the dir list to match the actual `routes/` listing — include every page dir except `login`.)
 
 - [ ] **Step 3: Move the Sidebar shell into `(app)/+layout.svelte`**
 
 Create `frontend/src/routes/(app)/+layout.svelte` with the current Sidebar markup:
+
 ```svelte
 <script lang="ts">
 	import Sidebar from '$lib/components/layout/Sidebar.svelte';
@@ -1536,6 +1569,7 @@ Create `frontend/src/routes/(app)/+layout.svelte` with the current Sidebar marku
 <svelte:head><title>Kammerz</title></svelte:head>
 {@render children()}
 ```
+
 Keep `frontend/src/routes/+layout.ts` as-is (`export const ssr = false; export const prerender = false;`).
 
 - [ ] **Step 5: Auth guard in `(app)/+layout.ts`**
@@ -1613,6 +1647,7 @@ export const load: LayoutLoad = async ({ url }) => {
 	</div>
 </div>
 ```
+
 (Use the actual `design-system` tokens/classes — this is a first pass; the `design-system` skill applies on the styling polish.)
 
 - [ ] **Step 7: Build**
@@ -1634,6 +1669,7 @@ git commit -m "feat(frontend): login page, auth store, (app) route group guard"
 ### Task 13: justfile + end-to-end release build
 
 **Files:**
+
 - Create/Modify: `justfile`
 
 - [ ] **Step 1: Write the `justfile`**
@@ -1680,6 +1716,7 @@ Expected: `frontend/build/` regenerated, then `cargo build --release` embeds it.
 - [ ] **Step 3: Run the release binary and verify it serves the real app + API**
 
 Run:
+
 ```bash
 HASH=$(echo -n secret | target/release/kammerz hash-password)
 KAMMERZ_PASSWORD_HASH="$HASH" DATABASE_URL="sqlite:/tmp/kz.db?mode=rwc" PORT=3001 target/release/kammerz &
@@ -1690,6 +1727,7 @@ curl -s -o /dev/null -w "%{http_code}\n" localhost:3001/cameras # 200, SPA fallb
 curl -s -o /dev/null -w "%{http_code}\n" localhost:3001/api/cameras # 401 (auth required)
 kill %1; rm -f /tmp/kz.db
 ```
+
 Expected: `me` → auth_required:true; `/` and `/cameras` → 200; `/api/cameras` → 401.
 
 - [ ] **Step 4: Commit**
@@ -1702,6 +1740,7 @@ git commit -m "chore: justfile dev/build recipes + verify embedded release build
 ### Task 14: Deployment artifacts (.env.example + systemd unit)
 
 **Files:**
+
 - Create: `.env.example`
 - Create: `deploy/kammerz.service`
 
@@ -1761,6 +1800,7 @@ git commit -m "chore(deploy): .env.example + hardened systemd unit"
 - [ ] **Step 1: Decide the data path and verify both bootstrap routes**
 
 Two cases:
+
 - **Carry over existing catalog:** copy the Mac DB to the NAS data dir before first run:
   `scp ~/Library/Application\ Support/com.kammerz.app/kammerz.db <nas>:/opt/kammerz/data/kammerz.db`. On boot, `seaql_migrations` is already fully populated → `Migrator::up` is a no-op → FK pragma is moot. Verify locally:
   ```bash
@@ -1780,12 +1820,14 @@ Expected: only additive differences (the `tower_sessions` table). Core schema id
 ### Task 16: Update CLAUDE.md, README, UI_DESIGN references
 
 **Files:**
+
 - Modify: `CLAUDE.md`
 - Modify: `README.md`
 
 - [ ] **Step 1: Rewrite the CLAUDE.md tech-stack + commands + architecture sections**
 
 Key edits:
+
 - Replace "Tauri 2 desktop app" framing with "axum + SvelteKit self-hosted web app."
 - **Lift the preview-tools prohibition.** Replace the "DO NOT use preview tools … invoke() requires the native IPC bridge" note with: browser/Playwright verification is now valid; dev via `just dev` (axum :3001 + vite :5173 proxy); verify backend with `cargo test`, frontend with `bun run build`/`bun run check`, data via `sqlite3`.
 - Update commands: `just dev`, `just build`, `cargo test`, `kammerz hash-password`.
@@ -1811,6 +1853,7 @@ git commit -m "docs: update CLAUDE.md + README for the axum web architecture"
 ### Task 17: Playwright smoke test of the served app
 
 **Files:**
+
 - Create: `frontend/tests/smoke.spec.ts`
 - Modify: `frontend/package.json` (add `@playwright/test` + a `test:e2e` script)
 
@@ -1823,6 +1866,7 @@ git commit -m "docs: update CLAUDE.md + README for the axum web architecture"
 - [ ] **Step 2: Write the smoke test**
 
 `frontend/tests/smoke.spec.ts`:
+
 ```typescript
 import { test, expect } from '@playwright/test';
 
@@ -1847,6 +1891,7 @@ sleep 3
 cd frontend && E2E_PASSWORD=secret bunx playwright test; cd ..
 kill %1; rm -f /tmp/kz-e2e.db
 ```
+
 Expected: smoke test PASS.
 
 - [ ] **Step 4: Manual parity walk-through (checklist)**

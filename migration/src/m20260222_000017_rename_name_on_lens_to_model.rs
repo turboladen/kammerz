@@ -16,7 +16,7 @@ impl MigrationTrait for Migration {
         //    e.g. brand="Mamiya", model="Mamiya 90mm K/L" → "90mm K/L"
         db.execute_unprepared(
             "UPDATE lenses SET model = TRIM(SUBSTR(model, LENGTH(brand) + 2)) \
-             WHERE model LIKE brand || ' %'"
+             WHERE model LIKE brand || ' %'",
         )
         .await?;
 

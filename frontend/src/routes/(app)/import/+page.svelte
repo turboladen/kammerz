@@ -88,9 +88,7 @@
 				]
 	);
 
-	const selectedModelLabel = $derived(
-		modelOptions.find((m) => m.value === selectedModel)?.label ?? selectedModel
-	);
+	const selectedModelLabel = $derived(modelOptions.find((m) => m.value === selectedModel)?.label ?? selectedModel);
 
 	const statusOptions = [
 		{ value: 'loaded', label: 'Loaded' },
@@ -127,9 +125,7 @@
 
 	const lensOptions = $derived.by(() => {
 		const owned = allLenses.filter((l) => !l.date_sold);
-		const options: { value: string; label: string }[] = [
-			{ value: '', label: 'No default lens' }
-		];
+		const options: { value: string; label: string }[] = [{ value: '', label: 'No default lens' }];
 		for (const l of owned) {
 			options.push({ value: String(l.id), label: lensDisplayName(l) });
 		}
@@ -152,10 +148,7 @@
 
 	async function loadSettings() {
 		try {
-			const [key, model] = await Promise.all([
-				getSetting('claude_api_key'),
-				getSetting('claude_model')
-			]);
+			const [key, model] = await Promise.all([getSetting('claude_api_key'), getSetting('claude_model')]);
 			if (key) {
 				// The backend returns a masked sentinel for secrets — only presence
 				// matters here; the cleartext key is never sent to the browser.
@@ -209,8 +202,8 @@
 	// Auto-persist model selection whenever it changes (after initial load)
 	$effect(() => {
 		const model = selectedModel; // read to subscribe
-		if (!settingsLoaded) return;  // skip before settings loaded
-		if (model === lastPersistedModel) return;  // skip redundant writes
+		if (!settingsLoaded) return; // skip before settings loaded
+		if (model === lastPersistedModel) return; // skip redundant writes
 		lastPersistedModel = model;
 		setSetting('claude_model', model).catch(() => {
 			// Non-critical — model will fall back to default
@@ -403,11 +396,7 @@
 									{/if}
 								</button>
 							</div>
-							<Button
-								size="sm"
-								onclick={saveApiKey}
-								disabled={savingKey || !apiKey.trim()}
-							>
+							<Button size="sm" onclick={saveApiKey} disabled={savingKey || !apiKey.trim()}>
 								{savingKey ? 'Saving...' : 'Save'}
 							</Button>
 						</div>
@@ -418,10 +407,7 @@
 						<span class="mb-1.5 block text-xs font-medium text-text-muted">Model</span>
 						<div class="flex items-center gap-2">
 							<div class="flex-1">
-								<Select
-									options={modelOptions}
-									bind:value={selectedModel}
-								/>
+								<Select options={modelOptions} bind:value={selectedModel} />
 							</div>
 							<button
 								onclick={fetchModels}
@@ -466,11 +452,7 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 			</label>
 
 			<div class="mt-4">
-				<Button
-					variant="primary"
-					onclick={handleParse}
-					disabled={parsing || !noteText.trim()}
-				>
+				<Button variant="primary" onclick={handleParse} disabled={parsing || !noteText.trim()}>
 					{#if parsing}
 						Analyzing your notes...
 					{:else}
@@ -484,166 +466,150 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 		<div class="max-w-4xl">
 			<div class="mb-4 flex items-center justify-between">
 				<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Review Parsed Data</h2>
-				<Button size="sm" variant="ghost" onclick={() => (step = 'input')}>
-					&larr; Back to input
-				</Button>
+				<Button size="sm" variant="ghost" onclick={() => (step = 'input')}>&larr; Back to input</Button>
 			</div>
 
 			<!-- Roll Info -->
 			<FadeIn>
-			<div class="mb-6 rounded-lg border border-border bg-surface-raised p-4">
-				<h3 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
-					Roll Info
-					<div class="flex-1 border-b border-border-subtle"></div>
-				</h3>
-				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<Input label="Roll ID" bind:value={rollId} />
-					<Select
-						label="Status"
-						options={statusOptions}
-						bind:value={rollStatus}
-					/>
-					<div>
-						<Select
-							label="Camera"
-							options={cameraOptions}
-							bind:value={cameraId}
-							placeholder="Select camera..."
-						/>
-						{#if cameraUnmatched}
-							<p class="mt-1 text-xs text-amber-400">
-								AI detected prefix "{cameraGuess}" but no matching camera found.
-								<a href="/cameras" class="underline hover:text-accent">Add camera</a> first?
-							</p>
-						{/if}
-					</div>
-					<div>
-						<Select
-							label="Film Stock"
-							options={filmStockOptions}
-							bind:value={filmStockId}
-							placeholder="Select film stock..."
-						/>
-						{#if filmStockUnmatched}
-							<p class="mt-1 text-xs text-amber-400">
-								AI detected "{filmStockGuess}" but no matching film stock found.
-								<a href="/film-stocks" class="underline hover:text-accent">Add film stock</a> first?
-							</p>
-						{/if}
-					</div>
-					<div>
-						<Select
-							label="Default Lens"
-							options={lensOptions}
-							bind:value={lensId}
-							placeholder="Select lens..."
-						/>
-						{#if lensUnmatched}
-							<p class="mt-1 text-xs text-amber-400">
-								AI detected "{lensGuess}" but no matching lens found.
-								<a href="/lenses" class="underline hover:text-accent">Add lens</a> first?
-							</p>
-						{/if}
-					</div>
-					<Input label="Frame Count" type="number" bind:value={frameCount} />
-					<DateInput label="Date Loaded" bind:value={dateLoaded} />
-					<DateInput label="Finished Shooting" bind:value={dateFinished} />
-					<div class="col-span-2">
-						<Input label="Notes" bind:value={rollNotes} />
+				<div class="mb-6 rounded-lg border border-border bg-surface-raised p-4">
+					<h3 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+						Roll Info
+						<div class="flex-1 border-b border-border-subtle"></div>
+					</h3>
+					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+						<Input label="Roll ID" bind:value={rollId} />
+						<Select label="Status" options={statusOptions} bind:value={rollStatus} />
+						<div>
+							<Select label="Camera" options={cameraOptions} bind:value={cameraId} placeholder="Select camera..." />
+							{#if cameraUnmatched}
+								<p class="mt-1 text-xs text-amber-400">
+									AI detected prefix "{cameraGuess}" but no matching camera found.
+									<a href="/cameras" class="underline hover:text-accent">Add camera</a> first?
+								</p>
+							{/if}
+						</div>
+						<div>
+							<Select
+								label="Film Stock"
+								options={filmStockOptions}
+								bind:value={filmStockId}
+								placeholder="Select film stock..."
+							/>
+							{#if filmStockUnmatched}
+								<p class="mt-1 text-xs text-amber-400">
+									AI detected "{filmStockGuess}" but no matching film stock found.
+									<a href="/film-stocks" class="underline hover:text-accent">Add film stock</a> first?
+								</p>
+							{/if}
+						</div>
+						<div>
+							<Select label="Default Lens" options={lensOptions} bind:value={lensId} placeholder="Select lens..." />
+							{#if lensUnmatched}
+								<p class="mt-1 text-xs text-amber-400">
+									AI detected "{lensGuess}" but no matching lens found.
+									<a href="/lenses" class="underline hover:text-accent">Add lens</a> first?
+								</p>
+							{/if}
+						</div>
+						<Input label="Frame Count" type="number" bind:value={frameCount} />
+						<DateInput label="Date Loaded" bind:value={dateLoaded} />
+						<DateInput label="Finished Shooting" bind:value={dateFinished} />
+						<div class="col-span-2">
+							<Input label="Notes" bind:value={rollNotes} />
+						</div>
 					</div>
 				</div>
-			</div>
 			</FadeIn>
 
 			<!-- Shots -->
 			{#if shots.length > 0}
 				<FadeIn delay={50}>
-				<div class="mb-6 rounded-lg border border-border bg-surface-raised p-4">
-					<h3 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
-						Shots ({shots.length})
-						<div class="flex-1 border-b border-border-subtle"></div>
-					</h3>
-					<div class="overflow-x-auto">
-						<table class="w-full text-sm">
-							<thead>
-								<tr class="border-b border-border text-left">
-									<th class="px-2 py-1.5 text-xs font-medium text-text-faint">Frame</th>
-									<th class="px-2 py-1.5 text-xs font-medium text-text-faint">Aperture</th>
-									<th class="px-2 py-1.5 text-xs font-medium text-text-faint">Shutter</th>
-									<th class="px-2 py-1.5 text-xs font-medium text-text-faint">Date</th>
-									<th class="px-2 py-1.5 text-xs font-medium text-text-faint">Location</th>
-									<th class="px-2 py-1.5 text-xs font-medium text-text-faint">Notes</th>
-									<th class="w-8"></th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each shots as shot, i}
-									<tr class="border-b border-border/50">
-										<td class="px-1 py-1">
-											<input
-												bind:value={shot.frame_number}
-												class="w-14 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text font-mono focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
-											/>
-										</td>
-										<td class="px-1 py-1">
-											<input
-												bind:value={shot.aperture}
-												class="w-16 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
-											/>
-										</td>
-										<td class="px-1 py-1">
-											<input
-												bind:value={shot.shutter_speed}
-												class="w-16 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
-											/>
-										</td>
-										<td class="px-1 py-1">
-											<input
-												bind:value={shot.date}
-												type="text"
-												placeholder="YYYY-MM-DD"
-												class="w-28 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs text-text placeholder-text-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50
-													{dateFieldError(shot.date) ? 'border-red-500/60' : ''}"
-											/>
-										</td>
-										<td class="px-1 py-1">
-											<input
-												bind:value={shot.location}
-												class="w-28 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
-											/>
-										</td>
-										<td class="px-1 py-1">
-											<input
-												bind:value={shot.notes}
-												class="w-32 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
-											/>
-										</td>
-										<td class="px-1 py-1">
-											<button
-												onclick={() => removeShot(i)}
-												class="rounded p-1 text-text-faint transition-colors hover:bg-red-500/15 hover:text-red-400"
-												title="Remove shot"
-											>
-												<Trash2 size={12} />
-											</button>
-										</td>
+					<div class="mb-6 rounded-lg border border-border bg-surface-raised p-4">
+						<h3 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+							Shots ({shots.length})
+							<div class="flex-1 border-b border-border-subtle"></div>
+						</h3>
+						<div class="overflow-x-auto">
+							<table class="w-full text-sm">
+								<thead>
+									<tr class="border-b border-border text-left">
+										<th class="px-2 py-1.5 text-xs font-medium text-text-faint">Frame</th>
+										<th class="px-2 py-1.5 text-xs font-medium text-text-faint">Aperture</th>
+										<th class="px-2 py-1.5 text-xs font-medium text-text-faint">Shutter</th>
+										<th class="px-2 py-1.5 text-xs font-medium text-text-faint">Date</th>
+										<th class="px-2 py-1.5 text-xs font-medium text-text-faint">Location</th>
+										<th class="px-2 py-1.5 text-xs font-medium text-text-faint">Notes</th>
+										<th class="w-8"></th>
 									</tr>
-								{/each}
-							</tbody>
-						</table>
+								</thead>
+								<tbody>
+									{#each shots as shot, i}
+										<tr class="border-b border-border/50">
+											<td class="px-1 py-1">
+												<input
+													bind:value={shot.frame_number}
+													class="w-14 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text font-mono focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+												/>
+											</td>
+											<td class="px-1 py-1">
+												<input
+													bind:value={shot.aperture}
+													class="w-16 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+												/>
+											</td>
+											<td class="px-1 py-1">
+												<input
+													bind:value={shot.shutter_speed}
+													class="w-16 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+												/>
+											</td>
+											<td class="px-1 py-1">
+												<input
+													bind:value={shot.date}
+													type="text"
+													placeholder="YYYY-MM-DD"
+													class="w-28 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs text-text placeholder-text-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50
+													{dateFieldError(shot.date) ? 'border-red-500/60' : ''}"
+												/>
+											</td>
+											<td class="px-1 py-1">
+												<input
+													bind:value={shot.location}
+													class="w-28 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+												/>
+											</td>
+											<td class="px-1 py-1">
+												<input
+													bind:value={shot.notes}
+													class="w-32 rounded border border-border bg-surface px-1.5 py-1 text-xs text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+												/>
+											</td>
+											<td class="px-1 py-1">
+												<button
+													onclick={() => removeShot(i)}
+													class="rounded p-1 text-text-faint transition-colors hover:bg-red-500/15 hover:text-red-400"
+													title="Remove shot"
+												>
+													<Trash2 size={12} />
+												</button>
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
 					</div>
-				</div>
 				</FadeIn>
 			{/if}
 
 			<!-- Import Button -->
 			<FadeIn delay={100}>
-			<Button variant="primary" disabled={!!importDateError} onclick={handleImport}>
-				Import Roll & {shots.length} Shot{shots.length !== 1 ? 's' : ''}
-			</Button>
-			{#if importDateError}
-				<p class="mt-1.5 text-xs text-red-400">{importDateError}</p>
-			{/if}
+				<Button variant="primary" disabled={!!importDateError} onclick={handleImport}>
+					Import Roll & {shots.length} Shot{shots.length !== 1 ? 's' : ''}
+				</Button>
+				{#if importDateError}
+					<p class="mt-1.5 text-xs text-red-400">{importDateError}</p>
+				{/if}
 			</FadeIn>
 		</div>
 	{:else if step === 'importing'}

@@ -1,0 +1,6 @@
+node_modules
+build
+.svelte-kit
+test-results
+static/fonts
+bun.lock

@@ -27,10 +27,32 @@
 	import { lensDisplayName, buildLensOptions } from '$lib/utils/lens';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
-	import { statusConfig, getDevPath, getFlowForPath, getPathLabel, allStatusOrder, devKindForStatus, type DevAutoPrompt } from '$lib/utils/status';
+	import {
+		statusConfig,
+		getDevPath,
+		getFlowForPath,
+		getPathLabel,
+		allStatusOrder,
+		devKindForStatus,
+		type DevAutoPrompt
+	} from '$lib/utils/status';
 	import { buildRollTimeline, readDateTarget, STATUS_DATE_TARGET } from '$lib/utils/timeline';
 	import { todayLocal, dateFieldError } from '$lib/utils/date';
-	import type { RollWithDetails, RollInsert, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
+	import type {
+		RollWithDetails,
+		RollInsert,
+		Camera,
+		FilmStock,
+		Lens,
+		Shot,
+		Lab,
+		DevelopmentLab,
+		DevelopmentSelf,
+		DevStage,
+		RollStatus,
+		PushPull,
+		LensMount
+	} from '$lib/types';
 	import { Trash2 } from 'lucide-svelte';
 
 	const id = $derived(Number(page.params.id));
@@ -42,7 +64,9 @@
 		dashboard: { href: '/', label: 'Dashboard' }
 	};
 	const fromParam = $derived(page.url.searchParams.get('from'));
-	const backNav = $derived(fromParam && backRoutes[fromParam] ? backRoutes[fromParam] : { href: '/rolls', label: 'Rolls' });
+	const backNav = $derived(
+		fromParam && backRoutes[fromParam] ? backRoutes[fromParam] : { href: '/rolls', label: 'Rolls' }
+	);
 
 	let roll: RollWithDetails | undefined = $state();
 	let cameras: Camera[] = $state([]);
@@ -93,9 +117,7 @@
 	let statusNotice = $state('');
 
 	// Path-aware status flow
-	const devPath = $derived(
-		roll ? getDevPath(roll.status as RollStatus, !!labDev, !!selfDev) : 'undecided' as const
-	);
+	const devPath = $derived(roll ? getDevPath(roll.status as RollStatus, !!labDev, !!selfDev) : ('undecided' as const));
 	const statusFlow = $derived(getFlowForPath(devPath));
 	const pathLabel = $derived(getPathLabel(devPath));
 
@@ -118,9 +140,7 @@
 	// status so it can never drift out of sync.
 	let datePromptOpen = $state(false);
 	let datePromptStatus: RollStatus | null = $state(null);
-	const datePromptLabel = $derived.by(() =>
-		datePromptStatus ? statusConfig[datePromptStatus].label : ''
-	);
+	const datePromptLabel = $derived.by(() => (datePromptStatus ? statusConfig[datePromptStatus].label : ''));
 
 	// Frame progress
 	const frameProgress = $derived.by(() => {
@@ -138,10 +158,7 @@
 	let finishDateSeededFor: number | null = $state(null);
 	const finishDateError = $derived(dateFieldError(finishDate));
 	const showRollFullNudge = $derived(
-		roll?.status === 'shooting' &&
-		frameProgress !== null &&
-		shots.length >= frameProgress.total &&
-		!rollFullDismissed
+		roll?.status === 'shooting' && frameProgress !== null && shots.length >= frameProgress.total && !rollFullDismissed
 	);
 
 	// Development-path picker popover (the live "Develop" chevron in the undecided flow).
@@ -157,9 +174,7 @@
 		...cameras.map((c) => ({ value: String(c.id), label: cameraLabels.get(c.id) ?? `${c.brand} ${c.model}` }))
 	]);
 
-	const selectedCamera = $derived(
-		roll?.camera_id ? cameras.find((c) => c.id === roll?.camera_id) ?? null : null
-	);
+	const selectedCamera = $derived(roll?.camera_id ? (cameras.find((c) => c.id === roll?.camera_id) ?? null) : null);
 
 	// Fixed-lens camera detection (based on saved roll camera)
 	const isFixedLensCamera = $derived(
@@ -167,22 +182,24 @@
 	);
 	const fixedLens = $derived(
 		isFixedLensCamera && selectedCamera?.default_lens_id
-			? allLenses.find((l) => l.id === selectedCamera.default_lens_id) ?? null
+			? (allLenses.find((l) => l.id === selectedCamera.default_lens_id) ?? null)
 			: null
 	);
 
 	// Edit-mode: camera selected in the edit form (for reactive film stock / lens filtering)
 	const editSelectedCamera = $derived(
-		editCameraId ? cameras.find((c) => c.id === Number(editCameraId)) ?? null : null
+		editCameraId ? (cameras.find((c) => c.id === Number(editCameraId)) ?? null) : null
 	);
 
 	// Edit-mode: fixed-lens detection for the camera selected in the edit form
 	const editIsFixedLens = $derived(
-		editSelectedCamera ? lensMounts.some((m) => m.id === editSelectedCamera.lens_mount_id && m.name === 'Fixed Lens') : false
+		editSelectedCamera
+			? lensMounts.some((m) => m.id === editSelectedCamera.lens_mount_id && m.name === 'Fixed Lens')
+			: false
 	);
 	const editFixedLens = $derived(
 		editIsFixedLens && editSelectedCamera?.default_lens_id
-			? allLenses.find((l) => l.id === editSelectedCamera.default_lens_id) ?? null
+			? (allLenses.find((l) => l.id === editSelectedCamera.default_lens_id) ?? null)
 			: null
 	);
 
@@ -190,9 +207,16 @@
 	const cameraFormatToStockFormat: Record<string, string> = {
 		'35mm': '135',
 		'medium format': '120',
-		'6x4.5': '120', '6x6': '120', '6x7': '120', '6x8': '120', '6x9': '120',
-		'large format': '4x5', '4x5': '4x5', '5x7': '5x7', '8x10': '8x10',
-		'instant': 'instant'
+		'6x4.5': '120',
+		'6x6': '120',
+		'6x7': '120',
+		'6x8': '120',
+		'6x9': '120',
+		'large format': '4x5',
+		'4x5': '4x5',
+		'5x7': '5x7',
+		'8x10': '8x10',
+		instant: 'instant'
 	};
 
 	function stockLabel(s: FilmStock): string {
@@ -200,9 +224,7 @@
 	}
 
 	const editFilmStockOptions = $derived.by(() => {
-		const matchingFormat = editSelectedCamera
-			? cameraFormatToStockFormat[editSelectedCamera.format]
-			: null;
+		const matchingFormat = editSelectedCamera ? cameraFormatToStockFormat[editSelectedCamera.format] : null;
 		if (!matchingFormat) {
 			return [
 				{ value: '', label: 'Not assigned' },
@@ -211,9 +233,7 @@
 		}
 		const matching = filmStocks.filter((s) => s.format === matchingFormat);
 		const rest = filmStocks.filter((s) => s.format !== matchingFormat);
-		const options: { value: string; label: string; disabled?: boolean }[] = [
-			{ value: '', label: 'Not assigned' }
-		];
+		const options: { value: string; label: string; disabled?: boolean }[] = [{ value: '', label: 'Not assigned' }];
 		for (const s of matching) options.push({ value: String(s.id), label: stockLabel(s) });
 		if (matching.length > 0 && rest.length > 0) {
 			options.push({ value: '__divider__', label: '── Other formats ──', disabled: true });
@@ -226,9 +246,7 @@
 
 	// Hint for medium format variable-back cameras and large format sheet film
 	const editFrameCountHint = $derived.by(() => {
-		const matchingFormat = editSelectedCamera
-			? cameraFormatToStockFormat[editSelectedCamera.format]
-			: null;
+		const matchingFormat = editSelectedCamera ? cameraFormatToStockFormat[editSelectedCamera.format] : null;
 		if (matchingFormat === '120' && !editFrameCount) {
 			return '120 film: 6\u00d74.5=15 \u00b7 6\u00d76=12 \u00b7 6\u00d77=10 \u00b7 6\u00d78=9 \u00b7 6\u00d79=8';
 		}
@@ -646,7 +664,7 @@
 			// For fixed-lens cameras the lens Select is hidden and replaced by a
 			// read-only display of the built-in lens — persist that lens, never a
 			// stale editLensId left over from a previous camera (kammerz-8hg).
-			const lensId = editIsFixedLens ? editFixedLens?.id ?? null : editLensId ? Number(editLensId) : null;
+			const lensId = editIsFixedLens ? (editFixedLens?.id ?? null) : editLensId ? Number(editLensId) : null;
 			await updateRoll(id, {
 				roll_id: editRollId,
 				camera_id: editCameraId ? Number(editCameraId) : null,
@@ -704,7 +722,9 @@
 	</div>
 {:else}
 	<PageHeader title="Roll {roll.roll_id}" backHref={backNav.href} backLabel={backNav.label}>
-		<Button variant="danger" onclick={handleDelete}><Trash2 size={16} strokeWidth={2} aria-hidden="true" />Delete</Button>
+		<Button variant="danger" onclick={handleDelete}
+			><Trash2 size={16} strokeWidth={2} aria-hidden="true" />Delete</Button
+		>
 	</PageHeader>
 
 	<div class="p-6">
@@ -714,306 +734,351 @@
 
 		<!-- Roll Header -->
 		<FadeIn delay={0}>
-		<div class="relative mb-6 overflow-hidden rounded-lg border border-border bg-surface-raised p-5">
-			{#if editingRoll}
-				<div class="space-y-4">
-					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-						<Input label="Roll ID" bind:value={editRollId} />
-						<Input label="Frame Count" bind:value={editFrameCount} type="number" placeholder="36" hint={editFrameCountHint} />
-					</div>
-					<Select label="Camera" bind:value={editCameraId} options={cameraOptions} onchange={handleEditCameraChange} />
-					<Select label="Film Stock" bind:value={editFilmStockId} options={editFilmStockOptions} />
-					{#if editIsFixedLens && editFixedLens}
-						<div>
-							<span class="mb-1.5 block text-xs font-medium text-text-muted">Default Lens</span>
-							<div class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted">
-								{lensDisplayName(editFixedLens)} <span class="text-text-faint">(fixed)</span>
+			<div class="relative mb-6 overflow-hidden rounded-lg border border-border bg-surface-raised p-5">
+				{#if editingRoll}
+					<div class="space-y-4">
+						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+							<Input label="Roll ID" bind:value={editRollId} />
+							<Input
+								label="Frame Count"
+								bind:value={editFrameCount}
+								type="number"
+								placeholder="36"
+								hint={editFrameCountHint}
+							/>
+						</div>
+						<Select
+							label="Camera"
+							bind:value={editCameraId}
+							options={cameraOptions}
+							onchange={handleEditCameraChange}
+						/>
+						<Select label="Film Stock" bind:value={editFilmStockId} options={editFilmStockOptions} />
+						{#if editIsFixedLens && editFixedLens}
+							<div>
+								<span class="mb-1.5 block text-xs font-medium text-text-muted">Default Lens</span>
+								<div class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted">
+									{lensDisplayName(editFixedLens)} <span class="text-text-faint">(fixed)</span>
+								</div>
 							</div>
-						</div>
-					{:else}
-						<Select label="Default Lens" bind:value={editLensId} options={editLensOptions} />
-					{/if}
-					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-						<Select label="Push/Pull" bind:value={editPushPull} options={pushPullOptions} />
-						<Input label="Fuzzy Date" bind:value={editDateFuzzy} placeholder="e.g. 'early October 2025'" />
-					</div>
-					<Textarea label="Notes" bind:value={editNotes} placeholder="Any notes about this roll..." />
-					<div class="flex justify-end gap-2 pt-1">
-						<Button variant="ghost" onclick={() => { editingRoll = false; }}>Cancel</Button>
-						<Button variant="primary" onclick={saveEditRoll}>Save</Button>
-					</div>
-				</div>
-			{:else}
-				<FilmStrip />
-				<div class="flex items-start justify-between">
-					<div>
-						<div class="mb-2 flex items-center gap-3">
-							<span class="text-2xl font-mono font-semibold">{roll.roll_id}</span>
-							<Badge status={roll.status} />
-						</div>
-						<div class="flex flex-wrap gap-4 text-sm text-text-muted">
-							{#if roll.camera_brand}
-								<span>{roll.camera_brand} {roll.camera_model}</span>
-							{/if}
-							{#if roll.film_stock_brand}
-								<span>{roll.film_stock_brand} {roll.film_stock_name}</span>
-							{/if}
-							{#if roll.lens_brand}
-								<span>{roll.lens_brand} {roll.lens_name}</span>
-							{/if}
-							{#if roll.film_stock_iso}
-								<span>ISO {roll.film_stock_iso}</span>
-							{/if}
-							{#if roll.push_pull}
-								<span class="rounded bg-accent/15 px-1.5 py-0.5 text-xs text-accent">
-									{roll.push_pull.startsWith('+') ? 'Push' : 'Pull'} {roll.push_pull}
-								</span>
-							{/if}
-							{#if roll.frame_count}
-								<span>{roll.frame_count} frames</span>
-							{/if}
-						</div>
-						<div class="mt-1.5 flex flex-wrap gap-4 text-xs text-text-faint">
-							{#if roll.date_loaded}
-								<span>Loaded {roll.date_loaded}</span>
-							{/if}
-							{#if roll.date_finished}
-								<span>Finished shooting {roll.date_finished}</span>
-							{/if}
-						</div>
-						{#if roll.date_fuzzy}
-							<p class="mt-1 text-xs italic text-text-faint">{roll.date_fuzzy}</p>
+						{:else}
+							<Select label="Default Lens" bind:value={editLensId} options={editLensOptions} />
 						{/if}
-						{#if roll.notes}
-							<p class="mt-2 text-sm text-text-muted whitespace-pre-wrap">{roll.notes}</p>
-						{/if}
+						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+							<Select label="Push/Pull" bind:value={editPushPull} options={pushPullOptions} />
+							<Input label="Fuzzy Date" bind:value={editDateFuzzy} placeholder="e.g. 'early October 2025'" />
+						</div>
+						<Textarea label="Notes" bind:value={editNotes} placeholder="Any notes about this roll..." />
+						<div class="flex justify-end gap-2 pt-1">
+							<Button
+								variant="ghost"
+								onclick={() => {
+									editingRoll = false;
+								}}>Cancel</Button
+							>
+							<Button variant="primary" onclick={saveEditRoll}>Save</Button>
+						</div>
 					</div>
-					<div class="flex flex-col items-end gap-3">
-						{#if frameProgress}
-							<FrameCounter current={frameProgress.current} total={frameProgress.total} size="lg" />
-						{/if}
-						<Button size="sm" variant="ghost" onclick={startEditRoll}>Edit</Button>
+				{:else}
+					<FilmStrip />
+					<div class="flex items-start justify-between">
+						<div>
+							<div class="mb-2 flex items-center gap-3">
+								<span class="text-2xl font-mono font-semibold">{roll.roll_id}</span>
+								<Badge status={roll.status} />
+							</div>
+							<div class="flex flex-wrap gap-4 text-sm text-text-muted">
+								{#if roll.camera_brand}
+									<span>{roll.camera_brand} {roll.camera_model}</span>
+								{/if}
+								{#if roll.film_stock_brand}
+									<span>{roll.film_stock_brand} {roll.film_stock_name}</span>
+								{/if}
+								{#if roll.lens_brand}
+									<span>{roll.lens_brand} {roll.lens_name}</span>
+								{/if}
+								{#if roll.film_stock_iso}
+									<span>ISO {roll.film_stock_iso}</span>
+								{/if}
+								{#if roll.push_pull}
+									<span class="rounded bg-accent/15 px-1.5 py-0.5 text-xs text-accent">
+										{roll.push_pull.startsWith('+') ? 'Push' : 'Pull'}
+										{roll.push_pull}
+									</span>
+								{/if}
+								{#if roll.frame_count}
+									<span>{roll.frame_count} frames</span>
+								{/if}
+							</div>
+							<div class="mt-1.5 flex flex-wrap gap-4 text-xs text-text-faint">
+								{#if roll.date_loaded}
+									<span>Loaded {roll.date_loaded}</span>
+								{/if}
+								{#if roll.date_finished}
+									<span>Finished shooting {roll.date_finished}</span>
+								{/if}
+							</div>
+							{#if roll.date_fuzzy}
+								<p class="mt-1 text-xs italic text-text-faint">{roll.date_fuzzy}</p>
+							{/if}
+							{#if roll.notes}
+								<p class="mt-2 text-sm text-text-muted whitespace-pre-wrap">{roll.notes}</p>
+							{/if}
+						</div>
+						<div class="flex flex-col items-end gap-3">
+							{#if frameProgress}
+								<FrameCounter current={frameProgress.current} total={frameProgress.total} size="lg" />
+							{/if}
+							<Button size="sm" variant="ghost" onclick={startEditRoll}>Edit</Button>
+						</div>
 					</div>
-				</div>
-			{/if}
-		</div>
+				{/if}
+			</div>
 		</FadeIn>
 
 		<!-- Status Progression -->
 		<FadeIn delay={50}>
-		<div class="mb-6">
-			<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
-				Status
-				<div class="flex-1 border-b border-border-subtle"></div>
-			</h2>
-			{#if pathLabel}
-				<p class="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-text-faint/70">{pathLabel}</p>
-			{/if}
-			<div class="flex flex-wrap items-center gap-[2px] gap-y-1">
-				{#each statusFlow as status, idx}
-					{@const isFirst = idx === 0}
-					{@const isLast = idx === statusFlow.length - 1}
-					{@const clipPath = isFirst
-						? 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%)'
-						: isLast
-							? 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 8px 50%)'
-							: 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)'}
-					<button
-						onclick={() => handleStatusClick(status)}
-						style="clip-path: {clipPath}"
-						class="whitespace-nowrap py-1.5 text-xs font-medium transition-colors
+			<div class="mb-6">
+				<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+					Status
+					<div class="flex-1 border-b border-border-subtle"></div>
+				</h2>
+				{#if pathLabel}
+					<p class="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-text-faint/70">{pathLabel}</p>
+				{/if}
+				<div class="flex flex-wrap items-center gap-[2px] gap-y-1">
+					{#each statusFlow as status, idx}
+						{@const isFirst = idx === 0}
+						{@const isLast = idx === statusFlow.length - 1}
+						{@const clipPath = isFirst
+							? 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%)'
+							: isLast
+								? 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 8px 50%)'
+								: 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)'}
+						<button
+							onclick={() => handleStatusClick(status)}
+							style="clip-path: {clipPath}"
+							class="whitespace-nowrap py-1.5 text-xs font-medium transition-colors
 							{isFirst ? 'pl-3 pr-4' : isLast ? 'pl-4 pr-3' : 'px-4'}
 							{roll.status === status
-							? 'bg-accent text-surface'
-							: idx < currentStatusIdx
-								? 'bg-surface-overlay text-accent hover:bg-surface-overlay/80'
-								: 'bg-surface-raised text-text-muted hover:text-text'}"
-					>
-						{statusConfig[status].label}
-					</button>
-					{#if devPath === 'undecided' && status === 'shot'}
-						<!-- Live next-step: the development decision happens here, in the flow,
+								? 'bg-accent text-surface'
+								: idx < currentStatusIdx
+									? 'bg-surface-overlay text-accent hover:bg-surface-overlay/80'
+									: 'bg-surface-raised text-text-muted hover:text-text'}"
+						>
+							{statusConfig[status].label}
+						</button>
+						{#if devPath === 'undecided' && status === 'shot'}
+							<!-- Live next-step: the development decision happens here, in the flow,
 						     rather than as disconnected dead placeholders. Choosing a path
 						     opens the matching dev dialog and re-renders the bar to that flow. -->
-						<div class="relative">
-							<button
-								onclick={() => (showDevPathMenu = !showDevPathMenu)}
-								aria-haspopup="menu"
-								aria-expanded={showDevPathMenu}
-								style="clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)"
-								class="px-4 py-1.5 text-xs font-medium transition-colors hover:bg-accent/25
-									{showDevPathMenu ? 'bg-accent/25 text-accent' : 'bg-accent/15 text-accent'}"
-							>
-								Develop<span aria-hidden="true">&nbsp;⌄</span>
-							</button>
-							{#if showDevPathMenu}
-								<!-- click-away catcher -->
+							<div class="relative">
 								<button
-									class="fixed inset-0 z-10 cursor-default"
-									aria-label="Close development menu"
-									onclick={() => (showDevPathMenu = false)}
-								></button>
-								<div
-									role="menu"
-									class="absolute left-1/2 top-full z-20 mt-1.5 -translate-x-1/2 overflow-hidden rounded-lg border border-border bg-surface-overlay shadow-lg"
+									onclick={() => (showDevPathMenu = !showDevPathMenu)}
+									aria-haspopup="menu"
+									aria-expanded={showDevPathMenu}
+									style="clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)"
+									class="px-4 py-1.5 text-xs font-medium transition-colors hover:bg-accent/25
+									{showDevPathMenu ? 'bg-accent/25 text-accent' : 'bg-accent/15 text-accent'}"
 								>
+									Develop<span aria-hidden="true">&nbsp;⌄</span>
+								</button>
+								{#if showDevPathMenu}
+									<!-- click-away catcher -->
 									<button
-										role="menuitem"
-										onclick={() => chooseDevPath('lab')}
-										class="block w-full whitespace-nowrap px-4 py-2 text-left text-xs font-medium text-text-muted transition-colors hover:bg-accent/15 hover:text-accent"
-									>Lab</button>
-									<button
-										role="menuitem"
-										onclick={() => chooseDevPath('self')}
-										class="block w-full whitespace-nowrap border-t border-border-subtle px-4 py-2 text-left text-xs font-medium text-text-muted transition-colors hover:bg-accent/15 hover:text-accent"
-									>Self / Home</button>
-								</div>
-							{/if}
-						</div>
-					{/if}
-				{/each}
+										class="fixed inset-0 z-10 cursor-default"
+										aria-label="Close development menu"
+										onclick={() => (showDevPathMenu = false)}
+									></button>
+									<div
+										role="menu"
+										class="absolute left-1/2 top-full z-20 mt-1.5 -translate-x-1/2 overflow-hidden rounded-lg border border-border bg-surface-overlay shadow-lg"
+									>
+										<button
+											role="menuitem"
+											onclick={() => chooseDevPath('lab')}
+											class="block w-full whitespace-nowrap px-4 py-2 text-left text-xs font-medium text-text-muted transition-colors hover:bg-accent/15 hover:text-accent"
+											>Lab</button
+										>
+										<button
+											role="menuitem"
+											onclick={() => chooseDevPath('self')}
+											class="block w-full whitespace-nowrap border-t border-border-subtle px-4 py-2 text-left text-xs font-medium text-text-muted transition-colors hover:bg-accent/15 hover:text-accent"
+											>Self / Home</button
+										>
+									</div>
+								{/if}
+							</div>
+						{/if}
+					{/each}
+				</div>
+				{#if statusNotice}
+					<p class="mt-2 text-xs text-text-faint">{statusNotice}</p>
+				{/if}
 			</div>
-			{#if statusNotice}
-				<p class="mt-2 text-xs text-text-faint">{statusNotice}</p>
-			{/if}
-		</div>
 		</FadeIn>
 
 		<!-- Lifecycle Timeline -->
 		<FadeIn delay={75}>
-		<div class="mb-6">
-			<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
-				Timeline
-				<div class="flex-1 border-b border-border-subtle"></div>
-			</h2>
-			<RollTimeline milestones={timeline} onedit={saveTimelineDate} />
-		</div>
+			<div class="mb-6">
+				<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+					Timeline
+					<div class="flex-1 border-b border-border-subtle"></div>
+				</h2>
+				<RollTimeline milestones={timeline} onedit={saveTimelineDate} />
+			</div>
 		</FadeIn>
 
 		<!-- Development -->
 		<FadeIn delay={100}>
-		<DevelopmentSection
-			rollId={id}
-			{labs}
-			bind:labDev
-			bind:selfDev
-			bind:devStages
-			bind:autoPrompt={devAutoPrompt}
-			currentStatus={roll?.status ?? null}
-			defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
-			onchange={loadRollData}
-			onpromptcancel={() => { statusNotice = 'Status unchanged — no development record was saved.'; }}
-		/>
-
+			<DevelopmentSection
+				rollId={id}
+				{labs}
+				bind:labDev
+				bind:selfDev
+				bind:devStages
+				bind:autoPrompt={devAutoPrompt}
+				currentStatus={roll?.status ?? null}
+				defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
+				onchange={loadRollData}
+				onpromptcancel={() => {
+					statusNotice = 'Status unchanged — no development record was saved.';
+				}}
+			/>
 		</FadeIn>
 
 		<!-- Shots -->
 		<FadeIn delay={150}>
-		<div>
-			<div class="mb-3 flex items-center justify-between">
-				<div class="flex items-center gap-3">
-					<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Shots</h2>
-					{#if frameProgress}
-						<div class="flex items-center gap-2">
-							<span class="text-xs text-text-faint">{frameProgress.current}/{frameProgress.total}</span>
-							<div class="h-1.5 w-24 overflow-hidden rounded-full bg-surface-overlay">
-								<div
-									class="h-full rounded-full transition-all duration-300 {frameProgress.current > frameProgress.total ? 'bg-danger' : 'bg-accent'}"
-									style="width: {Math.min((frameProgress.current / frameProgress.total) * 100, 100)}%"
-								></div>
-							</div>
-						</div>
-					{/if}
-				</div>
-				<div class="flex gap-2">
-					<Button size="sm" variant="ghost" href="/quick-entry?roll={roll?.id}">Quick Entry</Button>
-					<Button size="sm" onclick={openAddShotDialog}>+ Add Shot</Button>
-				</div>
-			</div>
-
-			{#if showRollFullNudge}
-				<div class="mb-3 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3">
-					<div class="flex flex-col gap-2">
-						<div>
-							<p class="text-sm font-medium text-accent">Roll complete</p>
-							<p class="text-xs text-accent/70">
-								All {frameProgress?.total} frames shot. When did you finish it?
-							</p>
-						</div>
-						<div class="w-44">
-							<DateInput label="Finished shooting" bind:value={finishDate} />
-						</div>
-					</div>
-					<div class="flex items-center gap-2">
-						<Button size="sm" variant="primary" disabled={!finishDate.trim() || !!finishDateError} onclick={() => updateStatus('shot', finishDate)}>Mark as Shot</Button>
-						<button
-							onclick={() => { rollFullDismissed = true; }}
-							class="text-accent/60 hover:text-accent transition-colors text-lg leading-none px-1"
-							aria-label="Dismiss"
-						>&times;</button>
-					</div>
-				</div>
-			{:else if frameProgress && shots.length > frameProgress.total}
-				<div class="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
-					More shots ({shots.length}) than the roll's frame count ({frameProgress.total}). This may indicate extra frames or a counting error.
-				</div>
-			{/if}
-
-			{#if shots.length === 0}
-				<p class="text-sm text-text-faint">No shots logged yet. Add your first shot to start tracking frames.</p>
-			{:else}
-				<div class="space-y-1.5">
-					{#each shots as shot}
-						{@const lensDisplay = getShotLensDisplay(shot.id)}
-						<div class="group flex items-start justify-between rounded-lg border border-border bg-surface-raised px-4 py-2.5 transition-all duration-150 hover:border-accent/40">
-							<div class="flex items-start gap-3">
-								<span class="mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded bg-accent/15 px-1.5 font-mono text-xs font-medium text-accent">
-									{shot.frame_number}
-								</span>
-								<div>
-									<div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm">
-										{#if shot.aperture}
-											<span class="text-text-muted">f/{shot.aperture}</span>
-										{/if}
-										{#if shot.shutter_speed}
-											<span class="text-text-muted">{shot.shutter_speed}</span>
-										{/if}
-										{#if lensDisplay}
-											<span class="text-text-faint">
-												{lensDisplay.name}
-												{#if lensDisplay.isDefault}
-													<span class="text-text-faint/60 italic">(roll default)</span>
-												{/if}
-											</span>
-										{/if}
-										{#if shot.date}
-											<span class="text-text-faint">{shot.date}</span>
-										{/if}
-										{#if shot.location}
-											<span class="text-text-faint">{shot.location}</span>
-										{/if}
-									</div>
-									{#if shot.notes}
-										<p class="mt-0.5 text-xs text-text-faint">{shot.notes}</p>
-									{/if}
+			<div>
+				<div class="mb-3 flex items-center justify-between">
+					<div class="flex items-center gap-3">
+						<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Shots</h2>
+						{#if frameProgress}
+							<div class="flex items-center gap-2">
+								<span class="text-xs text-text-faint">{frameProgress.current}/{frameProgress.total}</span>
+								<div class="h-1.5 w-24 overflow-hidden rounded-full bg-surface-overlay">
+									<div
+										class="h-full rounded-full transition-all duration-300 {frameProgress.current > frameProgress.total
+											? 'bg-danger'
+											: 'bg-accent'}"
+										style="width: {Math.min((frameProgress.current / frameProgress.total) * 100, 100)}%"
+									></div>
 								</div>
 							</div>
-							<div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
-								<Button size="sm" variant="ghost" onclick={() => openEditShotDialog(shot)}>Edit</Button>
-								<Button size="sm" variant="ghost" onclick={() => (deletingShotId = shot.id)}>&times;</Button>
+						{/if}
+					</div>
+					<div class="flex gap-2">
+						<Button size="sm" variant="ghost" href="/quick-entry?roll={roll?.id}">Quick Entry</Button>
+						<Button size="sm" onclick={openAddShotDialog}>+ Add Shot</Button>
+					</div>
+				</div>
+
+				{#if showRollFullNudge}
+					<div
+						class="mb-3 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3"
+					>
+						<div class="flex flex-col gap-2">
+							<div>
+								<p class="text-sm font-medium text-accent">Roll complete</p>
+								<p class="text-xs text-accent/70">
+									All {frameProgress?.total} frames shot. When did you finish it?
+								</p>
+							</div>
+							<div class="w-44">
+								<DateInput label="Finished shooting" bind:value={finishDate} />
 							</div>
 						</div>
-					{/each}
-				</div>
-			{/if}
-		</div>
+						<div class="flex items-center gap-2">
+							<Button
+								size="sm"
+								variant="primary"
+								disabled={!finishDate.trim() || !!finishDateError}
+								onclick={() => updateStatus('shot', finishDate)}>Mark as Shot</Button
+							>
+							<button
+								onclick={() => {
+									rollFullDismissed = true;
+								}}
+								class="text-accent/60 hover:text-accent transition-colors text-lg leading-none px-1"
+								aria-label="Dismiss">&times;</button
+							>
+						</div>
+					</div>
+				{:else if frameProgress && shots.length > frameProgress.total}
+					<div class="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+						More shots ({shots.length}) than the roll's frame count ({frameProgress.total}). This may indicate extra
+						frames or a counting error.
+					</div>
+				{/if}
+
+				{#if shots.length === 0}
+					<p class="text-sm text-text-faint">No shots logged yet. Add your first shot to start tracking frames.</p>
+				{:else}
+					<div class="space-y-1.5">
+						{#each shots as shot}
+							{@const lensDisplay = getShotLensDisplay(shot.id)}
+							<div
+								class="group flex items-start justify-between rounded-lg border border-border bg-surface-raised px-4 py-2.5 transition-all duration-150 hover:border-accent/40"
+							>
+								<div class="flex items-start gap-3">
+									<span
+										class="mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded bg-accent/15 px-1.5 font-mono text-xs font-medium text-accent"
+									>
+										{shot.frame_number}
+									</span>
+									<div>
+										<div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm">
+											{#if shot.aperture}
+												<span class="text-text-muted">f/{shot.aperture}</span>
+											{/if}
+											{#if shot.shutter_speed}
+												<span class="text-text-muted">{shot.shutter_speed}</span>
+											{/if}
+											{#if lensDisplay}
+												<span class="text-text-faint">
+													{lensDisplay.name}
+													{#if lensDisplay.isDefault}
+														<span class="text-text-faint/60 italic">(roll default)</span>
+													{/if}
+												</span>
+											{/if}
+											{#if shot.date}
+												<span class="text-text-faint">{shot.date}</span>
+											{/if}
+											{#if shot.location}
+												<span class="text-text-faint">{shot.location}</span>
+											{/if}
+										</div>
+										{#if shot.notes}
+											<p class="mt-0.5 text-xs text-text-faint">{shot.notes}</p>
+										{/if}
+									</div>
+								</div>
+								<div
+									class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
+								>
+									<Button size="sm" variant="ghost" onclick={() => openEditShotDialog(shot)}>Edit</Button>
+									<Button size="sm" variant="ghost" onclick={() => (deletingShotId = shot.id)}>&times;</Button>
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
 		</FadeIn>
 	</div>
 {/if}
 
 <!-- Add/Edit Shot Dialog -->
 {#if showShotDialog}
-	<Dialog open={true} title={editingShotId ? 'Edit Shot' : 'Add Shot'} onclose={() => { showShotDialog = false; resetShotForm(); }}>
+	<Dialog
+		open={true}
+		title={editingShotId ? 'Edit Shot' : 'Add Shot'}
+		onclose={() => {
+			showShotDialog = false;
+			resetShotForm();
+		}}
+	>
 		<div class="space-y-4">
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
 				<Input label="Frame #" bind:value={shotFrameNumber} placeholder="1" required />
@@ -1043,7 +1108,13 @@
 				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{shotError}</div>
 			{/if}
 			<div class="flex justify-end gap-2 pt-2">
-				<Button variant="ghost" onclick={() => { showShotDialog = false; resetShotForm(); }}>Cancel</Button>
+				<Button
+					variant="ghost"
+					onclick={() => {
+						showShotDialog = false;
+						resetShotForm();
+					}}>Cancel</Button
+				>
 				{#if !editingShotId}
 					<Button variant="ghost" disabled={!!shotDateError} onclick={handleSaveShotAndNext}>Save & Next</Button>
 				{/if}
@@ -1073,7 +1144,9 @@
 		message="Permanently delete this shot? This cannot be undone."
 		confirmLabel="Delete Shot"
 		onconfirm={confirmDeleteShot}
-		oncancel={() => { deletingShotId = null; }}
+		oncancel={() => {
+			deletingShotId = null;
+		}}
 	/>
 {/if}
 
@@ -1085,8 +1158,13 @@
 		message={`Move status back to ${statusConfig[pendingStatus].label}? This will revert progress.`}
 		confirmLabel="Move Back"
 		variant="primary"
-		onconfirm={() => { updateStatus(pendingStatus!); pendingStatus = null; }}
-		oncancel={() => { pendingStatus = null; }}
+		onconfirm={() => {
+			updateStatus(pendingStatus!);
+			pendingStatus = null;
+		}}
+		oncancel={() => {
+			pendingStatus = null;
+		}}
 	/>
 {/if}
 

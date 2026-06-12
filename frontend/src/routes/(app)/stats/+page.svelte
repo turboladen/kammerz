@@ -10,9 +10,7 @@
 	let error = $state('');
 
 	// Derived max values for bar scaling
-	const maxMonthCount = $derived(
-		stats ? Math.max(...stats.rolls_per_month.map((m) => m.count), 1) : 1
-	);
+	const maxMonthCount = $derived(stats ? Math.max(...stats.rolls_per_month.map((m) => m.count), 1) : 1);
 
 	function formatCurrency(amount: number): string {
 		return amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -159,7 +157,8 @@
 											<span class="font-mono text-xs text-text-faint">{i + 1}.</span>
 											{item.label}
 										</span>
-										<span class="rounded-full bg-accent/15 px-2 py-0.5 font-mono text-xs text-accent">{item.count}</span>
+										<span class="rounded-full bg-accent/15 px-2 py-0.5 font-mono text-xs text-accent">{item.count}</span
+										>
 									</div>
 								{/each}
 							</div>
@@ -182,7 +181,8 @@
 											<span class="font-mono text-xs text-text-faint">{i + 1}.</span>
 											{item.label}
 										</span>
-										<span class="rounded-full bg-accent/15 px-2 py-0.5 font-mono text-xs text-accent">{item.count}</span>
+										<span class="rounded-full bg-accent/15 px-2 py-0.5 font-mono text-xs text-accent">{item.count}</span
+										>
 									</div>
 								{/each}
 							</div>
@@ -205,7 +205,8 @@
 											<span class="font-mono text-xs text-text-faint">{i + 1}.</span>
 											{item.label}
 										</span>
-										<span class="rounded-full bg-accent/15 px-2 py-0.5 font-mono text-xs text-accent">{item.count}</span>
+										<span class="rounded-full bg-accent/15 px-2 py-0.5 font-mono text-xs text-accent">{item.count}</span
+										>
 									</div>
 								{/each}
 							</div>
@@ -284,11 +285,15 @@
 							<div class="space-y-2">
 								{#each stats.rolls_by_status as item}
 									<div class="flex items-center gap-3">
-										<span class="w-20 text-right text-xs text-text-muted">{isRollStatus(item.label) ? getStatusLabel(item.label) : item.label}</span>
+										<span class="w-20 text-right text-xs text-text-muted"
+											>{isRollStatus(item.label) ? getStatusLabel(item.label) : item.label}</span
+										>
 										<div class="flex-1">
 											<div
 												class="h-5 rounded-r transition-all duration-300"
-												style="width: {(item.count / maxStatus) * 100}%; background-color: {getStatusColorSafe(item.label)}"
+												style="width: {(item.count / maxStatus) * 100}%; background-color: {getStatusColorSafe(
+													item.label
+												)}"
 											></div>
 										</div>
 										<span class="w-8 font-mono text-xs text-text-faint">{item.count}</span>

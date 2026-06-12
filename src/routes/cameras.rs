@@ -104,14 +104,18 @@ pub fn router() -> Router<AppState> {
         .route("/distinct/maint-providers", get(distinct_maint_providers))
         .route("/{id}", get(get_one).put(update).delete(delete_one))
         .route("/{id}/lenses", get(lenses_for_camera))
-        .route("/{id}/lenses/{lens_id}", post(link_lens).delete(unlink_lens))
+        .route(
+            "/{id}/lenses/{lens_id}",
+            post(link_lens).delete(unlink_lens),
+        )
         .route("/{id}/maintenance", get(list_maintenance))
 }
 
 pub fn maintenance_router() -> Router<AppState> {
-    Router::new()
-        .route("/", post(create_maintenance))
-        .route("/{id}", axum::routing::put(update_maintenance).delete(delete_maintenance))
+    Router::new().route("/", post(create_maintenance)).route(
+        "/{id}",
+        axum::routing::put(update_maintenance).delete(delete_maintenance),
+    )
 }
 
 // --- Camera handlers ---
@@ -169,7 +173,9 @@ async fn update(
     Path(id): Path<i32>,
     Json(data): Json<UpdateCameraDto>,
 ) -> AppResult<StatusCode> {
-    let existing = CameraService::get_by_id(&db, id).await?.or_404("Camera", id)?;
+    let existing = CameraService::get_by_id(&db, id)
+        .await?
+        .or_404("Camera", id)?;
     if let Some(v) = &data.date_purchased {
         validate_date_opt("date_purchased", v)?;
     }

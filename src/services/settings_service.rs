@@ -5,10 +5,7 @@ use ::entity::setting::{self, Entity as Setting};
 pub struct SettingsService;
 
 impl SettingsService {
-    pub async fn get_setting(
-        db: &DatabaseConnection,
-        key: &str,
-    ) -> Result<Option<String>, DbErr> {
+    pub async fn get_setting(db: &DatabaseConnection, key: &str) -> Result<Option<String>, DbErr> {
         Ok(Setting::find_by_id(key).one(db).await?.map(|s| s.value))
     }
 

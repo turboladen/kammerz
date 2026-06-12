@@ -109,14 +109,7 @@ export const selfFlow: RollStatus[] = [
 ];
 
 /** Undecided path (no dev record): shows shared prefix + suffix with a visual gap. */
-export const undecidedFlow: RollStatus[] = [
-	'loaded',
-	'shooting',
-	'shot',
-	'scanned',
-	'post-processed',
-	'archived'
-];
+export const undecidedFlow: RollStatus[] = ['loaded', 'shooting', 'shot', 'scanned', 'post-processed', 'archived'];
 
 /**
  * Combined sort order — includes ALL statuses for cross-roll sorting contexts
@@ -154,11 +147,7 @@ export type DevPath = 'lab' | 'self' | 'undecided';
  * 2. Current status belongs to a specific path → that path (orphaned edge case)
  * 3. Otherwise → undecided
  */
-export function getDevPath(
-	status: RollStatus,
-	hasLabDev: boolean,
-	hasSelfDev: boolean
-): DevPath {
+export function getDevPath(status: RollStatus, hasLabDev: boolean, hasSelfDev: boolean): DevPath {
 	if (hasLabDev) return 'lab';
 	if (hasSelfDev) return 'self';
 	// No dev record yet — fall back to the status's intrinsic dev kind (orphaned edge case).

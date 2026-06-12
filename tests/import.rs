@@ -97,12 +97,7 @@ async fn import_roll_persists_roll_shots_and_lens_links() {
     let pairs = detail["shot_lens_pairs"].as_array().expect("pairs array");
     let pairs: Vec<(i32, i32)> = pairs
         .iter()
-        .map(|p| {
-            (
-                p[0].as_i64().unwrap() as i32,
-                p[1].as_i64().unwrap() as i32,
-            )
-        })
+        .map(|p| (p[0].as_i64().unwrap() as i32, p[1].as_i64().unwrap() as i32))
         .collect();
     assert_eq!(
         pairs,

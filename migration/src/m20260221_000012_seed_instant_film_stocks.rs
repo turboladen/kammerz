@@ -45,8 +45,9 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
 
         db.execute_unprepared(
-            "DELETE FROM film_stocks WHERE brand = 'Polaroid' AND format = 'instant'"
-        ).await?;
+            "DELETE FROM film_stocks WHERE brand = 'Polaroid' AND format = 'instant'",
+        )
+        .await?;
 
         Ok(())
     }

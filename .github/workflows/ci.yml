@@ -22,6 +22,28 @@ env:
   BUN_VERSION: "1.3.14"
 
 jobs:
+  # Format gate: dprint (Markdown/JSON/TOML/YAML per dprint.jsonc), Prettier
+  # (frontend Svelte/TS/CSS per frontend/.prettierrc), rustfmt (Rust).
+  # Mirror locally with `just fmt-check`; fix with `just fmt`.
+  format:
+    name: format (dprint + prettier + rustfmt)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dprint/check@v2.3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install
+        working-directory: frontend
+      - run: bun run format:check
+        working-directory: frontend
+
   # Backend gate: cargo build + test. Compiles against the empty
   # frontend/build embed (the committed .gitkeep satisfies rust-embed's
   # #[folder]) — the SPA is never served in tests, so no frontend build here.

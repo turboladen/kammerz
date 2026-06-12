@@ -145,10 +145,8 @@ impl MigrationTrait for Migration {
         .await?;
 
         // Revert camera
-        db.execute_unprepared(
-            "DELETE FROM cameras WHERE brand = 'Mamiya' AND model = 'DSX 1000'",
-        )
-        .await?;
+        db.execute_unprepared("DELETE FROM cameras WHERE brand = 'Mamiya' AND model = 'DSX 1000'")
+            .await?;
 
         // Revert Mamiya 90mm K/L aperture fix
         db.execute_unprepared(

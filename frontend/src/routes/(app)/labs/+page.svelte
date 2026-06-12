@@ -108,7 +108,13 @@
 </script>
 
 <PageHeader title="Labs" description="Development labs you use">
-	<Button variant="primary" onclick={() => { resetForm(); showAddDialog = true; }}>+ Add Lab</Button>
+	<Button
+		variant="primary"
+		onclick={() => {
+			resetForm();
+			showAddDialog = true;
+		}}>+ Add Lab</Button
+	>
 </PageHeader>
 
 <div class="p-6">
@@ -126,7 +132,9 @@
 	{:else}
 		<div class="grid gap-3">
 			{#each labs as lab}
-				<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px">
+				<div
+					class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+				>
 					<div>
 						<span class="font-semibold">{lab.name}</span>
 						<div class="mt-1 flex gap-3 text-xs text-text-muted">
@@ -141,7 +149,9 @@
 							<p class="mt-1 text-sm text-text-muted">{lab.notes}</p>
 						{/if}
 					</div>
-					<div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
+					<div
+						class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
+					>
 						<Button size="sm" variant="ghost" onclick={() => startEdit(lab)}>Edit</Button>
 						<Button size="sm" variant="ghost" onclick={() => handleDelete(lab)}>&times;</Button>
 					</div>
@@ -168,7 +178,14 @@
 </Dialog>
 
 {#if editingLab}
-	<Dialog open={true} title="Edit Lab" onclose={() => { editingLab = null; resetForm(); }}>
+	<Dialog
+		open={true}
+		title="Edit Lab"
+		onclose={() => {
+			editingLab = null;
+			resetForm();
+		}}
+	>
 		<div class="space-y-4">
 			<Input label="Lab Name" bind:value={name} />
 			<Input label="Location" bind:value={location} />
@@ -178,7 +195,13 @@
 				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 			{/if}
 			<div class="flex justify-end gap-2 pt-2">
-				<Button variant="ghost" onclick={() => { editingLab = null; resetForm(); }}>Cancel</Button>
+				<Button
+					variant="ghost"
+					onclick={() => {
+						editingLab = null;
+						resetForm();
+					}}>Cancel</Button
+				>
 				<Button variant="primary" onclick={handleEdit}>Save</Button>
 			</div>
 		</div>
@@ -192,6 +215,8 @@
 		message={`Permanently delete ${deletingLab.name}?`}
 		confirmLabel="Delete Lab"
 		onconfirm={confirmDelete}
-		oncancel={() => { deletingLab = null; }}
+		oncancel={() => {
+			deletingLab = null;
+		}}
 	/>
 {/if}

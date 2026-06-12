@@ -2,8 +2,7 @@ import type { Lens, LensMount } from '$lib/types';
 import { buildDisambiguatedLabels } from './disambiguate';
 
 /** Minimal shape needed to render a lens display name — satisfied by both Lens and LensSearchResult. */
-export type LensNameParts = Pick<Lens, 'brand' | 'model'> &
-	Partial<Pick<Lens, 'focal_length' | 'max_aperture'>>;
+export type LensNameParts = Pick<Lens, 'brand' | 'model'> & Partial<Pick<Lens, 'focal_length' | 'max_aperture'>>;
 
 export function lensDisplayName(lens: LensNameParts): string {
 	if (lens.model) {
@@ -20,10 +19,7 @@ export function lensDisplayName(lens: LensNameParts): string {
 /** Returns true if the mount name belongs to the large format family. */
 export function isLargeFormatMount(name: string): boolean {
 	return (
-		name.startsWith('Copal') ||
-		name.startsWith('Compur') ||
-		name.startsWith('Barrel') ||
-		name.includes('Large Format')
+		name.startsWith('Copal') || name.startsWith('Compur') || name.startsWith('Barrel') || name.includes('Large Format')
 	);
 }
 
@@ -34,11 +30,7 @@ function buildLfFamilyIds(mounts: LensMount[]): Set<number> {
 
 /** Returns true if the mount name belongs to the medium format family. */
 function isMediumFormatMount(name: string): boolean {
-	return (
-		name.includes('Pentax 67') ||
-		name.includes('Hasselblad') ||
-		name.includes('Mamiya')
-	);
+	return name.includes('Pentax 67') || name.includes('Hasselblad') || name.includes('Mamiya');
 }
 
 type SelectOption = { value: string; label: string; disabled?: boolean };
@@ -49,10 +41,7 @@ function isFixedLensMount(name: string): boolean {
 }
 
 /** Build mount dropdown options grouped by format: 35mm, Medium Format, Large Format, Other. */
-export function buildMountOptions(
-	mounts: LensMount[],
-	emptyLabel = 'Select mount...'
-): SelectOption[] {
+export function buildMountOptions(mounts: LensMount[], emptyLabel = 'Select mount...'): SelectOption[] {
 	const groups: { label: string; mounts: LensMount[] }[] = [
 		{ label: '35mm', mounts: [] },
 		{ label: 'Medium Format', mounts: [] },
@@ -98,17 +87,14 @@ export function buildLensOptions(
 	const owned = allLenses.filter((l) => !l.date_sold);
 	const labels = buildLensLabels(owned);
 	const getLabel = (l: Lens) => labels.get(l.id) ?? lensDisplayName(l);
-	const options: { value: string; label: string; disabled?: boolean }[] = [
-		{ value: '', label: emptyLabel }
-	];
+	const options: { value: string; label: string; disabled?: boolean }[] = [{ value: '', label: emptyLabel }];
 
 	if (selectedCamera?.lens_mount_id) {
 		const lfFamily = buildLfFamilyIds(lensMounts);
 		const cameraIsLf = lfFamily.has(selectedCamera.lens_mount_id);
 
 		const isCompatible = (lens: Lens) =>
-			lens.lens_mount_id === selectedCamera.lens_mount_id ||
-			(cameraIsLf && lfFamily.has(lens.lens_mount_id));
+			lens.lens_mount_id === selectedCamera.lens_mount_id || (cameraIsLf && lfFamily.has(lens.lens_mount_id));
 
 		const matching = owned.filter(isCompatible);
 		const rest = owned.filter((l) => !isCompatible(l));

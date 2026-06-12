@@ -13,7 +13,13 @@
 	import { dateFieldError } from '$lib/utils/date';
 	import GroupHeader from '$lib/components/ui/GroupHeader.svelte';
 	import { Camera as CameraIcon } from 'lucide-svelte';
-	import { listCameras, createCamera, createCameraWithLens, listDistinctCameraBrands, listDistinctVendors } from '$lib/api/cameras';
+	import {
+		listCameras,
+		createCamera,
+		createCameraWithLens,
+		listDistinctCameraBrands,
+		listDistinctVendors
+	} from '$lib/api/cameras';
 	import { listDistinctLensBrands } from '$lib/api/lenses';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { buildMountOptions } from '$lib/utils/lens';
@@ -36,9 +42,7 @@
 	let brandOptions: string[] = $state([]);
 	let vendorOptions: string[] = $state([]);
 
-	const mountNameById = $derived(
-		Object.fromEntries(lensMounts.map((m) => [m.id, m.name]))
-	);
+	const mountNameById = $derived(Object.fromEntries(lensMounts.map((m) => [m.id, m.name])));
 
 	// Pipeline: ownership filter → search → sort → group
 	const afterOwnerFilter = $derived(
@@ -57,12 +61,18 @@
 
 	const afterSort = $derived.by(() => {
 		switch (sortBy) {
-			case 'brand-desc': return sortByString(afterSearch, (c) => `${c.brand} ${c.model}`, 'desc');
-			case 'date-purchased-desc': return sortByDate(afterSearch, (c) => c.date_purchased, 'desc');
-			case 'date-purchased-asc': return sortByDate(afterSearch, (c) => c.date_purchased, 'asc');
-			case 'date-added-desc': return sortByDate(afterSearch, (c) => c.created_at, 'desc');
-			case 'format-asc': return sortByString(afterSearch, (c) => c.format, 'asc');
-			default: return sortByString(afterSearch, (c) => `${c.brand} ${c.model}`, 'asc');
+			case 'brand-desc':
+				return sortByString(afterSearch, (c) => `${c.brand} ${c.model}`, 'desc');
+			case 'date-purchased-desc':
+				return sortByDate(afterSearch, (c) => c.date_purchased, 'desc');
+			case 'date-purchased-asc':
+				return sortByDate(afterSearch, (c) => c.date_purchased, 'asc');
+			case 'date-added-desc':
+				return sortByDate(afterSearch, (c) => c.created_at, 'desc');
+			case 'format-asc':
+				return sortByString(afterSearch, (c) => c.format, 'asc');
+			default:
+				return sortByString(afterSearch, (c) => `${c.brand} ${c.model}`, 'asc');
 		}
 	});
 
@@ -113,9 +123,7 @@
 	let lensMaxAperture = $state('');
 
 	const isFixedLens = $derived(
-		lensMountId
-			? lensMounts.find((m) => m.id === Number(lensMountId))?.name === 'Fixed Lens'
-			: false
+		lensMountId ? lensMounts.find((m) => m.id === Number(lensMountId))?.name === 'Fixed Lens' : false
 	);
 
 	const formatOptions = [
@@ -185,10 +193,22 @@
 
 	async function handleAdd() {
 		error = '';
-		if (!brand.trim()) { error = 'Brand is required.'; return; }
-		if (!model.trim()) { error = 'Model is required.'; return; }
-		if (!lensMountId) { error = 'Lens mount is required.'; return; }
-		if (isFixedLens && !lensFocalLength.trim()) { error = 'Focal length is required for fixed-lens cameras.'; return; }
+		if (!brand.trim()) {
+			error = 'Brand is required.';
+			return;
+		}
+		if (!model.trim()) {
+			error = 'Model is required.';
+			return;
+		}
+		if (!lensMountId) {
+			error = 'Lens mount is required.';
+			return;
+		}
+		if (isFixedLens && !lensFocalLength.trim()) {
+			error = 'Focal length is required for fixed-lens cameras.';
+			return;
+		}
 		try {
 			const camera: CameraInsert = {
 				brand,
@@ -251,21 +271,15 @@
 	/>
 
 	<div class="mb-4 flex gap-2">
-		<Button
-			variant={filterOwned === 'all' ? 'primary' : 'ghost'}
-			size="sm"
-			onclick={() => (filterOwned = 'all')}
-		>All</Button>
-		<Button
-			variant={filterOwned === 'owned' ? 'primary' : 'ghost'}
-			size="sm"
-			onclick={() => (filterOwned = 'owned')}
-		>Owned</Button>
-		<Button
-			variant={filterOwned === 'sold' ? 'primary' : 'ghost'}
-			size="sm"
-			onclick={() => (filterOwned = 'sold')}
-		>Sold</Button>
+		<Button variant={filterOwned === 'all' ? 'primary' : 'ghost'} size="sm" onclick={() => (filterOwned = 'all')}
+			>All</Button
+		>
+		<Button variant={filterOwned === 'owned' ? 'primary' : 'ghost'} size="sm" onclick={() => (filterOwned = 'owned')}
+			>Owned</Button
+		>
+		<Button variant={filterOwned === 'sold' ? 'primary' : 'ghost'} size="sm" onclick={() => (filterOwned = 'sold')}
+			>Sold</Button
+		>
 	</div>
 
 	{#if loading}
@@ -292,7 +306,9 @@
 							<div class="flex items-center gap-2">
 								<span class="text-sm font-semibold leading-snug">{camera.brand} {camera.model}</span>
 								{#if camera.prefix}
-									<span class="shrink-0 rounded bg-surface-overlay px-1.5 py-0.5 font-mono text-[10px] text-text-muted">{camera.prefix}</span>
+									<span class="shrink-0 rounded bg-surface-overlay px-1.5 py-0.5 font-mono text-[10px] text-text-muted"
+										>{camera.prefix}</span
+									>
 								{/if}
 							</div>
 							<div class="mt-1 text-xs text-text-muted">
@@ -341,7 +357,12 @@
 					<div class="flex-1 border-b border-border-subtle"></div>
 				</h3>
 				<div class="space-y-4">
-					<Input label="Model" bind:value={lensModel} placeholder="Rokkor 75mm f/3.5" hint="Brand, mount, and purchase info will match the camera" />
+					<Input
+						label="Model"
+						bind:value={lensModel}
+						placeholder="Rokkor 75mm f/3.5"
+						hint="Brand, mount, and purchase info will match the camera"
+					/>
 					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<Input label="Focal Length (mm)" bind:value={lensFocalLength} placeholder="75" />
 						<Input label="Max Aperture (f/)" bind:value={lensMaxAperture} placeholder="3.5" />
@@ -355,7 +376,12 @@
 		</div>
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<DateInput label="Date Purchased" bind:value={datePurchased} />
-			<ComboInput label="Purchased From" bind:value={purchasedFrom} placeholder="eBay, KEH, etc." options={vendorOptions} />
+			<ComboInput
+				label="Purchased From"
+				bind:value={purchasedFrom}
+				placeholder="eBay, KEH, etc."
+				options={vendorOptions}
+			/>
 		</div>
 		<DateInput label="Date Sold" bind:value={dateSold} hint="Leave empty if you still own it" />
 		<Textarea label="Notes" bind:value={notes} placeholder="Any notes about this camera..." />
@@ -363,7 +389,13 @@
 			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 		{/if}
 		<div class="flex justify-end gap-2 pt-2">
-			<Button variant="ghost" onclick={() => { showAddDialog = false; resetForm(); }}>Cancel</Button>
+			<Button
+				variant="ghost"
+				onclick={() => {
+					showAddDialog = false;
+					resetForm();
+				}}>Cancel</Button
+			>
 			<Button variant="primary" disabled={!!addDateError} onclick={handleAdd}>Add Camera</Button>
 		</div>
 	</div>

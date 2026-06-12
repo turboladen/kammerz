@@ -14,9 +14,7 @@
 	let inputEl: HTMLInputElement | undefined = $state();
 
 	const filtered = $derived(
-		value
-			? options.filter((o) => o.toLowerCase().includes(value.toLowerCase()) && o !== value)
-			: options
+		value ? options.filter((o) => o.toLowerCase().includes(value.toLowerCase()) && o !== value) : options
 	);
 
 	function handleFocus() {
@@ -91,7 +89,9 @@
 			transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 	/>
 	{#if showDropdown && filtered.length > 0}
-		<div class="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-surface-raised shadow-xl">
+		<div
+			class="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-surface-raised shadow-xl"
+		>
 			{#each filtered as option, i}
 				<button
 					type="button"

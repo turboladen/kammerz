@@ -266,7 +266,9 @@ async fn lenses_for_roll_shots(
     State(db): State<DatabaseConnection>,
     Path(roll_id): Path<i32>,
 ) -> AppResult<Json<Vec<(i32, i32)>>> {
-    Ok(Json(ShotService::get_lenses_for_roll_shots(&db, roll_id).await?))
+    Ok(Json(
+        ShotService::get_lenses_for_roll_shots(&db, roll_id).await?,
+    ))
 }
 
 async fn suggest_next_frame(

@@ -4,7 +4,7 @@
 **Status:** Implemented (see revision below)
 
 > **Revision 2026-06-03 — palette pivoted to graphite/silver.** Real-app review
-> showed the original plan's decision to *keep the warm-brown surfaces* was the
+> showed the original plan's decision to _keep the warm-brown surfaces_ was the
 > core problem: the brown wash overwhelmed text and the status chevron bar stayed
 > brown-on-brown. The implemented theme instead re-bases to a **near-neutral
 > graphite/black** surface (`#0d0d0c` / `#161615` / `#211f1e`) with **brushed-silver
@@ -84,11 +84,11 @@ palette. The danger change touches two shared components.
 
 In `app.css` `@theme`:
 
-| token | current | new | approx contrast on `#151210` |
-| --- | --- | --- | --- |
-| `--color-text` | `#e8e2d9` | `#ece6dd` | ~15:1 |
-| `--color-text-muted` | `#a09488` | `#bcb0a0` | ~8.8:1 |
-| `--color-text-faint` | `#6d6258` | `#9d9384` | ~6.2:1 |
+| token                | current   | new       | approx contrast on `#151210` |
+| -------------------- | --------- | --------- | ---------------------------- |
+| `--color-text`       | `#e8e2d9` | `#ece6dd` | ~15:1                        |
+| `--color-text-muted` | `#a09488` | `#bcb0a0` | ~8.8:1                       |
+| `--color-text-faint` | `#6d6258` | `#9d9384` | ~6.2:1                       |
 
 Surfaces, borders, accent, fonts, and the grain texture are unchanged.
 
@@ -98,19 +98,20 @@ Grouped by lifecycle phase — **blue → amber → neutral** — with lightness
 separating statuses within a phase. The exact status is always also spelled out
 in its text label.
 
-| status | current | new |
-| --- | --- | --- |
-| loaded | `#6ca4d4` | `#6fbcff` |
-| shooting | `#5cb88a` | `#93c4ec` |
-| shot | `#a38bc7` | `#afb3ea` |
-| at-lab | `#d4a84e` | `#e3a347` |
-| lab-done | `#d4c24e` | `#f0cf57` |
+| status     | current   | new       |
+| ---------- | --------- | --------- |
+| loaded     | `#6ca4d4` | `#6fbcff` |
+| shooting   | `#5cb88a` | `#93c4ec` |
+| shot       | `#a38bc7` | `#afb3ea` |
+| at-lab     | `#d4a84e` | `#e3a347` |
+| lab-done   | `#d4c24e` | `#f0cf57` |
 | developing | `#c87a42` | `#dd8b44` |
-| developed | `#b384c7` | `#ecc185` |
-| scanned | `#5aaf9e` | `#a8cdd8` |
-| archived | `#7a726a` | `#b3a99c` |
+| developed  | `#b384c7` | `#ecc185` |
+| scanned    | `#5aaf9e` | `#a8cdd8` |
+| archived   | `#7a726a` | `#b3a99c` |
 
 Notes:
+
 - Shooting phase = cool blues (loaded vivid azure, shooting paler blue, shot
   blue-violet).
 - Development phase = warm ambers (lab path `at-lab`/`lab-done`; self path

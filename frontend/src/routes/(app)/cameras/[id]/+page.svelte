@@ -11,14 +11,37 @@
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import ComboInput from '$lib/components/ui/ComboInput.svelte';
-	import { getCamera, updateCamera, deleteCamera, listMaintenanceForCamera, createMaintenance, deleteMaintenance, listDistinctCameraBrands, listDistinctVendors, listDistinctMaintProviders, getLensesForCamera, linkLensToCamera, unlinkLensFromCamera } from '$lib/api/cameras';
+	import {
+		getCamera,
+		updateCamera,
+		deleteCamera,
+		listMaintenanceForCamera,
+		createMaintenance,
+		deleteMaintenance,
+		listDistinctCameraBrands,
+		listDistinctVendors,
+		listDistinctMaintProviders,
+		getLensesForCamera,
+		linkLensToCamera,
+		unlinkLensFromCamera
+	} from '$lib/api/cameras';
 	import { listDistinctLensBrands, listLenses } from '$lib/api/lenses';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { listRollsForCamera } from '$lib/api/rolls';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import { lensDisplayName, buildMountOptions } from '$lib/utils/lens';
 	import { dateFieldError } from '$lib/utils/date';
-	import type { Camera, CameraFormat, CameraType, MaintenanceType, CameraMaintenance, CameraMaintenanceInsert, Lens, LensMount, RollWithDetails } from '$lib/types';
+	import type {
+		Camera,
+		CameraFormat,
+		CameraType,
+		MaintenanceType,
+		CameraMaintenance,
+		CameraMaintenanceInsert,
+		Lens,
+		LensMount,
+		RollWithDetails
+	} from '$lib/types';
 	import { Trash2 } from 'lucide-svelte';
 
 	const id = $derived(Number(page.params.id));
@@ -28,7 +51,11 @@
 		search: { href: '/search', label: 'Search' }
 	};
 	const cameraFromParam = $derived(page.url.searchParams.get('from'));
-	const cameraBackNav = $derived(cameraFromParam && cameraBackRoutes[cameraFromParam] ? cameraBackRoutes[cameraFromParam] : { href: '/cameras', label: 'Cameras' });
+	const cameraBackNav = $derived(
+		cameraFromParam && cameraBackRoutes[cameraFromParam]
+			? cameraBackRoutes[cameraFromParam]
+			: { href: '/cameras', label: 'Cameras' }
+	);
 
 	let camera: Camera | undefined = $state();
 	let maintenance: CameraMaintenance[] = $state([]);
@@ -74,22 +101,16 @@
 
 	const lensMountOptions = $derived(buildMountOptions(lensMounts));
 
-	const mountNameById = $derived(
-		Object.fromEntries(lensMounts.map((m) => [m.id, m.name]))
-	);
+	const mountNameById = $derived(Object.fromEntries(lensMounts.map((m) => [m.id, m.name])));
 
-	const isFixedLens = $derived(
-		camera ? mountNameById[camera.lens_mount_id] === 'Fixed Lens' : false
-	);
+	const isFixedLens = $derived(camera ? mountNameById[camera.lens_mount_id] === 'Fixed Lens' : false);
 
 	const linkedLenses = $derived(allLenses.filter((l) => linkedLensIds.includes(l.id)));
 	const unlinkedLenses = $derived(allLenses.filter((l) => !linkedLensIds.includes(l.id) && !l.date_sold));
 	const linkLensOptions = $derived.by(() => {
 		const compatible = unlinkedLenses.filter((l) => l.lens_mount_id === camera?.lens_mount_id);
 		const rest = unlinkedLenses.filter((l) => l.lens_mount_id !== camera?.lens_mount_id);
-		const options: { value: string; label: string; disabled?: boolean }[] = [
-			{ value: '', label: 'Select a lens...' }
-		];
+		const options: { value: string; label: string; disabled?: boolean }[] = [{ value: '', label: 'Select a lens...' }];
 		for (const l of compatible) options.push({ value: String(l.id), label: lensDisplayName(l) });
 		if (compatible.length > 0 && rest.length > 0) {
 			options.push({ value: '__divider__', label: '── Other mounts ──', disabled: true });
@@ -151,18 +172,19 @@
 
 	async function load() {
 		try {
-			const [cam, maint, r, lenses, camLensIds, camBrands, lensBrands, vendors, maintProviders, mounts] = await Promise.all([
-				getCamera(id),
-				listMaintenanceForCamera(id),
-				listRollsForCamera(id),
-				listLenses(),
-				getLensesForCamera(id),
-				listDistinctCameraBrands(),
-				listDistinctLensBrands(),
-				listDistinctVendors(),
-				listDistinctMaintProviders(),
-				listLensMounts()
-			]);
+			const [cam, maint, r, lenses, camLensIds, camBrands, lensBrands, vendors, maintProviders, mounts] =
+				await Promise.all([
+					getCamera(id),
+					listMaintenanceForCamera(id),
+					listRollsForCamera(id),
+					listLenses(),
+					getLensesForCamera(id),
+					listDistinctCameraBrands(),
+					listDistinctLensBrands(),
+					listDistinctVendors(),
+					listDistinctMaintProviders(),
+					listLensMounts()
+				]);
 			camera = cam ?? undefined;
 			maintenance = maint;
 			rolls = r;
@@ -382,7 +404,9 @@
 {:else}
 	<PageHeader title="{camera.brand} {camera.model}" backHref={cameraBackNav.href} backLabel={cameraBackNav.label}>
 		<Button variant="ghost" onclick={startEditing}>Edit</Button>
-		<Button variant="danger" onclick={handleDelete}><Trash2 size={16} strokeWidth={2} aria-hidden="true" />Delete</Button>
+		<Button variant="danger" onclick={handleDelete}
+			><Trash2 size={16} strokeWidth={2} aria-hidden="true" />Delete</Button
+		>
 	</PageHeader>
 
 	<div class="p-6">
@@ -392,183 +416,205 @@
 
 		<!-- Camera Details -->
 		<FadeIn delay={0}>
-		<div class="mb-8 grid grid-cols-1 gap-x-8 gap-y-3 rounded-lg border border-border bg-surface-raised p-5 sm:grid-cols-2">
-			<div>
-				<span class="text-xs text-text-muted">Format</span>
-				<p class="text-sm">{camera.format}</p>
+			<div
+				class="mb-8 grid grid-cols-1 gap-x-8 gap-y-3 rounded-lg border border-border bg-surface-raised p-5 sm:grid-cols-2"
+			>
+				<div>
+					<span class="text-xs text-text-muted">Format</span>
+					<p class="text-sm">{camera.format}</p>
+				</div>
+				<div>
+					<span class="text-xs text-text-muted">Lens Mount</span>
+					<p class="text-sm">{mountNameById[camera.lens_mount_id] ?? '—'}</p>
+				</div>
+				{#if defaultLensDisplay}
+					<div>
+						<span class="text-xs text-text-muted">Default Lens</span>
+						<p class="text-sm">{defaultLensDisplay}</p>
+					</div>
+				{/if}
+				{#if camera.camera_type}
+					<div>
+						<span class="text-xs text-text-muted">Type</span>
+						<p class="text-sm">{camera.camera_type}</p>
+					</div>
+				{/if}
+				{#if camera.prefix}
+					<div>
+						<span class="text-xs text-text-muted">Prefix</span>
+						<p class="font-mono text-sm">{camera.prefix}</p>
+					</div>
+				{/if}
+				{#if camera.serial_number}
+					<div>
+						<span class="text-xs text-text-muted">Serial Number</span>
+						<p class="text-sm">{camera.serial_number}</p>
+					</div>
+				{/if}
+				{#if camera.date_purchased}
+					<div>
+						<span class="text-xs text-text-muted">Purchased</span>
+						<p class="text-sm">
+							{camera.date_purchased}{camera.purchased_from ? ` from ${camera.purchased_from}` : ''}
+						</p>
+					</div>
+				{/if}
+				{#if camera.date_sold}
+					<div>
+						<span class="text-xs text-text-muted">Sold</span>
+						<p class="text-sm">{camera.date_sold}</p>
+					</div>
+				{/if}
+				{#if camera.notes}
+					<div class="col-span-2">
+						<span class="text-xs text-text-muted">Notes</span>
+						<p class="text-sm whitespace-pre-wrap">{camera.notes}</p>
+					</div>
+				{/if}
 			</div>
-			<div>
-				<span class="text-xs text-text-muted">Lens Mount</span>
-				<p class="text-sm">{mountNameById[camera.lens_mount_id] ?? '—'}</p>
-			</div>
-			{#if defaultLensDisplay}
-				<div>
-					<span class="text-xs text-text-muted">Default Lens</span>
-					<p class="text-sm">{defaultLensDisplay}</p>
-				</div>
-			{/if}
-			{#if camera.camera_type}
-				<div>
-					<span class="text-xs text-text-muted">Type</span>
-					<p class="text-sm">{camera.camera_type}</p>
-				</div>
-			{/if}
-			{#if camera.prefix}
-				<div>
-					<span class="text-xs text-text-muted">Prefix</span>
-					<p class="font-mono text-sm">{camera.prefix}</p>
-				</div>
-			{/if}
-			{#if camera.serial_number}
-				<div>
-					<span class="text-xs text-text-muted">Serial Number</span>
-					<p class="text-sm">{camera.serial_number}</p>
-				</div>
-			{/if}
-			{#if camera.date_purchased}
-				<div>
-					<span class="text-xs text-text-muted">Purchased</span>
-					<p class="text-sm">{camera.date_purchased}{camera.purchased_from ? ` from ${camera.purchased_from}` : ''}</p>
-				</div>
-			{/if}
-			{#if camera.date_sold}
-				<div>
-					<span class="text-xs text-text-muted">Sold</span>
-					<p class="text-sm">{camera.date_sold}</p>
-				</div>
-			{/if}
-			{#if camera.notes}
-				<div class="col-span-2">
-					<span class="text-xs text-text-muted">Notes</span>
-					<p class="text-sm whitespace-pre-wrap">{camera.notes}</p>
-				</div>
-			{/if}
-		</div>
 		</FadeIn>
 
 		<!-- Maintenance History -->
 		<FadeIn delay={50}>
-		<div class="mb-8">
-			<div class="mb-3 flex items-center justify-between">
-				<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Maintenance History</h2>
-				<Button size="sm" onclick={() => (showMaintenanceDialog = true)}>+ Add Record</Button>
-			</div>
-			{#if maintenance.length === 0}
-				<p class="text-sm text-text-faint">No maintenance records yet.</p>
-			{:else}
-				<div class="space-y-2">
-					{#each maintenance as record}
-						<div class="flex items-start justify-between rounded-lg border border-border bg-surface-raised p-3">
-							<div>
-								<div class="flex items-center gap-2">
-									<span class="rounded bg-accent/15 px-1.5 py-0.5 text-xs font-medium text-accent">{record.maintenance_type}</span>
-									{#if record.date_done}
-										<span class="text-xs text-text-muted">{record.date_done}</span>
-									{/if}
-								</div>
-								{#if record.done_by}
-									<p class="mt-1 text-sm">Done by: {record.done_by}</p>
-								{/if}
-								{#if record.cost}
-									<p class="text-xs text-text-muted">${record.cost.toFixed(2)}</p>
-								{/if}
-								{#if record.notes}
-									<p class="mt-1 text-sm text-text-muted">{record.notes}</p>
-								{/if}
-							</div>
-							<Button size="sm" variant="ghost" onclick={() => removeMaintenance(record.id)}>&times;</Button>
-						</div>
-					{/each}
-				</div>
-			{/if}
-		</div>
-		</FadeIn>
-
-		<!-- Lenses -->
-		<FadeIn delay={100}>
-		{#if isFixedLens}
-			<div class="mb-8">
-				<h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-text-faint">Built-in Lens</h2>
-				{#if linkedLenses.length > 0}
-					{@const lens = linkedLenses[0]}
-					<div class="rounded-lg border border-border bg-surface-raised p-3">
-						<div class="flex items-center gap-2">
-							<span class="text-sm">{lensDisplayName(lens)}</span>
-							{#if lens.max_aperture}
-								<span class="text-xs text-text-faint">f/{lens.max_aperture}</span>
-							{/if}
-						</div>
-					</div>
-				{:else}
-					<p class="text-sm text-text-faint">No lens data recorded.</p>
-				{/if}
-			</div>
-		{:else}
 			<div class="mb-8">
 				<div class="mb-3 flex items-center justify-between">
-					<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Compatible Lenses</h2>
-					<Button size="sm" onclick={() => { linkLensId = ''; showLinkLensDialog = true; }}>+ Link Lens</Button>
+					<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Maintenance History</h2>
+					<Button size="sm" onclick={() => (showMaintenanceDialog = true)}>+ Add Record</Button>
 				</div>
-				{#if linkedLenses.length === 0}
-					<p class="text-sm text-text-faint">No lenses linked yet. Link your {mountNameById[camera.lens_mount_id] ?? ''} mount lenses to set a default for new rolls.</p>
+				{#if maintenance.length === 0}
+					<p class="text-sm text-text-faint">No maintenance records yet.</p>
 				{:else}
-					<div class="mb-3">
-						<Select
-							label="Default Lens"
-							bind:value={defaultLensId}
-							options={defaultLensOptions}
-							onchange={handleDefaultLensChange}
-						/>
-					</div>
 					<div class="space-y-2">
-						{#each linkedLenses as lens}
-							<div class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-3">
-								<div class="flex items-center gap-2">
-									<span class="text-sm">{lensDisplayName(lens)}</span>
-									{#if mountNameById[lens.lens_mount_id]}
-										<span class="text-xs text-text-faint">{mountNameById[lens.lens_mount_id]}</span>
+						{#each maintenance as record}
+							<div class="flex items-start justify-between rounded-lg border border-border bg-surface-raised p-3">
+								<div>
+									<div class="flex items-center gap-2">
+										<span class="rounded bg-accent/15 px-1.5 py-0.5 text-xs font-medium text-accent"
+											>{record.maintenance_type}</span
+										>
+										{#if record.date_done}
+											<span class="text-xs text-text-muted">{record.date_done}</span>
+										{/if}
+									</div>
+									{#if record.done_by}
+										<p class="mt-1 text-sm">Done by: {record.done_by}</p>
 									{/if}
-									{#if lens.date_sold}
-										<span class="rounded bg-red-500/15 px-1.5 py-0.5 text-xs text-red-400">Sold</span>
+									{#if record.cost}
+										<p class="text-xs text-text-muted">${record.cost.toFixed(2)}</p>
+									{/if}
+									{#if record.notes}
+										<p class="mt-1 text-sm text-text-muted">{record.notes}</p>
 									{/if}
 								</div>
-								<Button size="sm" variant="ghost" class="opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 pointer-coarse:opacity-100" onclick={() => handleUnlinkLens(lens.id)}>&times;</Button>
+								<Button size="sm" variant="ghost" onclick={() => removeMaintenance(record.id)}>&times;</Button>
 							</div>
 						{/each}
 					</div>
 				{/if}
 			</div>
-		{/if}
+		</FadeIn>
+
+		<!-- Lenses -->
+		<FadeIn delay={100}>
+			{#if isFixedLens}
+				<div class="mb-8">
+					<h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-text-faint">Built-in Lens</h2>
+					{#if linkedLenses.length > 0}
+						{@const lens = linkedLenses[0]}
+						<div class="rounded-lg border border-border bg-surface-raised p-3">
+							<div class="flex items-center gap-2">
+								<span class="text-sm">{lensDisplayName(lens)}</span>
+								{#if lens.max_aperture}
+									<span class="text-xs text-text-faint">f/{lens.max_aperture}</span>
+								{/if}
+							</div>
+						</div>
+					{:else}
+						<p class="text-sm text-text-faint">No lens data recorded.</p>
+					{/if}
+				</div>
+			{:else}
+				<div class="mb-8">
+					<div class="mb-3 flex items-center justify-between">
+						<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Compatible Lenses</h2>
+						<Button
+							size="sm"
+							onclick={() => {
+								linkLensId = '';
+								showLinkLensDialog = true;
+							}}>+ Link Lens</Button
+						>
+					</div>
+					{#if linkedLenses.length === 0}
+						<p class="text-sm text-text-faint">
+							No lenses linked yet. Link your {mountNameById[camera.lens_mount_id] ?? ''} mount lenses to set a default for
+							new rolls.
+						</p>
+					{:else}
+						<div class="mb-3">
+							<Select
+								label="Default Lens"
+								bind:value={defaultLensId}
+								options={defaultLensOptions}
+								onchange={handleDefaultLensChange}
+							/>
+						</div>
+						<div class="space-y-2">
+							{#each linkedLenses as lens}
+								<div
+									class="group flex items-center justify-between rounded-lg border border-border bg-surface-raised p-3"
+								>
+									<div class="flex items-center gap-2">
+										<span class="text-sm">{lensDisplayName(lens)}</span>
+										{#if mountNameById[lens.lens_mount_id]}
+											<span class="text-xs text-text-faint">{mountNameById[lens.lens_mount_id]}</span>
+										{/if}
+										{#if lens.date_sold}
+											<span class="rounded bg-red-500/15 px-1.5 py-0.5 text-xs text-red-400">Sold</span>
+										{/if}
+									</div>
+									<Button
+										size="sm"
+										variant="ghost"
+										class="opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 pointer-coarse:opacity-100"
+										onclick={() => handleUnlinkLens(lens.id)}>&times;</Button
+									>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/if}
 		</FadeIn>
 
 		<!-- Rolls shot with this camera -->
 		<FadeIn delay={150}>
-		<div>
-			<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
-				Rolls ({rolls.length})
-				<div class="flex-1 border-b border-border-subtle"></div>
-			</h2>
-			{#if rolls.length === 0}
-				<p class="text-sm text-text-faint">No rolls shot with this camera yet.</p>
-			{:else}
-				<div class="space-y-2">
-					{#each rolls as roll}
-						<a
-							href="/rolls/{roll.id}"
-							class="flex items-center justify-between rounded-lg border border-border bg-surface-raised p-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
-						>
-							<div class="flex items-center gap-3">
-								<span class="font-mono text-sm">{roll.roll_id}</span>
-								<Badge status={roll.status} />
-								{#if roll.film_stock_brand}
-									<span class="text-xs text-text-muted">{roll.film_stock_brand} {roll.film_stock_name}</span>
-								{/if}
-							</div>
-						</a>
-					{/each}
-				</div>
-			{/if}
-		</div>
+			<div>
+				<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+					Rolls ({rolls.length})
+					<div class="flex-1 border-b border-border-subtle"></div>
+				</h2>
+				{#if rolls.length === 0}
+					<p class="text-sm text-text-faint">No rolls shot with this camera yet.</p>
+				{:else}
+					<div class="space-y-2">
+						{#each rolls as roll}
+							<a
+								href="/rolls/{roll.id}"
+								class="flex items-center justify-between rounded-lg border border-border bg-surface-raised p-3 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+							>
+								<div class="flex items-center gap-3">
+									<span class="font-mono text-sm">{roll.roll_id}</span>
+									<Badge status={roll.status} />
+									{#if roll.film_stock_brand}
+										<span class="text-xs text-text-muted">{roll.film_stock_brand} {roll.film_stock_name}</span>
+									{/if}
+								</div>
+							</a>
+						{/each}
+					</div>
+				{/if}
+			</div>
 		</FadeIn>
 	</div>
 {/if}
@@ -577,7 +623,12 @@
 <Dialog bind:open={showMaintenanceDialog} title="Add Maintenance Record">
 	<div class="space-y-4">
 		<Select label="Type" bind:value={maintType} options={maintTypeOptions} />
-		<ComboInput label="Done By" bind:value={maintDoneBy} placeholder="Garry's Camera Repair" options={maintProviderOptions} />
+		<ComboInput
+			label="Done By"
+			bind:value={maintDoneBy}
+			placeholder="Garry's Camera Repair"
+			options={maintProviderOptions}
+		/>
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<DateInput label="Date" bind:value={maintDateDone} />
 			<Input label="Cost ($)" bind:value={maintCost} type="number" step="0.01" placeholder="0.00" />
@@ -594,7 +645,9 @@
 <ConfirmDialog
 	bind:open={showDeleteConfirm}
 	title="Delete Camera"
-	message={camera ? `Permanently delete ${camera.brand} ${camera.model}? This will also remove all maintenance records for this camera.` : ''}
+	message={camera
+		? `Permanently delete ${camera.brand} ${camera.model}? This will also remove all maintenance records for this camera.`
+		: ''}
 	confirmLabel="Delete Camera"
 	onconfirm={confirmDelete}
 	oncancel={() => {}}
@@ -625,6 +678,8 @@
 		message="Permanently delete this maintenance record?"
 		confirmLabel="Delete Record"
 		onconfirm={confirmRemoveMaintenance}
-		oncancel={() => { deletingMaintenanceId = null; }}
+		oncancel={() => {
+			deletingMaintenanceId = null;
+		}}
 	/>
 {/if}

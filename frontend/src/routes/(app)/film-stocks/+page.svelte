@@ -44,19 +44,23 @@
 	);
 
 	const afterSearch = $derived(
-		filterBySearch(afterTabFilter, searchQuery, (s) =>
-			[s.brand, s.name, s.format, s.stock_type].join(' ')
-		)
+		filterBySearch(afterTabFilter, searchQuery, (s) => [s.brand, s.name, s.format, s.stock_type].join(' '))
 	);
 
 	const afterSort = $derived.by(() => {
 		switch (sortBy) {
-			case 'brand-desc': return sortByString(afterSearch, (s) => `${s.brand} ${s.name}`, 'desc');
-			case 'iso-asc': return sortByNumber(afterSearch, (s) => s.iso, 'asc');
-			case 'iso-desc': return sortByNumber(afterSearch, (s) => s.iso, 'desc');
-			case 'date-added-desc': return sortByDate(afterSearch, (s) => s.created_at, 'desc');
-			case 'format-asc': return sortByString(afterSearch, (s) => s.format, 'asc');
-			default: return sortByString(afterSearch, (s) => `${s.brand} ${s.name}`, 'asc');
+			case 'brand-desc':
+				return sortByString(afterSearch, (s) => `${s.brand} ${s.name}`, 'desc');
+			case 'iso-asc':
+				return sortByNumber(afterSearch, (s) => s.iso, 'asc');
+			case 'iso-desc':
+				return sortByNumber(afterSearch, (s) => s.iso, 'desc');
+			case 'date-added-desc':
+				return sortByDate(afterSearch, (s) => s.created_at, 'desc');
+			case 'format-asc':
+				return sortByString(afterSearch, (s) => s.format, 'asc');
+			default:
+				return sortByString(afterSearch, (s) => `${s.brand} ${s.name}`, 'asc');
 		}
 	});
 
@@ -119,10 +123,7 @@
 
 	async function load() {
 		try {
-			const [s, brands] = await Promise.all([
-				listFilmStocks(),
-				listDistinctFilmBrands()
-			]);
+			const [s, brands] = await Promise.all([listFilmStocks(), listDistinctFilmBrands()]);
 			stocks = s;
 			filmBrandOptions = brands;
 		} catch (err) {
@@ -144,8 +145,14 @@
 
 	async function handleAdd() {
 		error = '';
-		if (!brand.trim()) { error = 'Brand is required.'; return; }
-		if (!name.trim()) { error = 'Name is required.'; return; }
+		if (!brand.trim()) {
+			error = 'Brand is required.';
+			return;
+		}
+		if (!name.trim()) {
+			error = 'Name is required.';
+			return;
+		}
 		try {
 			const stock: FilmStockInsert = {
 				brand,
@@ -213,17 +220,43 @@
 	<!-- Filters -->
 	<div class="mb-4 flex gap-4">
 		<div class="flex gap-2">
-			<Button size="sm" variant={filterType === 'all' ? 'primary' : 'ghost'} onclick={() => (filterType = 'all')}>All</Button>
-			<Button size="sm" variant={filterType === 'color-negative' ? 'primary' : 'ghost'} onclick={() => (filterType = 'color-negative')}>Color</Button>
-			<Button size="sm" variant={filterType === 'bw-negative' ? 'primary' : 'ghost'} onclick={() => (filterType = 'bw-negative')}>B&W</Button>
-			<Button size="sm" variant={filterType === 'color-slide' ? 'primary' : 'ghost'} onclick={() => (filterType = 'color-slide')}>Slide</Button>
+			<Button size="sm" variant={filterType === 'all' ? 'primary' : 'ghost'} onclick={() => (filterType = 'all')}
+				>All</Button
+			>
+			<Button
+				size="sm"
+				variant={filterType === 'color-negative' ? 'primary' : 'ghost'}
+				onclick={() => (filterType = 'color-negative')}>Color</Button
+			>
+			<Button
+				size="sm"
+				variant={filterType === 'bw-negative' ? 'primary' : 'ghost'}
+				onclick={() => (filterType = 'bw-negative')}>B&W</Button
+			>
+			<Button
+				size="sm"
+				variant={filterType === 'color-slide' ? 'primary' : 'ghost'}
+				onclick={() => (filterType = 'color-slide')}>Slide</Button
+			>
 		</div>
 		<div class="flex gap-2">
-			<Button size="sm" variant={filterFormat === 'all' ? 'primary' : 'ghost'} onclick={() => (filterFormat = 'all')}>All Formats</Button>
-			<Button size="sm" variant={filterFormat === '135' ? 'primary' : 'ghost'} onclick={() => (filterFormat = '135')}>35mm</Button>
-			<Button size="sm" variant={filterFormat === '120' ? 'primary' : 'ghost'} onclick={() => (filterFormat = '120')}>120</Button>
-			<Button size="sm" variant={filterFormat === '4x5' ? 'primary' : 'ghost'} onclick={() => (filterFormat = '4x5')}>4x5</Button>
-			<Button size="sm" variant={filterFormat === 'instant' ? 'primary' : 'ghost'} onclick={() => (filterFormat = 'instant')}>Instant</Button>
+			<Button size="sm" variant={filterFormat === 'all' ? 'primary' : 'ghost'} onclick={() => (filterFormat = 'all')}
+				>All Formats</Button
+			>
+			<Button size="sm" variant={filterFormat === '135' ? 'primary' : 'ghost'} onclick={() => (filterFormat = '135')}
+				>35mm</Button
+			>
+			<Button size="sm" variant={filterFormat === '120' ? 'primary' : 'ghost'} onclick={() => (filterFormat = '120')}
+				>120</Button
+			>
+			<Button size="sm" variant={filterFormat === '4x5' ? 'primary' : 'ghost'} onclick={() => (filterFormat = '4x5')}
+				>4x5</Button
+			>
+			<Button
+				size="sm"
+				variant={filterFormat === 'instant' ? 'primary' : 'ghost'}
+				onclick={() => (filterFormat = 'instant')}>Instant</Button
+			>
 		</div>
 	</div>
 
@@ -244,12 +277,16 @@
 			<div class="mb-4 grid gap-1.5">
 				{#each groupStocks as stock, i}
 					<FadeIn delay={Math.min(i, 10) * 30}>
-						<div class="group relative flex items-center justify-between overflow-hidden rounded-lg border border-border bg-surface-raised py-2.5 pl-5 pr-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px">
+						<div
+							class="group relative flex items-center justify-between overflow-hidden rounded-lg border border-border bg-surface-raised py-2.5 pl-5 pr-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+						>
 							<FilmStrip orientation="vertical" />
 							<div class="flex items-center gap-3">
 								<span class="text-sm font-semibold leading-snug">{stock.brand} {stock.name}</span>
 								{#if stock.iso}
-									<span class="inline-flex items-center gap-1 rounded border border-border-subtle bg-surface px-1.5 py-0.5 font-mono text-[11px] text-text-muted">
+									<span
+										class="inline-flex items-center gap-1 rounded border border-border-subtle bg-surface px-1.5 py-0.5 font-mono text-[11px] text-text-muted"
+									>
 										<span aria-hidden="true" class="dx-barcode"></span>
 										ISO {stock.iso}
 									</span>
@@ -260,7 +297,12 @@
 									<span class="text-xs text-text-faint">{stock.exposure_count} exp</span>
 								{/if}
 							</div>
-							<Button size="sm" variant="ghost" class="opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 pointer-coarse:opacity-100" onclick={() => handleDelete(stock)}>&times;</Button>
+							<Button
+								size="sm"
+								variant="ghost"
+								class="opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 pointer-coarse:opacity-100"
+								onclick={() => handleDelete(stock)}>&times;</Button
+							>
 						</div>
 					</FadeIn>
 				{/each}
@@ -281,14 +323,26 @@
 		</div>
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 			<Input label="ISO" bind:value={iso} type="number" placeholder="400" />
-			<Input label="Exposure Count" bind:value={exposureCount} type="number" placeholder="36" hint="Leave empty for variable (120 film)" />
+			<Input
+				label="Exposure Count"
+				bind:value={exposureCount}
+				type="number"
+				placeholder="36"
+				hint="Leave empty for variable (120 film)"
+			/>
 		</div>
 		<Textarea label="Notes" bind:value={notes} />
 		{#if error}
 			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 		{/if}
 		<div class="flex justify-end gap-2 pt-2">
-			<Button variant="ghost" onclick={() => { showAddDialog = false; resetForm(); }}>Cancel</Button>
+			<Button
+				variant="ghost"
+				onclick={() => {
+					showAddDialog = false;
+					resetForm();
+				}}>Cancel</Button
+			>
 			<Button variant="primary" onclick={handleAdd}>Add Film Stock</Button>
 		</div>
 	</div>
@@ -301,6 +355,8 @@
 		message={`Permanently delete ${deletingStock.brand} ${deletingStock.name}?`}
 		confirmLabel="Delete Film Stock"
 		onconfirm={confirmDelete}
-		oncancel={() => { deletingStock = null; }}
+		oncancel={() => {
+			deletingStock = null;
+		}}
 	/>
 {/if}

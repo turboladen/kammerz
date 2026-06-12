@@ -18,10 +18,11 @@ Film photography catalog — a self-hosted web app built with axum + SvelteKit +
 - `just dev` — Run backend (axum on :3002) + frontend (Vite on :5273, proxies `/api` → :3002) together for development
 - `just dev-backend` / `just dev-frontend` — Run either half alone
 - `just build` — Production build: `frontend/build` (Vite) then `cargo build --release` (embeds it). Binary at `target/release/kammerz`
-- `just check` — Delegates to `ci-backend` + `ci-frontend` (cargo build/test `--locked`, frozen bun install, svelte-check, frontend build). All are hard gates. **Run this and ensure it passes before opening a PR.**
+- `just fmt` — Format everything: `dprint fmt` (Markdown/JSON/TOML/YAML, config in `dprint.jsonc`) + Prettier via `bun run format` in `frontend/` (Svelte/TS/CSS, `prettier-plugin-svelte`, config in `frontend/.prettierrc`) + `cargo fmt --all`. **Run before committing.** `just fmt-check` is the read-only variant.
+- `just check` — Delegates to `fmt-check` + `ci-backend` + `ci-frontend` (formatting, cargo build/test `--locked`, frozen bun install, svelte-check, frontend build). All are hard gates. **Run this and ensure it passes before opening a PR.**
 - `cargo test -p kammerz` — Backend integration tests (in-memory SQLite, real migrations + seed)
-- **CI** (`.github/workflows/ci.yml`) runs on every PR and push to `main`: a `backend` job (`cargo test`), a `frontend` job (`bun run check` + `bun run build`), and an `e2e` job (Playwright `smoke.spec.ts` against the release binary on :3002). The first two are required gates; mirror them locally with `just check`.
-- `just ci` — Full local mirror of the GitHub Actions pipeline, all three jobs in order: `ci-backend` (`cargo build`/`test --locked`), `ci-frontend` (frozen `bun install` + check + build), `e2e` (Playwright smoke against the release binary on :3002, DB under /tmp). **GitHub Actions is currently unavailable on this account (billing) — run `just ci` against the PR branch merged with current `main` and post the result as a PR comment; that comment is the PR gate.** It warns (without failing) on a dirty tree and on a local bun version that differs from ci.yml's pinned `BUN_VERSION`.
+- **CI** (`.github/workflows/ci.yml`) runs on every PR and push to `main`: a `format` job (`dprint check` + Prettier `format:check` + `cargo fmt --all --check`), a `backend` job (`cargo test`), a `frontend` job (`bun run check` + `bun run build`), and an `e2e` job (Playwright `smoke.spec.ts` against the release binary on :3002). The first three are required gates; mirror them locally with `just check`.
+- `just ci` — Full local mirror of the GitHub Actions pipeline, all jobs in order: `fmt-check`, `ci-backend` (`cargo build`/`test --locked`), `ci-frontend` (frozen `bun install` + check + build), `e2e` (Playwright smoke against the release binary on :3002, DB under /tmp). **GitHub Actions is currently unavailable on this account (billing) — run `just ci` against the PR branch merged with current `main` and post the result as a PR comment; that comment is the PR gate.** It warns (without failing) on a dirty tree and on a local bun version that differs from ci.yml's pinned `BUN_VERSION`.
 - `just deploy <user>@<host> [port]` — Release = deploy: runs `ci-backend` (cargo test), cross-compiles for the aarch64 DietPi server (`just build-linux`; messense gcc toolchain + rustup target, linker set in the recipe env), uploads the binary next to the live one and swaps atomically, installs the systemd unit, restarts, and polls `GET /api/health` until it reports the locally-built **git SHA** (embedded by `build.rs` as `KAMMERZ_BUILD_SHA`; also in the startup log). Requires passwordless sudo on the box. There are no GitHub releases.
 - `echo -n <pw> | kammerz hash-password` — Generate the argon2 hash for `KAMMERZ_PASSWORD_HASH`. **Reads the password from stdin, never argv** (argv leaks into shell history / `ps`). On a TTY it prompts with echo off.
 - **Build wipes `frontend/build/`** — `bun run build` (and thus `just check` / `just build`) deletes the tracked `frontend/build/.gitkeep` (the adapter-static output dir is regenerated). Restore it before committing: `git checkout -- frontend/build/.gitkeep`. Don't commit its deletion.
@@ -87,6 +88,7 @@ Every former Tauri command maps to one route: reads `GET`, creates `POST` (→ `
 ## Important Conventions
 
 ### UX Rules
+
 - **Always confirm destructive actions.** Never delete data without user confirmation.
 - Back navigation: Detail pages use `PageHeader`'s `backHref`/`backLabel` props for consistent back links. Cross-entity links (e.g., developments→roll, dashboard→roll, search→roll/camera) pass `?from=<source>` query param; detail pages read this via `$page.url.searchParams.get('from')` and map it to the correct back route. See `backRoutes` map in `rolls/[id]/+page.svelte`.
 - Owned/Sold filtering: List pages with `date_sold` fields (cameras, lenses) use client-side All/Owned/Sold tab buttons with a `$derived()` filter. No backend changes needed to add this to a new list page.
@@ -94,17 +96,19 @@ Every former Tauri command maps to one route: reads `GET`, creates `POST` (→ `
 - Shot lens defaults: Smart cascade — fixed lens (auto-locked) > last-used lens on roll > `roll.lens_id` (roll default) > `camera.default_lens_id` (camera default) > empty.
 - Shot date defaults: Smart cascade — last shot's date on roll > `roll.date_loaded` (first shot) > empty. Date persists as a session default across "Save & Next".
 - Development auto-prompt: Moving status to "at-lab" auto-opens lab dev dialog; "developing" auto-opens self dev dialog (only if neither dev record exists). Lab and self dev are mutually exclusive — UI hides "+ Lab" / "+ Self" buttons once one exists.
-- Data-driven status sync: Roll status auto-advances and auto-reverts based on related data, handled transactionally in backend commands. Two backend helpers in `roll_service.rs`: `auto_sync_status()` is a conditional *set* (if status ∈ from-set, set to target) used for the reverts; `sync_lab_dev_status()` / `sync_self_dev_status()` (built on `advance_status_along()`) *advance forward* along the lab/self flow from any earlier rung, including a roll orphaned mid-path. Rules: first shot added → `loaded→shooting`; **lab dev created → `→lab-done` if a `date_received` is recorded, else `→at-lab`**; **self dev created → `→developed` if a `date_processed` is recorded, else `→developing`** (the dev record's date fields are the status signal — kammerz-afc); all shots deleted → `shooting/shot→loaded`; lab dev deleted → `at-lab/lab-done→shot`; self dev deleted → `developing/developed→shot`. The create-advance is forward-only: a roll already past the target on its flow (e.g. `scanned`) is untouched, and a roll orphaned at `at-lab`/`developing` advances to `lab-done`/`developed` in one action when the completing date is supplied. Status beyond a data type's range is not affected (e.g., deleting a dev record at `scanned` stays at `scanned`). Manual backward moves (chevron clicks) still require `ConfirmDialog` — the confirmation exists for when the user intentionally contradicts the data state. Never use frontend `$effect` for status sync — the backend owns this logic.
+- Data-driven status sync: Roll status auto-advances and auto-reverts based on related data, handled transactionally in backend commands. Two backend helpers in `roll_service.rs`: `auto_sync_status()` is a conditional _set_ (if status ∈ from-set, set to target) used for the reverts; `sync_lab_dev_status()` / `sync_self_dev_status()` (built on `advance_status_along()`) _advance forward_ along the lab/self flow from any earlier rung, including a roll orphaned mid-path. Rules: first shot added → `loaded→shooting`; **lab dev created → `→lab-done` if a `date_received` is recorded, else `→at-lab`**; **self dev created → `→developed` if a `date_processed` is recorded, else `→developing`** (the dev record's date fields are the status signal — kammerz-afc); all shots deleted → `shooting/shot→loaded`; lab dev deleted → `at-lab/lab-done→shot`; self dev deleted → `developing/developed→shot`. The create-advance is forward-only: a roll already past the target on its flow (e.g. `scanned`) is untouched, and a roll orphaned at `at-lab`/`developing` advances to `lab-done`/`developed` in one action when the completing date is supplied. Status beyond a data type's range is not affected (e.g., deleting a dev record at `scanned` stays at `scanned`). Manual backward moves (chevron clicks) still require `ConfirmDialog` — the confirmation exists for when the user intentionally contradicts the data state. Never use frontend `$effect` for status sync — the backend owns this logic.
 - Shot dialog "Save & Next": Keeps dialog open after save, resets per-shot fields (aperture, shutter, notes), preserves session defaults (date, location, lens), auto-suggests next frame number. Only shown in add mode (not edit).
 - Dashboard roll sections: "In the Field" shows `loaded`/`shooting` rolls (in a camera). "In the Darkroom" shows `shot`/`at-lab`/`lab-done`/`developing`/`developed`/`scanned` rolls (post-shooting pipeline, sorted by status progression). "Needs Attention" shows rolls with `!camera_id` (excluding archived). All non-archived rolls must appear in at least one clickable section.
 
 ### Svelte 5 Patterns
+
 - Use `$state()`, `$derived()`, `$effect()`, `$props()`, `$bindable()` — no legacy `let` reactivity.
 - Use `onclick={handler}` on buttons instead of `<form onsubmit>`. (Historically a Tauri WebKit workaround; kept as a project convention for consistency across the existing pages.)
 - Button component passes `onclick` via `{...rest}` spread to the native `<button>` element.
 - Detail page edit mode: When a page has view/edit toggle, maintain parallel `$derived` vars — e.g., `selectedCamera` (from saved `roll.camera_id`) for shot defaults vs `editSelectedCamera` (from `editCameraId` form state) for edit-mode film stock/lens filtering.
 
 ### axum / SeaORM Patterns
+
 - Handlers take `RequireAuth` first (enforces the session guard), then `State<DatabaseConnection>` (or `State<AppState>`/`State<AppConfig>` when config is needed), then `Path`/`Query`/`Json` extractors; they delegate to services and return `AppResult<Json<T>>` / `StatusCode::NO_CONTENT` / `(StatusCode::CREATED, Json(id))`.
 - Services are static async methods on unit structs (e.g., `CameraService::list_all(&db)`)
 - Entities use `String` for timestamps (SQLite TEXT), `Option<T>` for nullable fields
@@ -124,6 +128,7 @@ Every former Tauri command maps to one route: reads `GET`, creates `POST` (→ `
 - Raw SQL with `find_by_statement`: Prefer `SELECT *` over explicit column lists — SeaORM's `FromQueryResult` maps by column name, not position, so `SELECT *` stays in sync if entity fields change. Only use raw SQL when SeaORM's query builder can't express the query (e.g., `ORDER BY CAST(col AS INTEGER)`).
 
 ### Camera Format Dropdown
+
 - Camera type options: `SLR`, `rangefinder`, `TLR`, `point-and-shoot`, `box` (Box Camera), `instant`, `view` (View/Field Camera). Defined in `typeOptions` arrays in both `cameras/+page.svelte` and `cameras/[id]/+page.svelte` — keep them in sync.
 - Includes generic "Medium Format" and "Large Format" options for cameras that support multiple backs (e.g., Mamiya RB67).
 - Format labels use "Medium Format: 6x6" style (not "6x6 (Medium Format)").
@@ -132,6 +137,7 @@ Every former Tauri command maps to one route: reads `GET`, creates `POST` (→ `
 - Generic "Large Format" lens mount was removed (migration 009). LF cameras should use a specific shutter mount (Copal #0/#1/#3, Compur #0/#1/#3, Barrel Mount). Cross-mount compatibility within the LF family is handled by `isLargeFormatMount()` in `$lib/utils/lens.ts`.
 
 ### Component Patterns
+
 - List pages use `ListToolbar` (search + group-by + sort) with `$bindable()` props. Pipeline: primary filter (ownership/status/type tabs) → `filterBySearch()` → sort → `groupItems()` — all via `$derived` chain. Utilities in `src/lib/utils/list.ts`.
 - `GroupHeader` renders the ledger-line group label. Uses `{#if label}` guard so `groupBy === 'none'` (empty-string key) renders nothing.
 - Collection Cards (cameras, lenses): `grid-cols-[repeat(auto-fill,minmax(260px,1fr))]` card grid for short scannable data. Lenses use `minmax(280px,1fr)` for edit/delete buttons.
@@ -158,25 +164,28 @@ Every former Tauri command maps to one route: reads `GET`, creates `POST` (→ `
 - Dialog component uses flex column layout with `max-h-[85vh]` and `overflow-y-auto` on content. When adding fields to dialogs (e.g., inline lens creation), scrolling is already handled.
 
 ### Error Handling
+
 - Frontend `request()` calls (and the `src/lib/api/` wrappers over them) reject with `ApiRequestError` on a non-2xx response, carrying the backend `{error: {code, message}}`. Wrap in try/catch with user-visible error display. A 401 fires the registered unauthorized handler (redirect to `/login`).
 - Always validate required fields client-side before API calls (brand, model, mount, etc.). Show inline `error` state text — don't rely on backend DB constraint errors which are opaque to users.
 
 ### UI Design
+
 - Follow the design system in `UI_DESIGN.md` — colors, typography, component styling, layout patterns, and design principles.
 - All colors use CSS custom properties defined in `frontend/src/app.css` via Tailwind's `@theme`. Never use raw hex colors.
 - Fonts: DM Sans (UI), IBM Plex Mono (data), Instrument Serif (display). Self-hosted in `frontend/static/fonts/`.
 - Keep `UI_DESIGN.md` updated when design decisions change.
 
 ### Git / Branch Hygiene
-- **PRs are squash-merged.** `git branch --merged origin/main` therefore *lies* — squash breaks ancestry, so merged branches show as unmerged. Verify with `gh pr list --state merged --json headRefName` before deleting. GitHub doesn't auto-delete branches on merge, so remote branches accumulate; prune with `git push origin --delete <branch>`.
+
+- **PRs are squash-merged.** `git branch --merged origin/main` therefore _lies_ — squash breaks ancestry, so merged branches show as unmerged. Verify with `gh pr list --state merged --json headRefName` before deleting. GitHub doesn't auto-delete branches on merge, so remote branches accumulate; prune with `git push origin --delete <branch>`.
 
 ## Reference
 
 - Another SeaORM + SQLite project by the same author: `~/Development/projects/financier` (same SeaORM patterns). The axum + tower-sessions + rust-embed server structure mirrors `~/Development/projects/chorez`.
 - `UI_DESIGN.md` documents the visual design system (colors, typography, components, layout)
 
-
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
+
 ## Beads Issue Tracker
 
 This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
@@ -217,8 +226,10 @@ bd close <id>         # Complete work
 7. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
+
 - Work is NOT complete until `git push` succeeds
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
+
 <!-- END BEADS INTEGRATION -->

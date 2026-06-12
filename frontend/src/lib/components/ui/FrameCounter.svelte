@@ -17,9 +17,7 @@
 	const hasCurrent = $derived(current != null);
 	const show = $derived(hasTotal || hasCurrent);
 	const over = $derived(current != null && total != null && current > total);
-	const numberColor = $derived(
-		over ? 'text-danger-fg' : size === 'lg' ? 'text-text' : 'text-text-muted'
-	);
+	const numberColor = $derived(over ? 'text-danger-fg' : size === 'lg' ? 'text-text' : 'text-text-muted');
 
 	const ariaLabel = $derived(
 		hasCurrent && hasTotal
@@ -35,7 +33,9 @@
      total only → just the capacity `total`. The `/total` suffix is only added when
      both are present, so we never render a dangling `/36` or `·/36`. -->
 {#snippet readout(numberClass: string)}
-	<span class="{numberClass} {numberColor}">{hasCurrent ? current : total}{#if hasCurrent && hasTotal}<span class="text-text-faint">/{total}</span>{/if}</span>
+	<span class="{numberClass} {numberColor}"
+		>{hasCurrent ? current : total}{#if hasCurrent && hasTotal}<span class="text-text-faint">/{total}</span>{/if}</span
+	>
 {/snippet}
 
 {#if show}

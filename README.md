@@ -10,7 +10,7 @@ axum 0.8 · SvelteKit (Svelte 5 runes) · SeaORM 1.1 + SQLite · tower-sessions 
 
 ## Development
 
-Prerequisites: Rust (stable), [Bun](https://bun.sh), and [`just`](https://github.com/casey/just).
+Prerequisites: Rust (stable), [Bun](https://bun.sh), [`just`](https://github.com/casey/just), and [`dprint`](https://dprint.dev) (`brew install dprint`). Formatting is enforced in CI: `just fmt` formats everything (dprint for Markdown/JSON/TOML/YAML, Prettier for the frontend, rustfmt for Rust); `just fmt-check` verifies.
 
 ```bash
 just dev
@@ -158,7 +158,7 @@ sudo rm -f /opt/kammerz/data/kammerz.db-wal /opt/kammerz/data/kammerz.db-shm
 sudo systemctl start kammerz
 ```
 
-Snapshots from `/api/backup` or `VACUUM INTO` have no sidecar files of their own — they restore as-is. If you are restoring a cold-copy *set* (`kammerz.db` + `-wal` + `-shm` copied together), restore all three files in place of the `rm` step — the WAL sidecar holds the most recent writes and must not be dropped.
+Snapshots from `/api/backup` or `VACUUM INTO` have no sidecar files of their own — they restore as-is. If you are restoring a cold-copy _set_ (`kammerz.db` + `-wal` + `-shm` copied together), restore all three files in place of the `rm` step — the WAL sidecar holds the most recent writes and must not be dropped.
 
 ## Field access over VPN
 

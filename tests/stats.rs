@@ -53,7 +53,11 @@ async fn stats_survives_partial_date_loaded() {
     create_roll_loaded(&app, "STATS-Y", &year).await;
 
     let res = app.oneshot(get("/api/stats")).await.unwrap();
-    assert_eq!(res.status(), StatusCode::OK, "partial dates must not 500 stats");
+    assert_eq!(
+        res.status(),
+        StatusCode::OK,
+        "partial dates must not 500 stats"
+    );
     let stats: Value = json_body(res).await;
 
     let months = stats["rolls_per_month"]

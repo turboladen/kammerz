@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let the user record the *real* date of every roll lifecycle milestone (including the missing Lab Done → "received back" date) via a confirm-on-transition prompt, and edit any date directly from an inline-editable Timeline.
+**Goal:** Let the user record the _real_ date of every roll lifecycle milestone (including the missing Lab Done → "received back" date) via a confirm-on-transition prompt, and edit any date directly from an inline-editable Timeline.
 
 **Architecture:** Frontend-only, reusing existing roll/lab/self update endpoints. The Timeline becomes the single home for dates: `buildRollTimeline` tags each milestone with a write `target` (roll/lab/self + field); a shared `DateConfirm` dialog is used both for inline edits (in a new `RollTimeline` component) and for the forward-transition prompt in `rolls/[id]/+page.svelte`. The roll Edit form drops its date pickers.
 
@@ -15,10 +15,12 @@
 ## File Structure
 
 **New**
+
 - `frontend/src/lib/components/ui/DateConfirm.svelte` — shared date-pick dialog (Confirm / Cancel, optional Clear). Built on existing `Dialog` + `DateInput`.
 - `frontend/src/lib/components/rolls/RollTimeline.svelte` — renders the milestone list and owns inline editing UI; emits `onedit(milestone, date|null)`.
 
 **Modified**
+
 - `frontend/src/lib/utils/timeline.ts` — add `DateTarget` + `target`/`editable` to milestones.
 - `frontend/src/routes/(app)/rolls/[id]/+page.svelte` — `STATUS_DATE_TARGET`; refactor `updateStatus`; `handleStatusClick` opens `DateConfirm` on forward+empty; render `<RollTimeline onedit=…>`; remove the 5 edit-form `DateInput`s and dead `editDate*` state.
 - `UI_DESIGN.md` — document the editable Timeline + `DateConfirm` pattern.
@@ -30,6 +32,7 @@
 ## Task 1: Tag timeline milestones with a write target
 
 **Files:**
+
 - Modify: `frontend/src/lib/utils/timeline.ts` (whole file)
 
 - [ ] **Step 1: Replace the file contents**
@@ -114,9 +117,11 @@ git commit -m "feat(timeline): tag lifecycle milestones with a date write target
 ## Task 2: `DateConfirm` shared date-pick dialog
 
 **Files:**
+
 - Create: `frontend/src/lib/components/ui/DateConfirm.svelte`
 
 Reference APIs (already in the codebase):
+
 - `Dialog.svelte` props: `open` (bindable), `title`, `children`, `onclose?`.
 - `DateInput.svelte` props: `label?`, `hint?`, `value` (bindable string).
 - `Button.svelte` variants: `primary`, `ghost`.
@@ -198,6 +203,7 @@ git commit -m "feat(ui): DateConfirm date-pick dialog (kammerz-b08)"
 ## Task 3: `RollTimeline` component with inline editing
 
 **Files:**
+
 - Create: `frontend/src/lib/components/rolls/RollTimeline.svelte`
 
 This reproduces the current Timeline markup (`[id]/+page.svelte:799-812`: dot + label + dashed rule + mono date) and adds a per-row edit affordance that opens `DateConfirm`.
@@ -294,6 +300,7 @@ git commit -m "feat(rolls): RollTimeline component with inline date editing (kam
 ## Task 4: Render `RollTimeline` and route date edits
 
 **Files:**
+
 - Modify: `frontend/src/routes/(app)/rolls/[id]/+page.svelte` (imports; timeline render ~792-814; add a save handler)
 
 - [ ] **Step 1: Add imports**
@@ -301,9 +308,9 @@ git commit -m "feat(rolls): RollTimeline component with inline date editing (kam
 Find the existing UI imports near the top (e.g. the `import FadeIn from '$lib/components/ui/FadeIn.svelte';` line) and add below them:
 
 ```ts
-	import RollTimeline from '$lib/components/rolls/RollTimeline.svelte';
-	import { updateLabDev, updateSelfDev } from '$lib/api/development';
-	import type { TimelineMilestone } from '$lib/utils/timeline';
+import RollTimeline from '$lib/components/rolls/RollTimeline.svelte';
+import { updateLabDev, updateSelfDev } from '$lib/api/development';
+import type { TimelineMilestone } from '$lib/utils/timeline';
 ```
 
 (`updateRoll` is already imported; `labDev`/`selfDev` are already `$state` in this file.)
@@ -313,23 +320,23 @@ Find the existing UI imports near the top (e.g. the `import FadeIn from '$lib/co
 Place this near `updateStatus` (anywhere in the `<script>`). It writes a milestone's new date (or null to clear) to the correct record, then refreshes:
 
 ```ts
-	// Persist an inline Timeline date edit to whichever record owns it, then refresh.
-	async function saveTimelineDate(milestone: TimelineMilestone, date: string | null) {
-		error = '';
-		try {
-			const t = milestone.target;
-			if (t.kind === 'roll') {
-				await updateRoll(id, { [t.field]: date });
-			} else if (t.kind === 'lab' && labDev) {
-				await updateLabDev(labDev.id, { [t.field]: date });
-			} else if (t.kind === 'self' && selfDev) {
-				await updateSelfDev(selfDev.id, { [t.field]: date });
-			}
-			await loadRollData();
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
+// Persist an inline Timeline date edit to whichever record owns it, then refresh.
+async function saveTimelineDate(milestone: TimelineMilestone, date: string | null) {
+	error = '';
+	try {
+		const t = milestone.target;
+		if (t.kind === 'roll') {
+			await updateRoll(id, { [t.field]: date });
+		} else if (t.kind === 'lab' && labDev) {
+			await updateLabDev(labDev.id, { [t.field]: date });
+		} else if (t.kind === 'self' && selfDev) {
+			await updateSelfDev(selfDev.id, { [t.field]: date });
 		}
+		await loadRollData();
+	} catch (err) {
+		error = err instanceof Error ? err.message : String(err);
 	}
+}
 ```
 
 - [ ] **Step 3: Replace the inline timeline markup**
@@ -337,7 +344,7 @@ Place this near `updateStatus` (anywhere in the `<script>`). It writes a milesto
 Replace the `<ol class="space-y-1.5"> … </ol>` block (currently `[id]/+page.svelte:799-812`) inside the `<!-- Lifecycle Timeline -->` section with:
 
 ```svelte
-				<RollTimeline milestones={timeline} onedit={saveTimelineDate} />
+<RollTimeline milestones={timeline} onedit={saveTimelineDate} />
 ```
 
 (The surrounding `<FadeIn delay={75}>` wrapper, the `<h2>Timeline</h2>` header, and the `<div class="mb-6">` stay.)
@@ -350,6 +357,7 @@ Expected: `0 ERRORS 0 WARNINGS`.
 - [ ] **Step 5: Browser-verify (Playwright MCP)**
 
 Start dev if not running: `just dev` (from repo root, background). Open `http://localhost:5273`, go to a roll on the **lab** path (status at-lab/lab-done so lab milestones show). Verify:
+
 - Timeline renders as before, each editable row shows the date (or "Set date") with a pencil on hover.
 - Click "Received back" → DateConfirm opens → pick a date → Save → the row now shows it (and the dot turns amber). Confirm the roll's `date_received` persisted via `sqlite3 kammerz.db "SELECT date_received FROM development_lab WHERE roll_id=<id>;"`.
 - Click an existing date → Clear → it reverts to "Set date" / dot greys.
@@ -367,22 +375,23 @@ git commit -m "feat(rolls): inline-editable Timeline via RollTimeline (kammerz-b
 ## Task 5: Confirm-on-transition (generalize the date prompt)
 
 **Files:**
+
 - Modify: `frontend/src/routes/(app)/rolls/[id]/+page.svelte` (`STATUS_DATE_FIELD`→`STATUS_DATE_TARGET` ~103-110; `updateStatus` ~471-507; `handleStatusClick` ~509-518; add `DateConfirm` instance + state; update the backward-confirm and roll-full-nudge call sites)
 
-Behavior: a **forward** advance into a status with a date target whose target date is **empty** opens `DateConfirm` (default today). **Confirm** advances status *and* writes the date to the target record; **Cancel** changes nothing. At Lab / Developing have **no** target (their full dialogs still auto-open). Backward moves keep `ConfirmDialog` and never touch dates.
+Behavior: a **forward** advance into a status with a date target whose target date is **empty** opens `DateConfirm` (default today). **Confirm** advances status _and_ writes the date to the target record; **Cancel** changes nothing. At Lab / Developing have **no** target (their full dialogs still auto-open). Backward moves keep `ConfirmDialog` and never touch dates.
 
 - [ ] **Step 1: Replace `STATUS_DATE_FIELD` with `STATUS_DATE_TARGET`**
 
 Replace the existing block (`[id]/+page.svelte:103-110`):
 
 ```ts
-	const STATUS_DATE_FIELD: Partial<
-		Record<RollStatus, 'date_scanned' | 'date_post_processed' | 'date_archived'>
-	> = {
-		scanned: 'date_scanned',
-		'post-processed': 'date_post_processed',
-		archived: 'date_archived'
-	};
+const STATUS_DATE_FIELD: Partial<
+	Record<RollStatus, 'date_scanned' | 'date_post_processed' | 'date_archived'>
+> = {
+	scanned: 'date_scanned',
+	'post-processed': 'date_post_processed',
+	archived: 'date_archived'
+};
 ```
 
 with (uses the `DateTarget` type — add it to the existing `timeline` import or import separately; Task 4 already imported `TimelineMilestone`, so extend that import to also bring `DateTarget`):
@@ -412,7 +421,7 @@ with (uses the `DateTarget` type — add it to the existing `timeline` import or
 Update the import added in Task 4 to:
 
 ```ts
-	import type { TimelineMilestone, DateTarget } from '$lib/utils/timeline';
+import type { TimelineMilestone, DateTarget } from '$lib/utils/timeline';
 ```
 
 - [ ] **Step 2: Add the transition-prompt state**
@@ -420,10 +429,10 @@ Update the import added in Task 4 to:
 Add near the other `$state` declarations:
 
 ```ts
-	// Confirm-on-transition prompt state.
-	let datePromptOpen = $state(false);
-	let datePromptStatus: RollStatus | null = $state(null);
-	let datePromptLabel = $state('');
+// Confirm-on-transition prompt state.
+let datePromptOpen = $state(false);
+let datePromptStatus: RollStatus | null = $state(null);
+let datePromptLabel = $state('');
 ```
 
 - [ ] **Step 3: Rewrite `updateStatus` to take an explicit date**
@@ -536,7 +545,7 @@ Near the end of the template (e.g. beside the existing backward-move `ConfirmDia
 Add the import near the other UI imports:
 
 ```ts
-	import DateConfirm from '$lib/components/ui/DateConfirm.svelte';
+import DateConfirm from '$lib/components/ui/DateConfirm.svelte';
 ```
 
 - [ ] **Step 8: Type-check**
@@ -547,6 +556,7 @@ Expected: `0 ERRORS 0 WARNINGS`.
 - [ ] **Step 9: Browser-verify (Playwright MCP)**
 
 On a roll on the lab path:
+
 - Click the **Lab Done** chevron (forward, `date_received` empty) → DateConfirm opens defaulting to today → back-date it → Confirm → status advances to Lab Done **and** the Timeline "Received back" shows the back-dated date. Verify `sqlite3 kammerz.db "SELECT date_received FROM development_lab WHERE roll_id=<id>;"`.
 - Click **Scanned** → prompt → Confirm → `date_scanned` set; click **Cancel** on the next (Post-processed) prompt → status does **not** change.
 - Click **At Lab** on a fresh lab roll → the full Lab dialog still auto-opens (no double prompt).
@@ -564,6 +574,7 @@ git commit -m "feat(rolls): confirm-on-transition date prompt incl. Lab Done (ka
 ## Task 6: Remove date pickers from the roll Edit form
 
 **Files:**
+
 - Modify: `frontend/src/routes/(app)/rolls/[id]/+page.svelte` (state ~55-59; `startEditRoll` seeds ~544-548; `saveEditRoll` patch ~564-568; edit-form markup ~646-654)
 
 Dates now live solely in the Timeline; the Edit form keeps Fuzzy Date and all non-date fields.
@@ -573,11 +584,11 @@ Dates now live solely in the Timeline; the Edit form keeps Fuzzy Date and all no
 Delete these five lines (`[id]/+page.svelte:55-59`):
 
 ```ts
-	let editDateLoaded = $state('');
-	let editDateFinished = $state('');
-	let editDateScanned = $state('');
-	let editDatePostProcessed = $state('');
-	let editDateArchived = $state('');
+let editDateLoaded = $state('');
+let editDateFinished = $state('');
+let editDateScanned = $state('');
+let editDatePostProcessed = $state('');
+let editDateArchived = $state('');
 ```
 
 (Keep `let editDateFuzzy = $state('');`.)
@@ -587,11 +598,11 @@ Delete these five lines (`[id]/+page.svelte:55-59`):
 Delete these lines (`~544-548`):
 
 ```ts
-		editDateLoaded = roll.date_loaded ?? '';
-		editDateFinished = roll.date_finished ?? '';
-		editDateScanned = roll.date_scanned ?? '';
-		editDatePostProcessed = roll.date_post_processed ?? '';
-		editDateArchived = roll.date_archived ?? '';
+editDateLoaded = roll.date_loaded ?? '';
+editDateFinished = roll.date_finished ?? '';
+editDateScanned = roll.date_scanned ?? '';
+editDatePostProcessed = roll.date_post_processed ?? '';
+editDateArchived = roll.date_archived ?? '';
 ```
 
 (Keep `editDateFuzzy = roll.date_fuzzy ?? '';`.)
@@ -601,11 +612,11 @@ Delete these lines (`~544-548`):
 Delete these lines (`~564-568`):
 
 ```ts
-				date_loaded: editDateLoaded || null,
-				date_finished: editDateFinished || null,
-				date_scanned: editDateScanned || null,
-				date_post_processed: editDatePostProcessed || null,
-				date_archived: editDateArchived || null,
+date_loaded: editDateLoaded || null,
+date_finished: editDateFinished || null,
+date_scanned: editDateScanned || null,
+date_post_processed: editDatePostProcessed || null,
+date_archived: editDateArchived || null,
 ```
 
 (Keep `date_fuzzy: editDateFuzzy || null,` and all non-date fields. The Edit form no longer writes these dates — the Timeline owns them.)
@@ -615,15 +626,15 @@ Delete these lines (`~564-568`):
 Delete the two grids (`~646-654`):
 
 ```svelte
-					<div class="grid grid-cols-2 gap-4">
-						<DateInput label="Date Loaded" bind:value={editDateLoaded} />
-						<DateInput label="Finished Shooting" bind:value={editDateFinished} />
-					</div>
-					<div class="grid grid-cols-3 gap-4">
-						<DateInput label="Scanned" bind:value={editDateScanned} />
-						<DateInput label="Post-processed" bind:value={editDatePostProcessed} />
-						<DateInput label="Archived" bind:value={editDateArchived} />
-					</div>
+<div class="grid grid-cols-2 gap-4">
+	<DateInput label="Date Loaded" bind:value={editDateLoaded} />
+	<DateInput label="Finished Shooting" bind:value={editDateFinished} />
+</div>
+<div class="grid grid-cols-3 gap-4">
+	<DateInput label="Scanned" bind:value={editDateScanned} />
+	<DateInput label="Post-processed" bind:value={editDatePostProcessed} />
+	<DateInput label="Archived" bind:value={editDateArchived} />
+</div>
 ```
 
 (Keep the Push/Pull + Fuzzy Date grid and the `<DateInput>` import — it's still used by `DateConfirm`/`RollTimeline` indirectly, and `editDateFuzzy` uses an `<Input>`. If `bun run check` flags `DateInput` as unused in this file, remove its import here.)
@@ -649,6 +660,7 @@ git commit -m "refactor(rolls): move lifecycle dates out of the Edit form into t
 ## Task 7: Final verification + docs
 
 **Files:**
+
 - Modify: `UI_DESIGN.md`
 
 - [ ] **Step 1: Backend tests still green**
@@ -697,8 +709,10 @@ git commit -m "docs(ui): document DateConfirm + editable RollTimeline (kammerz-b
 
 ## Notes for the implementer
 
-- **Svelte 5 index access on `$state` records:** *reading* `roll[t.field]`, `labDev?.[t.field]` is fine (the `t.kind` narrowing gives a string-literal field union matching the model). For *writing*, never assign through a union-keyed index (`patch[target.field] = …` → TS2322); always build an object literal with a computed key (`Object.assign(patch, { [target.field]: date })` or `updateRoll(id, { [t.field]: date })`), as the tasks do.
+- **Svelte 5 index access on `$state` records:** _reading_ `roll[t.field]`, `labDev?.[t.field]` is fine (the `t.kind` narrowing gives a string-literal field union matching the model). For _writing_, never assign through a union-keyed index (`patch[target.field] = …` → TS2322); always build an object literal with a computed key (`Object.assign(patch, { [target.field]: date })` or `updateRoll(id, { [t.field]: date })`), as the tasks do.
 - **`updateLabDev`/`updateSelfDev` payloads:** both take `Partial<…Insert>`, so `{ [t.field]: date }` (string or null) is valid. Clearing sends `null`.
 - **Don't touch the backend or `DevelopmentSection.svelte`.** The At Lab / Developing dialogs still own dropoff/processed capture at creation time; the new prompt only fills the gaps and the silent stamps.
 - **Status safety:** never call `updateStatus` from `saveTimelineDate` — editing a date must not change status.
+
+```
 ```

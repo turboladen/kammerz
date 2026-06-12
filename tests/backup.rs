@@ -42,7 +42,11 @@ async fn backup_returns_sqlite_snapshot_as_download() {
     let bytes = res.into_body().collect().await.unwrap().to_bytes();
     // Every SQLite database file starts with this 16-byte magic header — a
     // torn/empty/non-DB response would fail here.
-    assert!(bytes.len() > 16, "snapshot too small: {} bytes", bytes.len());
+    assert!(
+        bytes.len() > 16,
+        "snapshot too small: {} bytes",
+        bytes.len()
+    );
     assert_eq!(&bytes[..16], b"SQLite format 3\0");
 
     // Clean up the temp DB and its WAL sidecars.

@@ -119,7 +119,10 @@ async fn update_camera_applies_partial_patch() {
         .await
         .unwrap();
     let cam: Value = json_body(res).await;
-    assert_eq!(cam["brand"], "Patchley", "untouched field survives the patch");
+    assert_eq!(
+        cam["brand"], "Patchley",
+        "untouched field survives the patch"
+    );
     assert_eq!(cam["model"], "P-2");
     assert_eq!(cam["notes"], "updated");
 }
@@ -128,7 +131,10 @@ async fn update_camera_applies_partial_patch() {
 async fn update_missing_camera_is_404() {
     let app = open_app().await;
     let res = app
-        .oneshot(put_json("/api/cameras/999999", &json!({ "model": "ghost" })))
+        .oneshot(put_json(
+            "/api/cameras/999999",
+            &json!({ "model": "ghost" }),
+        ))
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
@@ -201,10 +207,14 @@ async fn create_with_lens_persists_camera_lens_junction_and_default() {
         .unwrap();
     let cam: Value = json_body(res).await;
     assert_eq!(cam["brand"], "Olympia");
-    assert_eq!(cam["lens_mount_id"].as_i64().unwrap() as i32, fixed_mount_id);
+    assert_eq!(
+        cam["lens_mount_id"].as_i64().unwrap() as i32,
+        fixed_mount_id
+    );
     let default_lens_id = cam["default_lens_id"]
         .as_i64()
-        .expect("default_lens_id set by step 4 of the transaction") as i32;
+        .expect("default_lens_id set by step 4 of the transaction")
+        as i32;
 
     // 2. Junction row persisted: the camera's linked lenses include the new lens.
     let res = app
@@ -213,7 +223,11 @@ async fn create_with_lens_persists_camera_lens_junction_and_default() {
         .await
         .unwrap();
     let linked: Vec<i32> = json_body(res).await;
-    assert_eq!(linked, vec![default_lens_id], "junction links exactly the built-in lens");
+    assert_eq!(
+        linked,
+        vec![default_lens_id],
+        "junction links exactly the built-in lens"
+    );
 
     // 3. Lens persisted sharing brand / mount / serial with the camera.
     let res = app
@@ -225,7 +239,10 @@ async fn create_with_lens_persists_camera_lens_junction_and_default() {
     assert_eq!(lens["model"], "Zuikon 35mm f/2.8");
     assert_eq!(lens["focal_length"], "35mm");
     assert_eq!(lens["max_aperture"], "f/2.8");
-    assert_eq!(lens["lens_mount_id"].as_i64().unwrap() as i32, fixed_mount_id);
+    assert_eq!(
+        lens["lens_mount_id"].as_i64().unwrap() as i32,
+        fixed_mount_id
+    );
     assert_eq!(lens["serial_number"], "SN-777");
 }
 
@@ -290,7 +307,9 @@ async fn link_then_unlink_lens_roundtrips() {
     // Unlink → 204 and the association is gone (lens itself survives).
     let res = app
         .clone()
-        .oneshot(delete(&format!("/api/cameras/{camera_id}/lenses/{lens_id}")))
+        .oneshot(delete(&format!(
+            "/api/cameras/{camera_id}/lenses/{lens_id}"
+        )))
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::NO_CONTENT);

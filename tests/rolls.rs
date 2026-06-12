@@ -40,10 +40,7 @@ async fn create_then_get_roll_roundtrips() {
     let app = open_app().await;
     let id = create_roll(&app, "TEST-001").await;
 
-    let res = app
-        .oneshot(get(&format!("/api/rolls/{id}")))
-        .await
-        .unwrap();
+    let res = app.oneshot(get(&format!("/api/rolls/{id}"))).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let roll: Value = json_body(res).await;
     // get_with_details returns a RollWithDetails; roll_id is the user-facing label.
@@ -161,12 +158,18 @@ async fn create_roll_with_malformed_date_is_rejected() {
         "status": "loaded",
         "date_loaded": "2026-13-45"
     });
-    let res = app.oneshot(post_json("/api/rolls", &payload)).await.unwrap();
+    let res = app
+        .oneshot(post_json("/api/rolls", &payload))
+        .await
+        .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body: Value = json_body(res).await;
     assert_eq!(body["error"]["code"], "VALIDATION_ERROR");
     assert!(
-        body["error"]["message"].as_str().unwrap().contains("date_loaded"),
+        body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("date_loaded"),
         "message should name the offending field"
     );
 }
@@ -182,7 +185,10 @@ async fn create_roll_with_partial_date_is_accepted() {
         "status": "loaded",
         "date_loaded": "2026-05"
     });
-    let res = app.oneshot(post_json("/api/rolls", &payload)).await.unwrap();
+    let res = app
+        .oneshot(post_json("/api/rolls", &payload))
+        .await
+        .unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);
 }
 
@@ -191,7 +197,10 @@ async fn update_roll_with_malformed_date_is_rejected() {
     let app = open_app().await;
     let id = create_roll(&app, "UPD-BAD-DATE").await;
     let payload = json!({ "date_finished": "2026-02-30" });
-    let res = app.oneshot(put_json(&format!("/api/rolls/{id}"), &payload)).await.unwrap();
+    let res = app
+        .oneshot(put_json(&format!("/api/rolls/{id}"), &payload))
+        .await
+        .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body: Value = json_body(res).await;
     assert_eq!(body["error"]["code"], "VALIDATION_ERROR");
@@ -218,15 +227,15 @@ async fn update_roll_applies_partial_patch() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::NO_CONTENT);
 
-    let res = app
-        .oneshot(get(&format!("/api/rolls/{id}")))
-        .await
-        .unwrap();
+    let res = app.oneshot(get(&format!("/api/rolls/{id}"))).await.unwrap();
     let roll: Value = json_body(res).await;
     assert_eq!(roll["status"], "shot");
     assert_eq!(roll["date_finished"], "2026-05-15");
     assert_eq!(roll["notes"], "windy day");
-    assert_eq!(roll["date_loaded"], "2026-05-01", "untouched field survives");
+    assert_eq!(
+        roll["date_loaded"], "2026-05-01",
+        "untouched field survives"
+    );
     assert!(
         roll["camera_id"].as_i64().is_some(),
         "camera association survives the patch"

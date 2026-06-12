@@ -28,11 +28,7 @@
 		placeholder = 'Search...'
 	}: Props = $props();
 
-	const countLabel = $derived(
-		resultCount < totalCount
-			? `${resultCount} of ${totalCount}`
-			: `${resultCount}`
-	);
+	const countLabel = $derived(resultCount < totalCount ? `${resultCount} of ${totalCount}` : `${resultCount}`);
 </script>
 
 <div class="mb-3 flex flex-wrap items-center gap-3">

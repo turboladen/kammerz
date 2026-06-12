@@ -1,0 +1,3 @@
+# Pin rustfmt behavior to stable defaults so local runs (which may otherwise
+# pick up a user-level rustfmt config) agree with CI's `cargo fmt --check`.
+edition = "2021"

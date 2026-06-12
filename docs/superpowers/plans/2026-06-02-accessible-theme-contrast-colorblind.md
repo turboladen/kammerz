@@ -1,7 +1,7 @@
 # Accessible Theme (Contrast + Red/Green-Safe Palette) Implementation Plan
 
 > **Superseded 2026-06-03 — read as history.** This plan was written for the
-> original approach that *kept the warm-brown surfaces*. Real-app review showed
+> original approach that _kept the warm-brown surfaces_. Real-app review showed
 > that warmth was the problem, so the implemented theme pivoted to a **neutral
 > graphite/silver** base (surface `#0d0d0c`, text `#eeebe7`/`#bab4ad`/`#8f8981`,
 > amber accent `#e2a45e`) — see the spec's revision banner and `UI_DESIGN.md`.
@@ -40,6 +40,7 @@
 ### Task 1: Brighten text tiers to AA
 
 **Files:**
+
 - Modify: `frontend/src/app.css` (the three `--color-text*` lines in `@theme`)
 
 - [ ] **Step 1: Edit the three text-tier tokens**
@@ -47,17 +48,17 @@
 Find (in the `@theme` block, under `/* Text: cream/warm white, like aged paper */`):
 
 ```css
-	--color-text: #e8e2d9;
-	--color-text-muted: #a09488;
-	--color-text-faint: #6d6258;
+--color-text: #e8e2d9;
+--color-text-muted: #a09488;
+--color-text-faint: #6d6258;
 ```
 
 Replace with:
 
 ```css
-	--color-text: #ece6dd;
-	--color-text-muted: #bcb0a0;
-	--color-text-faint: #9d9384;
+--color-text: #ece6dd;
+--color-text-muted: #bcb0a0;
+--color-text-faint: #9d9384;
 ```
 
 - [ ] **Step 2: Verify it compiles**
@@ -81,6 +82,7 @@ git commit -m "feat(theme): brighten text tiers to clear WCAG AA"
 ### Task 2: Red/green-safe status palette
 
 **Files:**
+
 - Modify: `frontend/src/app.css` (the nine `--color-status-*` lines in `@theme`)
 
 - [ ] **Step 1: Edit the nine status tokens**
@@ -88,30 +90,30 @@ git commit -m "feat(theme): brighten text tiers to clear WCAG AA"
 Find (under `/* Status colors: shifted warmer, still distinct */`):
 
 ```css
-	--color-status-loaded: #6ca4d4;
-	--color-status-shooting: #5cb88a;
-	--color-status-shot: #a38bc7;
-	--color-status-at-lab: #d4a84e;
-	--color-status-lab-done: #d4c24e;
-	--color-status-developing: #c87a42;
-	--color-status-developed: #b384c7;
-	--color-status-scanned: #5aaf9e;
-	--color-status-archived: #7a726a;
+--color-status-loaded: #6ca4d4;
+--color-status-shooting: #5cb88a;
+--color-status-shot: #a38bc7;
+--color-status-at-lab: #d4a84e;
+--color-status-lab-done: #d4c24e;
+--color-status-developing: #c87a42;
+--color-status-developed: #b384c7;
+--color-status-scanned: #5aaf9e;
+--color-status-archived: #7a726a;
 ```
 
 Replace with:
 
 ```css
-	/* Status colors: red/green-safe — blue (shooting phase) → amber (development) → neutral (finished) */
-	--color-status-loaded: #6fbcff;
-	--color-status-shooting: #93c4ec;
-	--color-status-shot: #afb3ea;
-	--color-status-at-lab: #e3a347;
-	--color-status-lab-done: #f0cf57;
-	--color-status-developing: #dd8b44;
-	--color-status-developed: #ecc185;
-	--color-status-scanned: #a8cdd8;
-	--color-status-archived: #b3a99c;
+/* Status colors: red/green-safe — blue (shooting phase) → amber (development) → neutral (finished) */
+--color-status-loaded: #6fbcff;
+--color-status-shooting: #93c4ec;
+--color-status-shot: #afb3ea;
+--color-status-at-lab: #e3a347;
+--color-status-lab-done: #f0cf57;
+--color-status-developing: #dd8b44;
+--color-status-developed: #ecc185;
+--color-status-scanned: #a8cdd8;
+--color-status-archived: #b3a99c;
 ```
 
 - [ ] **Step 2: Verify it compiles**
@@ -135,6 +137,7 @@ git commit -m "feat(theme): red/green-safe status palette (blue->amber->neutral)
 ### Task 3: Danger tokens + solid danger button
 
 **Files:**
+
 - Modify: `frontend/src/app.css` (add danger tokens to `@theme`)
 - Modify: `frontend/src/lib/components/ui/Button.svelte:18`
 
@@ -143,21 +146,20 @@ git commit -m "feat(theme): red/green-safe status palette (blue->amber->neutral)
 In `frontend/src/app.css`, find the accent block:
 
 ```css
-	/* Accent: amber/gold, like a darkroom safelight */
-	--color-accent: #d4915c;
-	--color-accent-hover: #e4a876;
-	--color-accent-muted: #a06830;
+/* Accent: amber/gold, like a darkroom safelight */
+--color-accent: #d4915c;
+--color-accent-hover: #e4a876;
+--color-accent-muted: #a06830;
 ```
 
 Immediately after it (still inside `@theme`), add:
 
 ```css
-
-	/* Danger: destructive actions. Solid fill takes white text at ~5:1; the
-	   lighter -fg is for danger icons/text on the dark surface. */
-	--color-danger: #c0473a;
-	--color-danger-hover: #d2594c;
-	--color-danger-fg: #e88c80;
+/* Danger: destructive actions. Solid fill takes white text at ~5:1; the
+   lighter -fg is for danger icons/text on the dark surface. */
+--color-danger: #c0473a;
+--color-danger-hover: #d2594c;
+--color-danger-fg: #e88c80;
 ```
 
 - [ ] **Step 2: Restyle the `danger` button variant**
@@ -165,13 +167,13 @@ Immediately after it (still inside `@theme`), add:
 In `frontend/src/lib/components/ui/Button.svelte`, find line 18:
 
 ```js
-		danger: 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+danger: 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
 ```
 
 Replace with:
 
 ```js
-		danger: 'bg-danger text-white hover:bg-danger-hover'
+danger: 'bg-danger text-white hover:bg-danger-hover'
 ```
 
 - [ ] **Step 3: Verify it compiles**
@@ -195,6 +197,7 @@ git commit -m "feat(theme): solid high-emphasis danger button + danger tokens"
 ### Task 4: ConfirmDialog — warning icon + iconed confirm
 
 **Files:**
+
 - Modify: `frontend/src/lib/components/ui/ConfirmDialog.svelte`
 
 - [ ] **Step 1: Import the icons**
@@ -202,14 +205,14 @@ git commit -m "feat(theme): solid high-emphasis danger button + danger tokens"
 In `ConfirmDialog.svelte`, find line 2:
 
 ```js
-	import Button from './Button.svelte';
+import Button from './Button.svelte';
 ```
 
 Replace with:
 
 ```js
-	import Button from './Button.svelte';
-	import { AlertTriangle, Trash2 } from 'lucide-svelte';
+import Button from './Button.svelte';
+import { AlertTriangle, Trash2 } from 'lucide-svelte';
 ```
 
 - [ ] **Step 2: Add the warning icon beside the title**
@@ -217,20 +220,20 @@ Replace with:
 Find (lines 64):
 
 ```svelte
-			<h2 class="font-display text-xl">{title}</h2>
+<h2 class="font-display text-xl">{title}</h2>
 ```
 
 Replace with:
 
 ```svelte
-			<div class="flex items-center gap-3">
-				{#if variant === 'danger'}
-					<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger/15 text-danger-fg">
-						<AlertTriangle size={18} strokeWidth={2} />
-					</span>
-				{/if}
-				<h2 class="font-display text-xl">{title}</h2>
-			</div>
+<div class="flex items-center gap-3">
+	{#if variant === 'danger'}
+		<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger/15 text-danger-fg">
+			<AlertTriangle size={18} strokeWidth={2} />
+		</span>
+	{/if}
+	<h2 class="font-display text-xl">{title}</h2>
+</div>
 ```
 
 - [ ] **Step 3: Put the trash icon in the confirm button**
@@ -238,16 +241,16 @@ Replace with:
 Find (line 68):
 
 ```svelte
-				<Button variant={variant} onclick={handleConfirm}>{confirmLabel}</Button>
+<Button variant={variant} onclick={handleConfirm}>{confirmLabel}</Button>
 ```
 
 Replace with:
 
 ```svelte
-				<Button variant={variant} onclick={handleConfirm}>
-					{#if variant === 'danger'}<Trash2 size={16} strokeWidth={2} />{/if}
-					{confirmLabel}
-				</Button>
+<Button variant={variant} onclick={handleConfirm}>
+	{#if variant === 'danger'}<Trash2 size={16} strokeWidth={2} />{/if}
+	{confirmLabel}
+</Button>
 ```
 
 - [ ] **Step 4: Verify it compiles**
@@ -271,6 +274,7 @@ git commit -m "feat(theme): warning + trash icons on destructive confirm dialog"
 ### Task 5: Trash icon on the two explicit Delete buttons
 
 **Files:**
+
 - Modify: `frontend/src/routes/(app)/rolls/[id]/+page.svelte:586`
 - Modify: `frontend/src/routes/(app)/cameras/[id]/+page.svelte:375`
 
@@ -281,13 +285,13 @@ Neither file currently imports from `lucide-svelte`.
 In `frontend/src/routes/(app)/rolls/[id]/+page.svelte`, find the import for the types line:
 
 ```js
-	import type { RollWithDetails, RollInsert, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
+import type { RollWithDetails, RollInsert, Camera, FilmStock, Lens, Shot, Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, PushPull, LensMount } from '$lib/types';
 ```
 
 Add immediately after it:
 
 ```js
-	import { Trash2 } from 'lucide-svelte';
+import { Trash2 } from 'lucide-svelte';
 ```
 
 - [ ] **Step 2: rolls/[id] — add the icon to the Delete button**
@@ -295,13 +299,13 @@ Add immediately after it:
 Find (line ~586):
 
 ```svelte
-		<Button variant="danger" onclick={handleDelete}>Delete</Button>
+<Button variant="danger" onclick={handleDelete}>Delete</Button>
 ```
 
 Replace with:
 
 ```svelte
-		<Button variant="danger" onclick={handleDelete}><Trash2 size={16} strokeWidth={2} />Delete</Button>
+<Button variant="danger" onclick={handleDelete}><Trash2 size={16} strokeWidth={2} />Delete</Button>
 ```
 
 - [ ] **Step 3: cameras/[id] — add the import**
@@ -309,7 +313,7 @@ Replace with:
 In `frontend/src/routes/(app)/cameras/[id]/+page.svelte`, add an import line alongside the existing imports at the top of the `<script>` block:
 
 ```js
-	import { Trash2 } from 'lucide-svelte';
+import { Trash2 } from 'lucide-svelte';
 ```
 
 - [ ] **Step 4: cameras/[id] — add the icon to the Delete button**
@@ -317,13 +321,13 @@ In `frontend/src/routes/(app)/cameras/[id]/+page.svelte`, add an import line alo
 Find (line ~375):
 
 ```svelte
-		<Button variant="danger" onclick={handleDelete}>Delete</Button>
+<Button variant="danger" onclick={handleDelete}>Delete</Button>
 ```
 
 Replace with:
 
 ```svelte
-		<Button variant="danger" onclick={handleDelete}><Trash2 size={16} strokeWidth={2} />Delete</Button>
+<Button variant="danger" onclick={handleDelete}><Trash2 size={16} strokeWidth={2} />Delete</Button>
 ```
 
 - [ ] **Step 5: Verify it compiles**
@@ -347,6 +351,7 @@ git commit -m "feat(theme): trash icon on explicit Delete buttons"
 ### Task 6: Update UI_DESIGN.md
 
 **Files:**
+
 - Modify: `UI_DESIGN.md` (Text, Status Colors, Danger sections; Button variant row)
 
 - [ ] **Step 1: Update the Text tier table**
@@ -374,16 +379,16 @@ Find (lines ~47–58, the `### Status Colors` heading through the Archived row):
 ```markdown
 ### Status Colors (warm-shifted, still distinct)
 
-| Status | Hex | Visual |
-|---|---|---|
-| Loaded | `#6ca4d4` | Dusty blue |
-| Shooting | `#5cb88a` | Sage green |
-| Shot | `#a38bc7` | Muted lavender |
-| At Lab | `#d4a84e` | Warm gold |
-| Developing | `#c87a42` | Burnt orange |
-| Developed | `#b384c7` | Soft purple |
-| Scanned | `#5aaf9e` | Teal |
-| Archived | `#7a726a` | Warm gray |
+| Status     | Hex       | Visual         |
+| ---------- | --------- | -------------- |
+| Loaded     | `#6ca4d4` | Dusty blue     |
+| Shooting   | `#5cb88a` | Sage green     |
+| Shot       | `#a38bc7` | Muted lavender |
+| At Lab     | `#d4a84e` | Warm gold      |
+| Developing | `#c87a42` | Burnt orange   |
+| Developed  | `#b384c7` | Soft purple    |
+| Scanned    | `#5aaf9e` | Teal           |
+| Archived   | `#7a726a` | Warm gray      |
 ```
 
 Replace with:
@@ -396,17 +401,17 @@ color vision reads reliably) plus lightness, grouped by phase: shooting = cool b
 development = warm ambers, finished = neutral (cool `scanned` vs warm `archived`). The
 status label text is always shown alongside the color, so color is never the sole signal.
 
-| Status | Hex | Phase |
-|---|---|---|
-| Loaded | `#6fbcff` | Shooting — vivid azure |
-| Shooting | `#93c4ec` | Shooting — sky blue |
-| Shot | `#afb3ea` | Shooting — blue-violet |
-| At Lab | `#e3a347` | Development — amber |
-| Lab Done | `#f0cf57` | Development — yellow |
-| Developing | `#dd8b44` | Development — orange |
-| Developed | `#ecc185` | Development — light tan |
-| Scanned | `#a8cdd8` | Finished — cool slate |
-| Archived | `#b3a99c` | Finished — warm taupe |
+| Status     | Hex       | Phase                   |
+| ---------- | --------- | ----------------------- |
+| Loaded     | `#6fbcff` | Shooting — vivid azure  |
+| Shooting   | `#93c4ec` | Shooting — sky blue     |
+| Shot       | `#afb3ea` | Shooting — blue-violet  |
+| At Lab     | `#e3a347` | Development — amber     |
+| Lab Done   | `#f0cf57` | Development — yellow    |
+| Developing | `#dd8b44` | Development — orange    |
+| Developed  | `#ecc185` | Development — light tan |
+| Scanned    | `#a8cdd8` | Finished — cool slate   |
+| Archived   | `#b3a99c` | Finished — warm taupe   |
 ```
 
 - [ ] **Step 3: Replace the Danger section**
