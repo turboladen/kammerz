@@ -10,7 +10,7 @@ axum 0.8 · SvelteKit (Svelte 5 runes) · SeaORM 1.1 + SQLite · tower-sessions 
 
 ## Development
 
-Prerequisites: Rust (stable), [Bun](https://bun.sh), and [`just`](https://github.com/casey/just).
+Prerequisites: Rust (stable), [Bun](https://bun.sh), [`just`](https://github.com/casey/just), and [`dprint`](https://dprint.dev) (`brew install dprint`). Formatting is enforced in CI: `just fmt` formats everything (dprint for Markdown/JSON/TOML/YAML, Prettier for the frontend, rustfmt for Rust); `just fmt-check` verifies.
 
 ```bash
 just dev

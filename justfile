@@ -75,19 +75,34 @@ deploy host port='3002': ci-backend build-linux
     echo "❌ no answer from /api/health within ~30s — check: ssh $host 'journalctl -u kammerz -n 50'" >&2
     exit 1
 
+
+# Format everything in place: dprint (Markdown/JSON/TOML/YAML), Prettier
+# (frontend: Svelte/TS/CSS via prettier-plugin-svelte), rustfmt (Rust).
+# Run before committing.
+fmt:
+    dprint fmt
+    cd frontend && bun run format
+    cargo fmt --all
+
+# Verify formatting without writing — mirrors CI's format job.
+fmt-check:
+    dprint check
+    cd frontend && bun run format:check
+    cargo fmt --all --check
+
 # Quality gates — all hard gates, matching what CI enforces on every PR and
 # push to main (.github/workflows/ci.yml). Delegates to the ci-* recipes so the
 # gate commands exist in exactly one place (--locked/--frozen-lockfile included:
 # lockfile drift should fail here, not surface later in `just ci` or Actions).
-check: ci-backend ci-frontend
+check: fmt-check ci-backend ci-frontend
 
 # Full local mirror of the GitHub Actions pipeline (.github/workflows/ci.yml):
 # backend (cargo build+test --locked), frontend (frozen install + svelte-check
 # + build), e2e (Playwright smoke against the release binary on :3002). Use
 # this as the PR gate when Actions isn't available — every job a PR needs runs
 # here, in the same order, with the same flags.
-ci: ci-preflight ci-backend ci-frontend e2e
-    @echo "✅ just ci: all CI jobs passed (backend, frontend, e2e)"
+ci: ci-preflight fmt-check ci-backend ci-frontend e2e
+    @echo "✅ just ci: all CI jobs passed (format, backend, frontend, e2e)"
 
 # Warn (never fail) when the local run can diverge from what Actions would do:
 # a dirty tree means the gate result may not reflect the pushed commits, and a
