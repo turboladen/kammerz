@@ -13,7 +13,7 @@ use serde::Deserialize;
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, DbOptionExt, OptionExt};
 use crate::patch::{double_option, now_string, trim_opt};
-use crate::routes::{friendly_err, friendly_txn_err};
+use crate::routes::{friendly_err, friendly_txn_err, Op};
 use crate::services::development_service::{
     DevelopmentService, LabDevListItem, SelfDevWithStages, StageInput,
 };
@@ -214,7 +214,7 @@ async fn create_lab_dev(
             })
         })
         .await
-        .map_err(|e| friendly_txn_err("lab development", e))?;
+        .map_err(|e| friendly_txn_err("lab development", Op::Write, e))?;
 
     Ok((StatusCode::CREATED, Json(result_id)))
 }
@@ -318,7 +318,7 @@ async fn delete_lab_dev(
         })
     })
     .await
-    .map_err(|e| friendly_txn_err("lab development", e))?;
+    .map_err(|e| friendly_txn_err("lab development", Op::Delete, e))?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -401,7 +401,7 @@ async fn create_self_dev(
             })
         })
         .await
-        .map_err(|e| friendly_txn_err("self development", e))?;
+        .map_err(|e| friendly_txn_err("self development", Op::Write, e))?;
 
     Ok((StatusCode::CREATED, Json(result_id)))
 }
@@ -527,7 +527,7 @@ async fn delete_self_dev(
         })
     })
     .await
-    .map_err(|e| friendly_txn_err("self development", e))?;
+    .map_err(|e| friendly_txn_err("self development", Op::Delete, e))?;
 
     Ok(StatusCode::NO_CONTENT)
 }
