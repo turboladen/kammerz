@@ -1,13 +1,14 @@
+use axum::extract::State;
 use axum::routing::{get, post, MethodRouter};
 use axum::{Json, Router};
-use sea_orm::{DbErr, TransactionError};
+use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, TransactionError};
 use serde_json::{json, Value};
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::{KeyExtractor, PeerIpKeyExtractor, SmartIpKeyExtractor};
 use tower_governor::GovernorLayer;
 
 use crate::auth::{handlers, rate_limit};
-use crate::error::AppError;
+use crate::error::{AppError, AppResult};
 use crate::AppState;
 
 pub mod backup;
@@ -87,14 +88,45 @@ where
     post(handlers::login).layer(limiter)
 }
 
-async fn health() -> Json<Value> {
+/// Health check must complete its DB probe within this budget. The pool is
+/// max=min=1 (src/db.rs), so a long-held connection would otherwise make the
+/// probe wait out sqlx's 30s acquire timeout; a saturated-but-alive server is
+/// reported unhealthy by design — a probe that hangs 30s is useless to the
+/// systemd/uptime watchdog, and `just deploy` already gives up after 2s.
+const HEALTH_DB_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+
+async fn health(State(db): State<DatabaseConnection>) -> AppResult<Json<Value>> {
+    // Liveness probe used by systemd/uptime monitors, CI readiness, and
+    // `just deploy`. Accepting the TCP connection isn't enough: the DB file can
+    // vanish if the NAS data dir is unmounted, leaving the process up but unable
+    // to serve. Run a real round-trip query (NOT `ping()`, whose sqlx-sqlite
+    // handler just confirms the worker thread is alive without touching the DB)
+    // so a dead/unreachable database reports 503. The CI/deploy probes use
+    // `curl -f`, so a non-2xx correctly fails readiness instead of a misleading
+    // healthy 200.
+    match tokio::time::timeout(HEALTH_DB_TIMEOUT, db.execute_unprepared("SELECT 1")).await {
+        Err(_elapsed) => {
+            return Err(AppError::ServiceUnavailable(
+                "health DB check timed out".to_string(),
+            ));
+        }
+        Ok(Err(e)) => {
+            return Err(AppError::ServiceUnavailable(format!(
+                "database check failed: {e}"
+            )));
+        }
+        Ok(Ok(_)) => {}
+    }
+
     // `version` identifies which build a deployment is running (the binary is
-    // installed on a remote NAS, so the log line alone isn't always reachable).
-    Json(json!({
+    // installed on a remote NAS, so the log line alone isn't always reachable);
+    // `build` is the SHA `just deploy` greps for to confirm the new binary is
+    // the one answering — keep both fields and their names stable.
+    Ok(Json(json!({
         "ok": true,
         "version": env!("CARGO_PKG_VERSION"),
         "build": env!("KAMMERZ_BUILD_SHA"),
-    }))
+    })))
 }
 
 /// The operation that produced a DB error, used to word a FOREIGN KEY violation
