@@ -14,7 +14,7 @@ use crate::patch::{double_option, now_string, trim, trim_opt};
 use crate::routes::{friendly_err, friendly_txn_err, Op};
 use crate::services::roll_service::RollService;
 use crate::services::shot_service::ShotService;
-use crate::validate::validate_date_opt;
+use crate::validate::{require_nonempty, validate_date_opt, validate_lat, validate_lon};
 use crate::AppState;
 use entity::roll::RollStatus;
 use entity::shot;
@@ -98,6 +98,9 @@ async fn create(
     Json(data): Json<CreateShotDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
     validate_date_opt("date", &data.date)?;
+    require_nonempty("frame_number", &data.frame_number)?;
+    validate_lat("gps_lat", data.gps_lat)?;
+    validate_lon("gps_lon", data.gps_lon)?;
 
     let now = now_string();
 
@@ -157,6 +160,15 @@ async fn update(
 
     if let Some(v) = &data.date {
         validate_date_opt("date", v)?;
+    }
+    if let Some(v) = &data.frame_number {
+        require_nonempty("frame_number", v)?;
+    }
+    if let Some(v) = data.gps_lat {
+        validate_lat("gps_lat", v)?;
+    }
+    if let Some(v) = data.gps_lon {
+        validate_lon("gps_lon", v)?;
     }
 
     let now = now_string();

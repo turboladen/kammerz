@@ -7,9 +7,10 @@ use serde::Deserialize;
 
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, OptionExt};
-use crate::patch::{double_option, now_string, trim, trim_opt};
+use crate::patch::{double_option, now_string, trim_opt};
 use crate::routes::{friendly_delete_err, friendly_err};
 use crate::services::film_stock_service::FilmStockService;
+use crate::validate::{require_nonempty, validate_non_negative_i32};
 use crate::AppState;
 use entity::film_stock::{self, FilmFormat, FilmStockType};
 
@@ -72,10 +73,15 @@ async fn create(
     State(db): State<sea_orm::DatabaseConnection>,
     Json(data): Json<CreateFilmStockDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
+    let brand = require_nonempty("brand", &data.brand)?;
+    let name = require_nonempty("name", &data.name)?;
+    validate_non_negative_i32("exposure_count", data.exposure_count)?;
+    validate_non_negative_i32("iso", data.iso)?;
+
     let now = now_string();
     let model = film_stock::ActiveModel {
-        brand: trim(data.brand),
-        name: trim(data.name),
+        brand: Set(brand),
+        name: Set(name),
         format: Set(data.format),
         exposure_count: Set(data.exposure_count),
         stock_type: Set(data.stock_type),
@@ -100,13 +106,19 @@ async fn update(
     let existing = FilmStockService::get_by_id(&db, id)
         .await?
         .or_404("Film stock", id)?;
+    if let Some(v) = data.exposure_count {
+        validate_non_negative_i32("exposure_count", v)?;
+    }
+    if let Some(v) = data.iso {
+        validate_non_negative_i32("iso", v)?;
+    }
     let now = now_string();
     let mut model: film_stock::ActiveModel = existing.into();
     if let Some(v) = data.brand {
-        model.brand = trim(v);
+        model.brand = Set(require_nonempty("brand", &v)?);
     }
     if let Some(v) = data.name {
-        model.name = trim(v);
+        model.name = Set(require_nonempty("name", &v)?);
     }
     if let Some(v) = data.format {
         model.format = Set(v);

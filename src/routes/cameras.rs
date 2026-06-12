@@ -7,11 +7,11 @@ use serde::Deserialize;
 
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, OptionExt};
-use crate::patch::{double_option, now_string, trim, trim_opt};
+use crate::patch::{double_option, now_string, trim_opt};
 use crate::routes::{friendly_delete_err, friendly_err};
 use crate::services::camera_service::CameraService;
 use crate::services::lens_service::LensService;
-use crate::validate::validate_date_opt;
+use crate::validate::{require_nonempty, validate_date_opt, validate_non_negative_f64};
 use crate::AppState;
 use entity::camera::{self, CameraFormat, CameraType};
 use entity::camera_maintenance::{self, MaintenanceType};
@@ -142,11 +142,13 @@ async fn create(
 ) -> AppResult<(StatusCode, Json<i32>)> {
     validate_date_opt("date_purchased", &data.date_purchased)?;
     validate_date_opt("date_sold", &data.date_sold)?;
+    let brand = require_nonempty("brand", &data.brand)?;
+    let camera_model = require_nonempty("model", &data.model)?;
 
     let now = now_string();
     let model = camera::ActiveModel {
-        brand: trim(data.brand),
-        model: trim(data.model),
+        brand: Set(brand),
+        model: Set(camera_model),
         prefix: trim_opt(data.prefix),
         format: Set(data.format),
         lens_mount_id: Set(data.lens_mount_id),
@@ -185,10 +187,10 @@ async fn update(
     let now = now_string();
     let mut model: camera::ActiveModel = existing.into();
     if let Some(v) = data.brand {
-        model.brand = trim(v);
+        model.brand = Set(require_nonempty("brand", &v)?);
     }
     if let Some(v) = data.model {
-        model.model = trim(v);
+        model.model = Set(require_nonempty("model", &v)?);
     }
     if let Some(v) = data.prefix {
         model.prefix = trim_opt(v);
@@ -247,6 +249,8 @@ async fn create_with_lens(
 ) -> AppResult<(StatusCode, Json<i32>)> {
     validate_date_opt("date_purchased", &data.camera.date_purchased)?;
     validate_date_opt("date_sold", &data.camera.date_sold)?;
+    require_nonempty("brand", &data.camera.brand)?;
+    require_nonempty("model", &data.camera.model)?;
 
     let now = now_string();
 
@@ -392,6 +396,7 @@ async fn create_maintenance(
     Json(data): Json<CreateMaintenanceDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
     validate_date_opt("date_done", &data.date_done)?;
+    validate_non_negative_f64("cost", data.cost)?;
 
     let now = now_string();
     let model = camera_maintenance::ActiveModel {
@@ -423,6 +428,9 @@ async fn update_maintenance(
         .or_404("Maintenance record", id)?;
     if let Some(v) = &data.date_done {
         validate_date_opt("date_done", v)?;
+    }
+    if let Some(v) = data.cost {
+        validate_non_negative_f64("cost", v)?;
     }
     let now = now_string();
     let mut model: camera_maintenance::ActiveModel = existing.into();

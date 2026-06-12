@@ -250,3 +250,62 @@ async fn import_roll_with_empty_frame_number_is_rejected() {
         "a rejected import must not persist the roll"
     );
 }
+
+// --- Server-side input validation (kammerz-grd) ---
+// Complements the client-side guards added in PR #75 with authoritative server
+// checks on the import-roll payload.
+
+#[tokio::test]
+async fn import_roll_rejects_whitespace_roll_id() {
+    let app = open_app().await;
+    let res = app.clone().oneshot(get("/api/cameras")).await.unwrap();
+    let cams: Vec<Value> = json_body(res).await;
+    let camera_id = cams[0]["id"].as_i64().unwrap() as i32;
+
+    let res = app
+        .oneshot(post_json(
+            "/api/import/roll",
+            &json!({
+                "roll_id": "   ",
+                "camera_id": camera_id,
+                "status": "shot",
+                "shots": []
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("roll_id"));
+}
+
+#[tokio::test]
+async fn import_roll_rejects_negative_frame_count() {
+    let app = open_app().await;
+    let res = app.clone().oneshot(get("/api/cameras")).await.unwrap();
+    let cams: Vec<Value> = json_body(res).await;
+    let camera_id = cams[0]["id"].as_i64().unwrap() as i32;
+
+    let res = app
+        .oneshot(post_json(
+            "/api/import/roll",
+            &json!({
+                "roll_id": "IMPORT-NEG",
+                "camera_id": camera_id,
+                "status": "shot",
+                "frame_count": -1,
+                "shots": []
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("frame_count"));
+}

@@ -7,12 +7,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, OptionExt};
-use crate::patch::{double_option, now_string, trim, trim_opt};
+use crate::patch::{double_option, now_string, trim_opt};
 use crate::routes::{friendly_delete_err, friendly_err};
 use crate::services::development_service::DevelopmentService;
 use crate::services::roll_service::{RollService, RollWithDetails};
 use crate::services::shot_service::ShotService;
-use crate::validate::validate_date_opt;
+use crate::validate::{require_nonempty, validate_date_opt, validate_non_negative_i32};
 use crate::AppState;
 use entity::roll::{self, PushPull, RollStatus};
 use entity::{dev_stage, development_lab, development_self, shot};
@@ -118,10 +118,12 @@ async fn create(
     validate_date_opt("date_scanned", &data.date_scanned)?;
     validate_date_opt("date_post_processed", &data.date_post_processed)?;
     validate_date_opt("date_archived", &data.date_archived)?;
+    let roll_id = require_nonempty("roll_id", &data.roll_id)?;
+    validate_non_negative_i32("frame_count", data.frame_count)?;
 
     let now = now_string();
     let model = roll::ActiveModel {
-        roll_id: trim(data.roll_id),
+        roll_id: Set(roll_id),
         camera_id: Set(data.camera_id),
         film_stock_id: Set(data.film_stock_id),
         lens_id: Set(data.lens_id),
@@ -171,12 +173,15 @@ async fn update(
     if let Some(v) = &data.date_archived {
         validate_date_opt("date_archived", v)?;
     }
+    if let Some(v) = data.frame_count {
+        validate_non_negative_i32("frame_count", v)?;
+    }
 
     let now = now_string();
     let mut model: roll::ActiveModel = existing.into();
 
     if let Some(v) = data.roll_id {
-        model.roll_id = trim(v);
+        model.roll_id = Set(require_nonempty("roll_id", &v)?);
     }
     if let Some(v) = data.camera_id {
         model.camera_id = Set(v);

@@ -147,3 +147,65 @@ async fn delete_missing_lens_returns_404() {
     assert_eq!(body["error"]["code"], "NOT_FOUND");
     assert_eq!(body["error"]["message"], "Lens 999999 not found");
 }
+
+// --- Server-side input validation (kammerz-grd) ---
+
+/// Borrow a seeded lens_mount_id.
+async fn seeded_lens_mount_id(app: &axum::Router) -> i32 {
+    let res = app.clone().oneshot(get("/api/lens-mounts")).await.unwrap();
+    let mounts: Vec<Value> = json_body(res).await;
+    mounts[0]["id"].as_i64().unwrap() as i32
+}
+
+#[tokio::test]
+async fn create_lens_rejects_whitespace_brand() {
+    let app = open_app().await;
+    let mount_id = seeded_lens_mount_id(&app).await;
+    let res = app
+        .oneshot(post_json(
+            "/api/lenses",
+            &json!({ "brand": "  ", "lens_mount_id": mount_id, "model": "Nope" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"].as_str().unwrap().contains("brand"));
+}
+
+#[tokio::test]
+async fn create_lens_rejects_negative_filter_thread() {
+    let app = open_app().await;
+    let mount_id = seeded_lens_mount_id(&app).await;
+    let res = app
+        .oneshot(post_json(
+            "/api/lenses",
+            &json!({
+                "brand": "Threadly",
+                "lens_mount_id": mount_id,
+                "filter_thread_front_mm": -52
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("filter_thread_front_mm"));
+}
+
+#[tokio::test]
+async fn update_lens_rejects_negative_filter_thread() {
+    let app = open_app().await;
+    let lens_id = create_lens(&app, "Patchlens").await;
+    let res = app
+        .oneshot(put_json(
+            &format!("/api/lenses/{lens_id}"),
+            &json!({ "filter_thread_rear_mm": -1 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}

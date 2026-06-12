@@ -13,7 +13,7 @@ use crate::routes::friendly_err;
 use crate::services::import_service::{ImportService, ModelInfo, ParsedRoll};
 use crate::services::roll_service::{ImportShotEntry, RollService};
 use crate::services::settings_service::SettingsService;
-use crate::validate::validate_date_opt;
+use crate::validate::{require_nonempty, validate_date_opt, validate_non_negative_i32};
 use crate::AppState;
 use entity::roll::{self, PushPull, RollStatus};
 
@@ -121,6 +121,11 @@ async fn import_parsed_roll(
 ) -> AppResult<(StatusCode, Json<i32>)> {
     validate_date_opt("date_loaded", &data.date_loaded)?;
     validate_date_opt("date_finished", &data.date_finished)?;
+    // Server-side mirror of PR #75's client guards (kammerz-grd): a blank
+    // roll_id otherwise satisfies NOT NULL and collides on the UNIQUE index as a
+    // confusing duplicate; a negative frame_count is nonsensical.
+    require_nonempty("roll_id", &data.roll_id)?;
+    validate_non_negative_i32("frame_count", data.frame_count)?;
     for (i, s) in data.shots.iter().enumerate() {
         validate_date_opt(&format!("shots[{i}].date"), &s.date)?;
     }

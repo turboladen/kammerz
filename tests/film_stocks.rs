@@ -1,7 +1,7 @@
 mod common;
 
 use axum::http::StatusCode;
-use common::{delete, get, json_body, open_app, post_json};
+use common::{delete, get, json_body, open_app, post_json, put_json};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
@@ -57,4 +57,80 @@ async fn delete_missing_film_stock_returns_404() {
     let body: Value = json_body(res).await;
     assert_eq!(body["error"]["code"], "NOT_FOUND");
     assert_eq!(body["error"]["message"], "Film stock 999999 not found");
+}
+
+// --- Server-side input validation (kammerz-grd) ---
+
+/// Create a valid film stock and return its id.
+async fn create_film_stock(app: &axum::Router, name: &str) -> i32 {
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/film-stocks",
+            &json!({
+                "brand": "Valid",
+                "name": name,
+                "format": "135",
+                "stock_type": "bw-negative"
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    json_body(res).await
+}
+
+#[tokio::test]
+async fn create_film_stock_rejects_whitespace_name() {
+    let app = open_app().await;
+    let res = app
+        .oneshot(post_json(
+            "/api/film-stocks",
+            &json!({
+                "brand": "Brandy",
+                "name": "   ",
+                "format": "135",
+                "stock_type": "bw-negative"
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"].as_str().unwrap().contains("name"));
+}
+
+#[tokio::test]
+async fn create_film_stock_rejects_negative_iso() {
+    let app = open_app().await;
+    let res = app
+        .oneshot(post_json(
+            "/api/film-stocks",
+            &json!({
+                "brand": "Brandy",
+                "name": "Negative ISO",
+                "format": "135",
+                "stock_type": "bw-negative",
+                "iso": -100
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"].as_str().unwrap().contains("iso"));
+}
+
+#[tokio::test]
+async fn update_film_stock_rejects_negative_exposure_count() {
+    let app = open_app().await;
+    let id = create_film_stock(&app, "Patchstock").await;
+    let res = app
+        .oneshot(put_json(
+            &format!("/api/film-stocks/{id}"),
+            &json!({ "exposure_count": -1 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }

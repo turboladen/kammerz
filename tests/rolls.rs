@@ -338,3 +338,74 @@ async fn suggest_id_skips_surviving_ids_after_delete() {
         "suggest-id derives the suffix from the max existing id, not a row count"
     );
 }
+
+// --- Server-side input validation (kammerz-grd) ---
+
+#[tokio::test]
+async fn create_roll_rejects_whitespace_roll_id() {
+    let app = open_app().await;
+    let res = app.clone().oneshot(get("/api/cameras")).await.unwrap();
+    let cams: Vec<Value> = json_body(res).await;
+    let camera_id = cams[0]["id"].as_i64().unwrap() as i32;
+
+    let res = app
+        .oneshot(post_json(
+            "/api/rolls",
+            &json!({ "roll_id": "   ", "camera_id": camera_id, "status": "loaded" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("roll_id"));
+}
+
+#[tokio::test]
+async fn create_roll_rejects_negative_frame_count() {
+    let app = open_app().await;
+    let res = app.clone().oneshot(get("/api/cameras")).await.unwrap();
+    let cams: Vec<Value> = json_body(res).await;
+    let camera_id = cams[0]["id"].as_i64().unwrap() as i32;
+
+    let res = app
+        .oneshot(post_json(
+            "/api/rolls",
+            &json!({
+                "roll_id": "NEG-FRAMES",
+                "camera_id": camera_id,
+                "status": "loaded",
+                "frame_count": -36
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("frame_count"));
+}
+
+#[tokio::test]
+async fn update_roll_rejects_whitespace_roll_id() {
+    let app = open_app().await;
+    let id = create_roll(&app, "ORIG-ID").await;
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/rolls/{id}"),
+            &json!({ "roll_id": "  " }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    // Original roll_id survives.
+    let res = app.oneshot(get(&format!("/api/rolls/{id}"))).await.unwrap();
+    let roll: Value = json_body(res).await;
+    assert_eq!(roll["roll_id"], "ORIG-ID");
+}

@@ -18,7 +18,9 @@ use crate::services::development_service::{
     DevelopmentService, LabDevListItem, SelfDevWithStages, StageInput,
 };
 use crate::services::roll_service::RollService;
-use crate::validate::validate_date_opt;
+use crate::validate::{
+    require_nonempty, validate_date_opt, validate_non_negative_f64, validate_non_negative_i32,
+};
 use crate::AppState;
 use entity::roll::RollStatus;
 use entity::{dev_stage, development_lab, development_self};
@@ -103,6 +105,19 @@ pub struct StageDto {
     pub sort_order: i32,
 }
 
+/// Validate each stage before the rows are written: `stage_name` must not be
+/// empty (it is `NOT NULL`), and `duration_seconds` / `sort_order` must be
+/// non-negative. Names the offending index so the 422 points the user at the
+/// right stage row.
+fn validate_stages(stages: &[StageDto]) -> AppResult<()> {
+    for (i, s) in stages.iter().enumerate() {
+        require_nonempty(&format!("stages[{i}].stage_name"), &s.stage_name)?;
+        validate_non_negative_i32(&format!("stages[{i}].duration_seconds"), s.duration_seconds)?;
+        validate_non_negative_i32(&format!("stages[{i}].sort_order"), Some(s.sort_order))?;
+    }
+    Ok(())
+}
+
 fn stages_to_inputs(stages: Vec<StageDto>) -> Vec<StageInput> {
     stages
         .into_iter()
@@ -166,6 +181,7 @@ async fn create_lab_dev(
 ) -> AppResult<(StatusCode, Json<i32>)> {
     validate_date_opt("date_dropped_off", &data.date_dropped_off)?;
     validate_date_opt("date_received", &data.date_received)?;
+    validate_non_negative_f64("cost", data.cost)?;
 
     let now = now_string();
 
@@ -240,6 +256,9 @@ async fn update_lab_dev(
     }
     if let Some(v) = &data.date_received {
         validate_date_opt("date_received", v)?;
+    }
+    if let Some(v) = data.cost {
+        validate_non_negative_f64("cost", v)?;
     }
 
     let now = now_string();
@@ -359,6 +378,9 @@ async fn create_self_dev(
     Json(data): Json<CreateSelfDevDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
     validate_date_opt("date_processed", &data.date_processed)?;
+    if let Some(stages) = &data.stages {
+        validate_stages(stages)?;
+    }
 
     let now = now_string();
 
@@ -438,6 +460,9 @@ async fn update_self_dev(
 
     if let Some(v) = &data.date_processed {
         validate_date_opt("date_processed", v)?;
+    }
+    if let Some(stages) = &data.stages {
+        validate_stages(stages)?;
     }
 
     let now = now_string();

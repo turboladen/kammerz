@@ -1,7 +1,7 @@
 mod common;
 
 use axum::http::StatusCode;
-use common::{delete, get, json_body, open_app, post_json};
+use common::{delete, get, json_body, open_app, post_json, put_json};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
@@ -50,4 +50,52 @@ async fn delete_missing_lab_returns_404() {
     let body: Value = json_body(res).await;
     assert_eq!(body["error"]["code"], "NOT_FOUND");
     assert_eq!(body["error"]["message"], "Lab 999999 not found");
+}
+
+// --- Server-side input validation (kammerz-grd) ---
+
+#[tokio::test]
+async fn create_lab_rejects_whitespace_name() {
+    let app = open_app().await;
+    let res = app
+        .oneshot(post_json("/api/labs", &json!({ "name": "   " })))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(body["error"]["message"].as_str().unwrap().contains("name"));
+}
+
+#[tokio::test]
+async fn create_lab_trims_name() {
+    let app = open_app().await;
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/labs", &json!({ "name": "  Padded Lab  " })))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let id: i32 = json_body(res).await;
+    let res = app.oneshot(get(&format!("/api/labs/{id}"))).await.unwrap();
+    let lab: Value = json_body(res).await;
+    assert_eq!(lab["name"], "Padded Lab", "name is stored trimmed");
+}
+
+#[tokio::test]
+async fn update_lab_rejects_whitespace_name() {
+    let app = open_app().await;
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/labs", &json!({ "name": "Keepme" })))
+        .await
+        .unwrap();
+    let id: i32 = json_body(res).await;
+    let res = app
+        .oneshot(put_json(
+            &format!("/api/labs/{id}"),
+            &json!({ "name": " " }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }

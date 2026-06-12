@@ -1,18 +1,86 @@
-//! Authoritative date validation — the backend half of kammerz-igc's
-//! defense-in-depth. The frontend gates Save/Confirm buttons (`dateFieldError`
-//! in `frontend/src/lib/utils/date.ts`), but a malformed date must never persist
-//! regardless of client, so every create/update handler with a real date column
-//! runs its inputs through here before touching the DB.
+//! Authoritative input validation — the backend half of kammerz-igc's
+//! defense-in-depth. The frontend gates Save/Confirm buttons, but invalid data
+//! must never persist regardless of client (kammerz-grd), so every create/update
+//! handler runs its inputs through here before touching the DB.
 //!
-//! The accepted shape mirrors the frontend exactly: a date is OK when it is
+//! Date validation (`validate_date_opt`) accepts the same shape as the frontend:
 //! empty (dates are optional) or a *complete* `YYYY`, `YYYY-MM`, or `YYYY-MM-DD`
 //! with year 1800–2100 and — for full dates — a real calendar day. Free-form
 //! `*_fuzzy` columns are deliberately NOT validated; handlers skip them.
+//!
+//! The remaining helpers cover required strings, non-negative numbers (costs,
+//! counts, dimensions — negatives are nonsensical and skew `/api/stats`), and
+//! GPS coordinates (hard geographic bounds). Every helper names its `field` in
+//! the 422 message so the user knows which input to fix. The numeric/coordinate
+//! helpers take an `Option<T>` and pass `None` through (no value to check), so
+//! an update handler validates a `double_option` field by peeling one layer —
+//! `if let Some(inner) = data.cost { validate_non_negative_f64("cost", inner)? }`
+//! — mirroring how `validate_date_opt` accepts the inner `&Option<String>`.
 
 use crate::error::{AppError, AppResult};
 
 const YEAR_MIN: i32 = 1800;
 const YEAR_MAX: i32 = 2100;
+
+/// Validate a required string from a create/update DTO, returning the trimmed
+/// value for the caller to `Set()`. Whitespace-only input is rejected with a
+/// 422 naming the field — a bare `trim()` would otherwise satisfy a `NOT NULL`
+/// column with `""`, and for `roll_id` an empty value collides on the UNIQUE
+/// index and surfaces a confusing duplicate error instead.
+pub fn require_nonempty(field: &str, value: &str) -> AppResult<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        Err(AppError::UnprocessableEntity(format!(
+            "{field}: must not be empty"
+        )))
+    } else {
+        Ok(trimmed.to_string())
+    }
+}
+
+/// Reject a negative optional integer (costs, counts, dimensions). `None` is
+/// accepted (the column is nullable / the field was omitted).
+pub fn validate_non_negative_i32(field: &str, value: Option<i32>) -> AppResult<()> {
+    match value {
+        Some(v) if v < 0 => Err(AppError::UnprocessableEntity(format!(
+            "{field}: must be 0 or greater"
+        ))),
+        _ => Ok(()),
+    }
+}
+
+/// Reject a negative, NaN, or infinite optional float (monetary costs). `None`
+/// is accepted. NaN/infinity can't be stored or aggregated meaningfully, so they
+/// are rejected alongside negatives.
+pub fn validate_non_negative_f64(field: &str, value: Option<f64>) -> AppResult<()> {
+    match value {
+        Some(v) if !v.is_finite() || v < 0.0 => Err(AppError::UnprocessableEntity(format!(
+            "{field}: must be a finite number 0 or greater"
+        ))),
+        _ => Ok(()),
+    }
+}
+
+/// Validate an optional latitude: finite and within −90..=90 degrees. `None` ok.
+pub fn validate_lat(field: &str, value: Option<f64>) -> AppResult<()> {
+    validate_coord(field, value, 90.0)
+}
+
+/// Validate an optional longitude: finite and within −180..=180 degrees. `None` ok.
+pub fn validate_lon(field: &str, value: Option<f64>) -> AppResult<()> {
+    validate_coord(field, value, 180.0)
+}
+
+/// Shared coordinate check: `None` passes; `Some(v)` must be finite and within
+/// `±bound` (inclusive). Rejects NaN/infinity (the `!is_finite` arm).
+fn validate_coord(field: &str, value: Option<f64>, bound: f64) -> AppResult<()> {
+    match value {
+        Some(v) if !v.is_finite() || v < -bound || v > bound => Err(AppError::UnprocessableEntity(
+            format!("{field}: must be between {} and {bound}", -bound),
+        )),
+        _ => Ok(()),
+    }
+}
 
 /// Validate an optional date string from a create/update DTO. `field` names the
 /// column (e.g. `"date_loaded"`) so the 422 message points the user at it.
@@ -141,5 +209,54 @@ mod tests {
             AppError::UnprocessableEntity(m) => assert!(m.contains("date_received")),
             _ => panic!("expected UnprocessableEntity"),
         }
+    }
+
+    #[test]
+    fn require_nonempty_rejects_blank_and_returns_trimmed() {
+        assert!(require_nonempty("brand", "").is_err());
+        assert!(require_nonempty("brand", "   ").is_err());
+        assert!(require_nonempty("brand", "\t\n").is_err());
+        assert_eq!(require_nonempty("brand", "  Nikon  ").unwrap(), "Nikon");
+        // The error names the field so the user knows which input to fix.
+        let e = require_nonempty("roll_id", " ").unwrap_err();
+        match e {
+            AppError::UnprocessableEntity(m) => assert!(m.contains("roll_id")),
+            _ => panic!("expected UnprocessableEntity"),
+        }
+    }
+
+    #[test]
+    fn non_negative_i32_accepts_none_zero_positive_rejects_negative() {
+        assert!(validate_non_negative_i32("iso", None).is_ok());
+        assert!(validate_non_negative_i32("iso", Some(0)).is_ok());
+        assert!(validate_non_negative_i32("iso", Some(400)).is_ok());
+        assert!(validate_non_negative_i32("iso", Some(-1)).is_err());
+    }
+
+    #[test]
+    fn non_negative_f64_rejects_negative_nan_and_infinity() {
+        assert!(validate_non_negative_f64("cost", None).is_ok());
+        assert!(validate_non_negative_f64("cost", Some(0.0)).is_ok());
+        assert!(validate_non_negative_f64("cost", Some(18.5)).is_ok());
+        assert!(validate_non_negative_f64("cost", Some(-0.01)).is_err());
+        assert!(validate_non_negative_f64("cost", Some(f64::NAN)).is_err());
+        assert!(validate_non_negative_f64("cost", Some(f64::INFINITY)).is_err());
+        assert!(validate_non_negative_f64("cost", Some(f64::NEG_INFINITY)).is_err());
+    }
+
+    #[test]
+    fn lat_lon_enforce_bounds_and_reject_non_finite() {
+        assert!(validate_lat("gps_lat", None).is_ok());
+        assert!(validate_lat("gps_lat", Some(0.0)).is_ok());
+        assert!(validate_lat("gps_lat", Some(-90.0)).is_ok());
+        assert!(validate_lat("gps_lat", Some(90.0)).is_ok());
+        assert!(validate_lat("gps_lat", Some(90.1)).is_err());
+        assert!(validate_lat("gps_lat", Some(-91.0)).is_err());
+        assert!(validate_lat("gps_lat", Some(f64::NAN)).is_err());
+
+        assert!(validate_lon("gps_lon", Some(-180.0)).is_ok());
+        assert!(validate_lon("gps_lon", Some(180.0)).is_ok());
+        assert!(validate_lon("gps_lon", Some(181.0)).is_err());
+        assert!(validate_lon("gps_lon", Some(f64::INFINITY)).is_err());
     }
 }
