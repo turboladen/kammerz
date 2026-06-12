@@ -6,6 +6,7 @@ pub mod error;
 pub mod patch;
 pub mod routes;
 pub mod services;
+pub mod spa;
 pub mod validate;
 
 use axum::extract::FromRef;
