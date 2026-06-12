@@ -47,9 +47,13 @@
 
 	async function handleAdd() {
 		error = '';
+		if (!name.trim()) {
+			error = 'Lab name is required.';
+			return;
+		}
 		try {
 			const lab: LabInsert = {
-				name,
+				name: name.trim(),
 				location: location || null,
 				website: website || null,
 				notes: notes || null
@@ -75,9 +79,13 @@
 	async function handleEdit() {
 		if (!editingLab) return;
 		error = '';
+		if (!name.trim()) {
+			error = 'Lab name is required.';
+			return;
+		}
 		try {
 			await updateLab(editingLab.id, {
-				name,
+				name: name.trim(),
 				location: location || null,
 				website: website || null,
 				notes: notes || null
