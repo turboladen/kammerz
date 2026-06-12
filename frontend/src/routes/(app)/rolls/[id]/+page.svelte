@@ -695,13 +695,17 @@
 
 	async function saveEditRoll() {
 		error = '';
+		if (!editRollId.trim()) {
+			error = 'Roll ID is required.';
+			return;
+		}
 		try {
 			// For fixed-lens cameras the lens Select is hidden and replaced by a
 			// read-only display of the built-in lens — persist that lens, never a
 			// stale editLensId left over from a previous camera (kammerz-8hg).
 			const lensId = editIsFixedLens ? (editFixedLens?.id ?? null) : editLensId ? Number(editLensId) : null;
 			await updateRoll(id, {
-				roll_id: editRollId,
+				roll_id: editRollId.trim(),
 				camera_id: editCameraId ? Number(editCameraId) : null,
 				film_stock_id: editFilmStockId ? Number(editFilmStockId) : null,
 				lens_id: lensId,

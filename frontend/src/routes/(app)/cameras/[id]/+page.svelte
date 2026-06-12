@@ -252,10 +252,18 @@
 
 	async function saveEdit() {
 		error = '';
+		if (!editBrand.trim()) {
+			error = 'Brand is required.';
+			return;
+		}
+		if (!editModel.trim()) {
+			error = 'Model is required.';
+			return;
+		}
 		try {
 			await updateCamera(id, {
-				brand: editBrand,
-				model: editModel,
+				brand: editBrand.trim(),
+				model: editModel.trim(),
 				prefix: editPrefix || null,
 				format: editFormat as CameraFormat,
 				lens_mount_id: Number(editLensMountId),

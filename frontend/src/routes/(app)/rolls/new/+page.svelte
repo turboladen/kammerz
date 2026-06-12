@@ -152,9 +152,13 @@
 
 	async function handleSubmit() {
 		error = '';
+		if (!rollId.trim()) {
+			error = 'Roll ID is required.';
+			return;
+		}
 		try {
 			const roll: RollInsert = {
-				roll_id: rollId,
+				roll_id: rollId.trim(),
 				camera_id: cameraId ? Number(cameraId) : null,
 				film_stock_id: filmStockId ? Number(filmStockId) : null,
 				lens_id: lensId ? Number(lensId) : null,
