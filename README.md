@@ -36,6 +36,8 @@ just build
 
 This builds the SvelteKit app into `frontend/build`, then `cargo build --release` embeds it into the binary at `target/release/kammerz`. The release binary serves the SPA and the API itself — no separate web server or Node runtime needed.
 
+Note that `just build` targets the **host** you run it on (on a Mac it produces a macOS binary). Deploying to the Linux server is handled by `just deploy`, which cross-compiles automatically (see [Deployment](#deployment-systemd)).
+
 ## Authentication
 
 Access is protected by a single shared password, stored as an argon2 hash in the `KAMMERZ_PASSWORD_HASH` environment variable.
@@ -66,16 +68,31 @@ ANTHROPIC_API_KEY=     # optional; overrides the claude_api_key settings row for
 
 ## Deployment (systemd)
 
-On the server (Linux), as a dedicated `kammerz` user:
+Releases are deployed straight from this repo with `just deploy` — there are no GitHub release artifacts. One-time toolchain setup on the Mac (cross-compiler for the aarch64 DietPi server; the linker is wired up in `.cargo/config.toml`):
 
 ```bash
-sudo install -d -o kammerz -g kammerz /opt/kammerz /opt/kammerz/data
-sudo install -o kammerz -g kammerz target/release/kammerz /opt/kammerz/kammerz
-sudo install -o kammerz -g kammerz .env /opt/kammerz/.env       # your filled-in .env
-sudo cp deploy/kammerz.service /etc/systemd/system/kammerz.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now kammerz
+rustup target add aarch64-unknown-linux-gnu
+brew install messense/macos-cross-toolchains/aarch64-unknown-linux-gnu
 ```
+
+First-time setup — create the service user and directories on the server, then push your filled-in `.env` from the Mac (the systemd unit hard-requires `/opt/kammerz/.env`, so this **must happen before the first deploy**; a premature start crash-loops the unit until `sudo systemctl reset-failed kammerz`):
+
+```bash
+# on the server
+sudo useradd --system --home-dir /opt/kammerz --no-create-home --shell /usr/sbin/nologin kammerz
+sudo install -d -o kammerz -g kammerz /opt/kammerz /opt/kammerz/data
+
+# from the Mac (filled-in .env in the repo root)
+ssh <user>@<server> "sudo tee /opt/kammerz/.env > /dev/null && sudo chown kammerz:kammerz /opt/kammerz/.env && sudo chmod 600 /opt/kammerz/.env" < .env
+```
+
+Then every release is one command from the Mac:
+
+```bash
+just deploy <user>@<server>          # add a port arg if your .env overrides PORT, e.g. just deploy box 8080
+```
+
+The deploy user needs **passwordless sudo** on the server (the recipe runs `sudo -n` over non-interactive ssh). The recipe runs the backend test suite, cross-compiles the binary (fresh SPA embedded via rust-embed), uploads it alongside the live one and swaps it in atomically, installs `deploy/kammerz.service` into `/etc/systemd/system/` (so unit-file edits always propagate), restarts the service, and then polls `GET /api/health` until it reports the **build SHA that was just compiled** — a green deploy means the new binary is the one serving, not merely that something answered. After the first deploy, enable boot startup once: `ssh <user>@<server> 'sudo systemctl enable kammerz'`.
 
 The provided `deploy/kammerz.service` is hardened (`ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `NoNewPrivileges`) and only grants write access to `/opt/kammerz/data`, where the SQLite catalog lives.
 

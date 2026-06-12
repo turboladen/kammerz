@@ -39,7 +39,9 @@ async fn main() {
             rpassword::prompt_password("Password: ").expect("failed to read password")
         } else {
             let mut s = String::new();
-            std::io::stdin().read_to_string(&mut s).expect("failed to read stdin");
+            std::io::stdin()
+                .read_to_string(&mut s)
+                .expect("failed to read stdin");
             s.trim_end_matches(['\n', '\r']).to_string()
         };
         println!("{}", kammerz::auth::password::hash_password(&pw).unwrap());
@@ -47,6 +49,15 @@ async fn main() {
     }
 
     tracing_subscriber::fmt::init();
+
+    // Surface the build version first thing so any deployed binary (NAS or dev)
+    // identifies itself in the log even if boot fails later. Also reported by
+    // GET /api/health for remote checks.
+    tracing::info!(
+        "kammerz v{} ({}) starting",
+        env!("CARGO_PKG_VERSION"),
+        env!("KAMMERZ_BUILD_SHA")
+    );
 
     let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| db::default_db_url());
     let db = db::init(&db_url).await.expect("database init failed");
@@ -89,7 +100,10 @@ async fn main() {
     .await
     .expect("session store pool");
     let session_store = SqliteStore::new(session_pool.clone());
-    session_store.migrate().await.expect("session store migrate");
+    session_store
+        .migrate()
+        .await
+        .expect("session store migrate");
 
     let session_layer = SessionManagerLayer::new(session_store)
         .with_secure(config.secure_cookies)
@@ -97,14 +111,20 @@ async fn main() {
         .with_http_only(true)
         .with_expiry(Expiry::OnInactivity(TimeDuration::days(30)));
 
-    let state = AppState { db: db.clone(), config };
+    let state = AppState {
+        db: db.clone(),
+        config,
+    };
 
     let app = routes::create_router(state)
         .fallback(serve_spa)
         .layer(session_layer)
         .layer(TraceLayer::new_for_http());
 
-    let port: u16 = std::env::var("PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(3002);
+    let port: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3002);
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
         .await
         .expect("failed to bind");
@@ -127,7 +147,10 @@ async fn main() {
     // the main DB file taken while the service is stopped is complete (a live
     // WAL would otherwise hold un-checkpointed writes), then close both pools.
     use sea_orm::ConnectionTrait;
-    if let Err(e) = db.execute_unprepared("PRAGMA wal_checkpoint(TRUNCATE)").await {
+    if let Err(e) = db
+        .execute_unprepared("PRAGMA wal_checkpoint(TRUNCATE)")
+        .await
+    {
         tracing::warn!("WAL checkpoint on shutdown failed: {e}");
     }
     session_pool.close().await;
@@ -142,7 +165,9 @@ async fn main() {
 /// stops accepting new connections and drains in-flight requests first.
 async fn shutdown_signal() {
     let ctrl_c = async {
-        tokio::signal::ctrl_c().await.expect("failed to install SIGINT handler");
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install SIGINT handler");
     };
 
     #[cfg(unix)]
@@ -189,13 +214,22 @@ async fn serve_spa(uri: Uri) -> impl IntoResponse {
     };
     match asset {
         Some(content) => {
-            let mime = mime_guess::from_path(mime_path).first_or_octet_stream().as_ref().to_string();
+            let mime = mime_guess::from_path(mime_path)
+                .first_or_octet_stream()
+                .as_ref()
+                .to_string();
             let cache = if path.starts_with("_app/immutable/") {
                 "public, max-age=31536000, immutable"
             } else {
                 "no-cache"
             };
-            ([(header::CONTENT_TYPE, mime), (header::CACHE_CONTROL, cache.to_string())], content.data)
+            (
+                [
+                    (header::CONTENT_TYPE, mime),
+                    (header::CACHE_CONTROL, cache.to_string()),
+                ],
+                content.data,
+            )
                 .into_response()
         }
         None => StatusCode::NOT_FOUND.into_response(),
