@@ -4,3 +4,4 @@ build
 test-results
 static/fonts
 bun.lock
+playwright/.auth
