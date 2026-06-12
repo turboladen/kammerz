@@ -33,7 +33,7 @@ sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls"], default
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
 tower = "0.5"
-tower-http = { version = "0.6", features = ["trace"] }
+tower-http = { version = "0.6", features = ["compression-br", "compression-gzip", "trace"] }
 tower-sessions = "0.14"
 tower-sessions-sqlx-store = { version = "0.15", features = ["sqlite"] }
 tower_governor = { version = "0.8.0", default-features = false, features = ["axum"] }

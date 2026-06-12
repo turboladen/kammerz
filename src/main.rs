@@ -129,10 +129,21 @@ async fn main() {
         config,
     };
 
+    // gzip/brotli negotiation on the way out (the primary remote path is a phone
+    // over the field VPN; the ~568KB first-load bundle and GET /api/rolls JSON
+    // compress 5-10x). The predicate and woff2 exclusion live in
+    // `kammerz::compression` so this layer and the integration tests share one
+    // definition.
+    //
+    // Layered last so it sits *outside* TraceLayer: trace then observes the
+    // pre-compression response, keeping logged body sizes meaningful. It wraps
+    // both create_router's /api routes and the serve_spa fallback because every
+    // layer here applies after `.fallback(...)`.
     let app = routes::create_router(state)
         .fallback(serve_spa)
         .layer(session_layer)
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        .layer(kammerz::compression::compression_layer());
 
     let port: u16 = std::env::var("PORT")
         .ok()
