@@ -13,6 +13,7 @@
 	import DateConfirm from '$lib/components/ui/DateConfirm.svelte';
 	import DevelopmentSection from '$lib/components/rolls/DevelopmentSection.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
+	import InlineNotice from '$lib/components/ui/InlineNotice.svelte';
 	import RollTimeline from '$lib/components/rolls/RollTimeline.svelte';
 	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
 	import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
@@ -32,8 +33,10 @@
 		getDevPath,
 		getFlowForPath,
 		getPathLabel,
-		allStatusOrder,
 		devKindForStatus,
+		getStatusLabel,
+		labFlow,
+		selfFlow,
 		type DevAutoPrompt
 	} from '$lib/utils/status';
 	import { buildRollTimeline, readDateTarget, STATUS_DATE_TARGET } from '$lib/utils/timeline';
@@ -115,6 +118,15 @@
 	// Inline notice under the chevron bar — set when a prompt-opened dev dialog is
 	// cancelled, so a dropped status click is acknowledged instead of silent.
 	let statusNotice = $state('');
+	// Transient notice for a status the BACKEND auto-changed as a side effect of a
+	// mutation (shot add/delete, dev create/update/delete, Timeline date edit). The
+	// backend's auto-sync repaints the chevron/Badge silently otherwise — this makes
+	// the invisible change legible. Suppressed for explicit chevron clicks / the
+	// roll-full nudge, where the user already drove (and saw) the move (kammerz-9xg).
+	let autoStatusNotice = $state('');
+	// Bumped on each auto-notice so InlineNotice restarts its dismiss timer even when
+	// two consecutive auto-changes produce the same text.
+	let autoStatusNoticeSeq = $state(0);
 
 	// Path-aware status flow
 	const devPath = $derived(roll ? getDevPath(roll.status as RollStatus, !!labDev, !!selfDev) : ('undecided' as const));
@@ -287,13 +299,64 @@
 		}
 	}
 
-	async function loadRollData() {
+	// Context hint passed into loadRollData so the auto-change notice can describe
+	// the side effect WITHOUT guessing its cause — each mutation call site knows what
+	// it did. 'explicit' = a user-driven status move (chevron / nudge): suppress the
+	// notice even when the status changes. The rest name the mutation that ran so the
+	// message can be specific; an undiffed status (no change) shows nothing regardless.
+	type ReloadReason = 'navigate' | 'explicit' | 'shot-add' | 'shot-delete' | 'dev' | 'timeline' | 'roll-edit';
+
+	// Direction of an auto-change, judged WITHIN a single dev flow. The canonical full
+	// status order interleaves the lab and self branches (at-lab, lab-done, developing,
+	// developed), so a cross-flow move (e.g. recording a lab dev on a roll stranded at
+	// 'developing' snaps it to 'at-lab') would read as "backward" against that flat order
+	// even though it isn't a revert. So we only call it forward/back when BOTH statuses sit
+	// on the same flow; a cross-flow or off-flow pair returns null and the message stays
+	// neutral ("is now"), which is always true regardless of direction.
+	function changeDirection(prev: RollStatus, next: RollStatus): 'forward' | 'back' | null {
+		for (const flow of [labFlow, selfFlow]) {
+			const p = flow.indexOf(prev);
+			const n = flow.indexOf(next);
+			if (p !== -1 && n !== -1) return n > p ? 'forward' : 'back';
+		}
+		return null;
+	}
+
+	// Build the auto-change notice text. The verb states direction when it's
+	// unambiguous (same flow) and stays neutral otherwise. The optional trailing
+	// clause only names a cause the page can GUARANTEE from the mutation that ran and
+	// the resulting status — never something it would have to infer. In particular it
+	// makes no claim about WHY a dev/timeline reload moved the status, because a single
+	// 'dev' reload covers create, edit (a cleared date reverts without removing the
+	// record — kammerz-3wg/PR #66) and delete; asserting "record removed" or "date
+	// cleared" there would lie for the edit case.
+	function statusChangeMessage(prev: RollStatus, next: RollStatus, reason: ReloadReason): string {
+		const label = getStatusLabel(next);
+		const dir = changeDirection(prev, next);
+		const verb = dir === 'forward' ? 'advanced to' : dir === 'back' ? 'moved back to' : 'is now';
+		// Guaranteed causes only: a first shot is the sole thing that lands a roll at
+		// Shooting via shot-add, and emptying the shot list is the sole thing that
+		// reverts to Loaded via shot-delete. Everything else stays cause-free.
+		let cause = '.';
+		if (reason === 'shot-add' && next === 'shooting') cause = ' — the first shot was logged.';
+		else if (reason === 'shot-delete' && next === 'loaded') cause = ' — the roll has no shots left.';
+		return `Status ${verb} ${label}${cause}`;
+	}
+
+	async function loadRollData(reason: ReloadReason = 'navigate') {
 		// Clear any stale error: this component instance is reused across [id]
 		// changes (the $effect re-runs loadRollData()), so a prior failure must
 		// not leak into the next roll's view. The cancel notice is transient for
 		// the same reason — any successful mutation reload supersedes it.
 		error = '';
 		statusNotice = '';
+		// Navigation and explicit user-driven moves clear any stale auto-change notice
+		// (a prior roll's, or one superseded by an intentional chevron click); auto
+		// reloads keep it until they either set a new one or leave it as-is.
+		if (reason === 'navigate' || reason === 'explicit') autoStatusNotice = '';
+		// Snapshot the status BEFORE the fetch so an auto-change can be detected by
+		// comparing it to the freshly-loaded value below.
+		const prevStatus = roll?.status as RollStatus | undefined;
 		try {
 			// The composite /detail endpoint collapses the six roll-scoped
 			// round-trips (roll, shots, shot-lens pairs, lab/self dev, dev stages)
@@ -320,6 +383,17 @@
 				(map[shotId] ??= []).push(lensId);
 			}
 			shotLensMap = map;
+
+			// Surface a backend auto-sync as the LAST step — after the roll data is
+			// applied — so a message-building hiccup (e.g. a status the frontend union
+			// doesn't yet know) can never strand the page on stale data. Suppressed for
+			// 'explicit'/'navigate' (user-driven moves and page loads, which carry no
+			// meaningful "prev" to diff against).
+			const newStatus = roll.status as RollStatus;
+			if (prevStatus && prevStatus !== newStatus && reason !== 'navigate' && reason !== 'explicit') {
+				autoStatusNotice = statusChangeMessage(prevStatus, newStatus, reason);
+				autoStatusNoticeSeq += 1;
+			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -424,7 +498,7 @@
 			}
 			showShotDialog = false;
 			resetShotForm();
-			await loadRollData();
+			await loadRollData('shot-add');
 		} catch (err) {
 			shotError = err instanceof Error ? err.message : String(err);
 		}
@@ -452,7 +526,7 @@
 				notes: shotNotes || null,
 				lens_ids: lensIds
 			});
-			await loadRollData();
+			await loadRollData('shot-add');
 			// Reset per-shot fields but keep session defaults (date, location, lens)
 			try {
 				shotFrameNumber = await suggestNextFrame(id);
@@ -478,7 +552,7 @@
 		error = '';
 		try {
 			await deleteShot(shotId);
-			await loadRollData();
+			await loadRollData('shot-delete');
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -538,7 +612,7 @@
 				error = err instanceof Error ? err.message : String(err);
 			}
 
-			await loadRollData();
+			await loadRollData('explicit');
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -563,7 +637,7 @@
 		error = '';
 		try {
 			await writeDateTarget(milestone.target, date);
-			await loadRollData();
+			await loadRollData('timeline');
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -715,7 +789,7 @@
 				notes: editNotes || null
 			});
 			editingRoll = false;
-			await loadRollData();
+			await loadRollData('roll-edit');
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -987,6 +1061,11 @@
 				{#if statusNotice}
 					<p class="mt-2 text-xs text-text-faint">{statusNotice}</p>
 				{/if}
+				{#if autoStatusNotice}
+					<div class="mt-2">
+						<InlineNotice bind:message={autoStatusNotice} seq={autoStatusNoticeSeq} />
+					</div>
+				{/if}
 			</div>
 		</FadeIn>
 
@@ -1012,7 +1091,7 @@
 				bind:autoPrompt={devAutoPrompt}
 				currentStatus={roll?.status ?? null}
 				defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
-				onchange={loadRollData}
+				onchange={() => loadRollData('dev')}
 				onpromptcancel={() => {
 					statusNotice = 'Status unchanged — no development record was saved.';
 				}}
