@@ -13,6 +13,10 @@ pub enum AppError {
     UnprocessableEntity(String),
     /// Rate limit exceeded (e.g. brute-force guard on the login route).
     TooManyRequests,
+    /// A dependency the request needs is unavailable (e.g. the database failed
+    /// its liveness check on `/api/health`). Distinct from `Internal` so probes
+    /// see a retry-able 503 rather than a 500.
+    ServiceUnavailable(String),
     Internal(String),
 }
 
@@ -33,6 +37,14 @@ impl IntoResponse for AppError {
                 "TOO_MANY_REQUESTS",
                 "Too many login attempts. Please wait and try again.".to_string(),
             ),
+            AppError::ServiceUnavailable(m) => {
+                tracing::error!("service unavailable: {m}");
+                (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "SERVICE_UNAVAILABLE",
+                    "The service is temporarily unavailable".to_string(),
+                )
+            }
             AppError::Internal(m) => {
                 tracing::error!("internal error: {m}");
                 (
@@ -85,5 +97,38 @@ pub trait DbOptionExt<T> {
 impl<T> DbOptionExt<T> for Option<T> {
     fn or_404_db(self, label: &str, id: i32) -> Result<T, sea_orm::DbErr> {
         self.ok_or_else(|| sea_orm::DbErr::RecordNotFound(format!("{label} {id} not found")))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use http_body_util::BodyExt;
+    use serde_json::Value;
+
+    // A wedged/locked/unmounted DB makes `/api/health` fail its liveness ping;
+    // the handler maps that to `ServiceUnavailable`. Integration-testing the
+    // failure end-to-end would require wedging the single-connection pool from
+    // outside, which isn't feasible in-process — so the contract that probes
+    // depend on (503 + the `{error:{code,message}}` envelope, generic message,
+    // no leaked internals) is pinned here at the `IntoResponse` boundary.
+    #[tokio::test]
+    async fn service_unavailable_maps_to_503_envelope() {
+        let res =
+            AppError::ServiceUnavailable("db ping failed: disk I/O error".into()).into_response();
+        assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+        let bytes = res.into_body().collect().await.unwrap().to_bytes();
+        let body: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["error"]["code"], "SERVICE_UNAVAILABLE");
+        assert_eq!(
+            body["error"]["message"],
+            "The service is temporarily unavailable"
+        );
+        // The raw cause must not leak to unauthenticated callers.
+        assert!(!body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("disk I/O"));
     }
 }
