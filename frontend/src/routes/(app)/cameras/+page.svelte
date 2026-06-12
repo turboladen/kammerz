@@ -21,8 +21,8 @@
 		listDistinctVendors
 	} from '$lib/api/cameras';
 	import { listDistinctLensBrands } from '$lib/api/lenses';
-	import { listLensMounts } from '$lib/api/lens-mounts';
-	import { buildMountOptions } from '$lib/utils/lens';
+	import { listLensMounts, createLensMount } from '$lib/api/lens-mounts';
+	import { buildMountOptions, NEW_MOUNT_OPTION } from '$lib/utils/lens';
 	import { filterBySearch, groupItems, sortByString, sortByDate } from '$lib/utils/list';
 	import type { Camera, CameraFormat, CameraType, CameraInsert, LensMount } from '$lib/types';
 
@@ -117,6 +117,11 @@
 	let notes = $state('');
 	const addDateError = $derived(dateFieldError(datePurchased) || dateFieldError(dateSold));
 
+	// Inline mount creation (revealed when the mount Select picks "+ New mount…")
+	let newMountName = $state('');
+	let newMountError = $state('');
+	const creatingMount = $derived(lensMountId === NEW_MOUNT_OPTION);
+
 	// Inline fixed-lens fields
 	let lensModel = $state('');
 	let lensFocalLength = $state('');
@@ -189,7 +194,26 @@
 		lensModel = '';
 		lensFocalLength = '';
 		lensMaxAperture = '';
+		newMountName = '';
+		newMountError = '';
 		error = '';
+	}
+
+	async function createMount() {
+		newMountError = '';
+		const name = newMountName.trim();
+		if (!name) {
+			newMountError = 'Mount name is required.';
+			return;
+		}
+		try {
+			const id = await createLensMount(name);
+			lensMounts = await listLensMounts();
+			lensMountId = String(id);
+			newMountName = '';
+		} catch (err) {
+			newMountError = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	async function handleAdd() {
@@ -351,6 +375,27 @@
 			<Select label="Lens Mount" bind:value={lensMountId} options={lensMountOptions} />
 			<Select label="Type" bind:value={cameraType} options={typeOptions} />
 		</div>
+		{#if creatingMount}
+			<div class="rounded-lg border border-border-subtle bg-surface px-3 py-3">
+				<div class="flex items-end gap-2">
+					<div class="flex-1">
+						<Input label="New Mount Name" bind:value={newMountName} placeholder="Nikon F" spellcheck="false" />
+					</div>
+					<Button variant="primary" onclick={createMount}>Create</Button>
+					<Button
+						variant="ghost"
+						onclick={() => {
+							lensMountId = '';
+							newMountName = '';
+							newMountError = '';
+						}}>Cancel</Button
+					>
+				</div>
+				{#if newMountError}
+					<div class="mt-2 text-sm text-red-400">{newMountError}</div>
+				{/if}
+			</div>
+		{/if}
 		{#if isFixedLens}
 			<div class="border-t border-border-subtle pt-4">
 				<h3 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
@@ -397,7 +442,7 @@
 					resetForm();
 				}}>Cancel</Button
 			>
-			<Button variant="primary" disabled={!!addDateError} onclick={handleAdd}>Add Camera</Button>
+			<Button variant="primary" disabled={!!addDateError || creatingMount} onclick={handleAdd}>Add Camera</Button>
 		</div>
 	</div>
 </Dialog>

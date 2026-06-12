@@ -35,6 +35,9 @@ function isMediumFormatMount(name: string): boolean {
 
 type SelectOption = { value: string; label: string; disabled?: boolean };
 
+/** Sentinel mount-Select value that reveals the inline "create a new mount" form. */
+export const NEW_MOUNT_OPTION = '__new__';
+
 /** Returns true if the mount is the special "Fixed Lens" type. */
 function isFixedLensMount(name: string): boolean {
 	return name === 'Fixed Lens';
@@ -69,6 +72,9 @@ export function buildMountOptions(mounts: LensMount[], emptyLabel = 'Select moun
 			options.push({ value: String(m.id), label: m.name });
 		}
 	}
+
+	options.push({ value: '__divider_new__', label: '── New ──', disabled: true });
+	options.push({ value: NEW_MOUNT_OPTION, label: '+ New mount…' });
 
 	return options;
 }

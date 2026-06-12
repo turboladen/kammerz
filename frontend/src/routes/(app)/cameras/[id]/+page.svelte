@@ -26,10 +26,10 @@
 		unlinkLensFromCamera
 	} from '$lib/api/cameras';
 	import { listDistinctLensBrands, listLenses } from '$lib/api/lenses';
-	import { listLensMounts } from '$lib/api/lens-mounts';
+	import { listLensMounts, createLensMount } from '$lib/api/lens-mounts';
 	import { listRollsForCamera } from '$lib/api/rolls';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
-	import { lensDisplayName, buildMountOptions } from '$lib/utils/lens';
+	import { lensDisplayName, buildMountOptions, NEW_MOUNT_OPTION } from '$lib/utils/lens';
 	import { dateFieldError } from '$lib/utils/date';
 	import type {
 		Camera,
@@ -89,6 +89,28 @@
 	let editDateSold = $state('');
 	let editNotes = $state('');
 	const editDateError = $derived(dateFieldError(editDatePurchased) || dateFieldError(editDateSold));
+
+	// Inline mount creation (revealed when the edit mount Select picks "+ New mount…")
+	let newMountName = $state('');
+	let newMountError = $state('');
+	const creatingMount = $derived(editLensMountId === NEW_MOUNT_OPTION);
+
+	async function createMount() {
+		newMountError = '';
+		const name = newMountName.trim();
+		if (!name) {
+			newMountError = 'Mount name is required.';
+			return;
+		}
+		try {
+			const newId = await createLensMount(name);
+			lensMounts = await listLensMounts();
+			editLensMountId = String(newId);
+			newMountName = '';
+		} catch (err) {
+			newMountError = err instanceof Error ? err.message : String(err);
+		}
+	}
 
 	// Maintenance form state
 	let maintType = $state('CLA');
@@ -223,6 +245,8 @@
 		editPurchasedFrom = camera.purchased_from ?? '';
 		editDateSold = camera.date_sold ?? '';
 		editNotes = camera.notes ?? '';
+		newMountName = '';
+		newMountError = '';
 		editing = true;
 	}
 
@@ -370,7 +394,7 @@
 {:else if editing}
 	<PageHeader title="Edit {camera.brand} {camera.model}" backHref={cameraBackNav.href} backLabel={cameraBackNav.label}>
 		<Button variant="ghost" onclick={() => (editing = false)}>Cancel</Button>
-		<Button variant="primary" disabled={!!editDateError} onclick={saveEdit}>Save</Button>
+		<Button variant="primary" disabled={!!editDateError || creatingMount} onclick={saveEdit}>Save</Button>
 	</PageHeader>
 	<div class="max-w-2xl p-6">
 		<div class="space-y-4">
@@ -390,6 +414,27 @@
 				{/if}
 				<Select label="Type" bind:value={editCameraType} options={typeOptions} />
 			</div>
+			{#if creatingMount}
+				<div class="rounded-lg border border-border-subtle bg-surface px-3 py-3">
+					<div class="flex items-end gap-2">
+						<div class="flex-1">
+							<Input label="New Mount Name" bind:value={newMountName} placeholder="Nikon F" spellcheck="false" />
+						</div>
+						<Button variant="primary" onclick={createMount}>Create</Button>
+						<Button
+							variant="ghost"
+							onclick={() => {
+								editLensMountId = '';
+								newMountName = '';
+								newMountError = '';
+							}}>Cancel</Button
+						>
+					</div>
+					{#if newMountError}
+						<div class="mt-2 text-sm text-red-400">{newMountError}</div>
+					{/if}
+				</div>
+			{/if}
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<Input label="Prefix (Legacy ID)" bind:value={editPrefix} />
 				<Input label="Serial Number" bind:value={editSerialNumber} />
