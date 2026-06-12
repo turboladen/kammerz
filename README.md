@@ -48,7 +48,7 @@ echo -n 'your-password' | target/release/kammerz hash-password
 target/release/kammerz hash-password
 ```
 
-Put the resulting `$argon2id$…` string in `KAMMERZ_PASSWORD_HASH`.
+Put the resulting `$argon2id$…` string in `KAMMERZ_PASSWORD_HASH`, **wrapped in single quotes** when it lives in a `.env` file — the hash is full of `$` tokens, and the `.env` loader performs `$VAR` substitution on unquoted values, silently mangling the hash so every login fails. (The app refuses to start on an unparseable hash, so a mangled value is caught immediately.)
 
 > If `KAMMERZ_PASSWORD_HASH` is unset, the app runs in **open (LAN-trust) mode** with no authentication and logs a warning at startup. Only do this on a fully trusted LAN; set the hash for anything network-reachable.
 
@@ -58,7 +58,7 @@ Copy `.env.example` to `.env` and fill it in:
 
 ```bash
 DATABASE_URL=sqlite:/opt/kammerz/data/kammerz.db?mode=rwc
-KAMMERZ_PASSWORD_HASH=$argon2id$v=19$...    # from `kammerz hash-password`
+KAMMERZ_PASSWORD_HASH='$argon2id$v=19$...'  # from `kammerz hash-password` — keep the single quotes!
 SECURE_COOKIES=false   # set true only when served over HTTPS (behind a TLS reverse proxy)
 PORT=3002
 ANTHROPIC_API_KEY=     # optional; overrides the claude_api_key settings row for AI import
