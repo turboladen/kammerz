@@ -309,3 +309,32 @@ async fn delete_missing_roll_returns_404() {
     assert_eq!(body["error"]["code"], "NOT_FOUND");
     assert_eq!(body["error"]["message"], "Roll 999999 not found");
 }
+
+// --- suggest-id must not collide with a surviving same-day roll (kammerz-cg1) ---
+#[tokio::test]
+async fn suggest_id_skips_surviving_ids_after_delete() {
+    let app = open_app().await;
+
+    // suggest_id keys off today's date, so build the YYMMDD prefix the same way.
+    let prefix = chrono::Local::now().format("%y%m%d").to_string();
+
+    // Create two same-day rolls, then delete the *first* one.
+    let first_pk = create_roll(&app, &format!("{prefix}-1")).await;
+    create_roll(&app, &format!("{prefix}-2")).await;
+    let res = app
+        .clone()
+        .oneshot(delete(&format!("/api/rolls/{first_pk}")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    // The suggestion must advance past the surviving max id (…-2), not reuse it.
+    let res = app.oneshot(get("/api/rolls/suggest-id")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let suggestion: String = json_body(res).await;
+    assert_eq!(
+        suggestion,
+        format!("{prefix}-3"),
+        "suggest-id derives the suffix from the max existing id, not a row count"
+    );
+}
