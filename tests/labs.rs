@@ -1,7 +1,7 @@
 mod common;
 
 use axum::http::StatusCode;
-use common::{get, json_body, open_app, post_json};
+use common::{delete, get, json_body, open_app, post_json};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
@@ -38,4 +38,16 @@ async fn create_then_get_lab_roundtrips() {
     let lab: Value = json_body(res).await;
     assert_eq!(lab["id"].as_i64().unwrap() as i32, new_id);
     assert_eq!(lab["name"], "Test Lab");
+}
+
+// kammerz-o0l: deleting a missing lab returns 404 NOT_FOUND, not a no-op 204.
+#[tokio::test]
+async fn delete_missing_lab_returns_404() {
+    let app = open_app().await;
+
+    let res = app.oneshot(delete("/api/labs/999999")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "NOT_FOUND");
+    assert_eq!(body["error"]["message"], "Lab 999999 not found");
 }

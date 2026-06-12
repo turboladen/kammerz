@@ -8,7 +8,7 @@ use serde::Deserialize;
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, OptionExt};
 use crate::patch::{double_option, now_string, trim, trim_opt};
-use crate::routes::friendly_err;
+use crate::routes::{friendly_delete_err, friendly_err};
 use crate::services::lens_service::LensService;
 use crate::validate::validate_date_opt;
 use crate::AppState;
@@ -198,7 +198,7 @@ async fn delete_one(
 ) -> AppResult<StatusCode> {
     LensService::delete(&db, id)
         .await
-        .map_err(|e| AppError::UnprocessableEntity(friendly_err("lens", e)))?;
+        .map_err(|e| friendly_delete_err("lens", e))?;
     Ok(StatusCode::NO_CONTENT)
 }
 

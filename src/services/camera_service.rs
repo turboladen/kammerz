@@ -37,7 +37,10 @@ impl CameraService {
     }
 
     pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
-        Camera::delete_by_id(id).exec(db).await?;
+        let res = Camera::delete_by_id(id).exec(db).await?;
+        if res.rows_affected == 0 {
+            return Err(DbErr::RecordNotFound(format!("Camera {id} not found")));
+        }
         Ok(())
     }
 
@@ -69,7 +72,12 @@ impl CameraService {
     }
 
     pub async fn delete_maintenance(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
-        CameraMaintenance::delete_by_id(id).exec(db).await?;
+        let res = CameraMaintenance::delete_by_id(id).exec(db).await?;
+        if res.rows_affected == 0 {
+            return Err(DbErr::RecordNotFound(format!(
+                "Maintenance record {id} not found"
+            )));
+        }
         Ok(())
     }
 

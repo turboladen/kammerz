@@ -144,7 +144,10 @@ impl RollService {
     }
 
     pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
-        Roll::delete_by_id(id).exec(db).await?;
+        let res = Roll::delete_by_id(id).exec(db).await?;
+        if res.rows_affected == 0 {
+            return Err(DbErr::RecordNotFound(format!("Roll {id} not found")));
+        }
         Ok(())
     }
 

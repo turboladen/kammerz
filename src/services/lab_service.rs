@@ -28,7 +28,10 @@ impl LabService {
     }
 
     pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
-        Lab::delete_by_id(id).exec(db).await?;
+        let res = Lab::delete_by_id(id).exec(db).await?;
+        if res.rows_affected == 0 {
+            return Err(DbErr::RecordNotFound(format!("Lab {id} not found")));
+        }
         Ok(())
     }
 }
