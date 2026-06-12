@@ -574,15 +574,27 @@
 	// won't perform. Keep these two in lockstep when changing click logic.
 	function statusHint(status: RollStatus): string {
 		const label = statusConfig[status].label;
-		if (roll?.status === status) return `Current status: ${label}`;
 		const targetIdx = statusFlow.indexOf(status);
+		const devKind = devKindForStatus(status);
+		const devRecordMissing = (devKind === 'lab' && !labDev) || (devKind === 'self' && !selfDev);
+		// Backward move stays first, mirroring handleStatusClick: an earlier lab/self
+		// chevron with no record still opens the Move-Back confirm (the devKind guard
+		// there only runs after the backward early-return), so it must NOT be described
+		// as recording development.
 		if (currentStatusIdx !== -1 && targetIdx < currentStatusIdx) {
 			return `Move back to ${label} (asks to confirm)`;
 		}
-		// Forward into a lab/self status with no dev record yet → opens the dev form.
-		const devKind = devKindForStatus(status);
-		if (devKind === 'lab' && !labDev) return `Record lab development to move to ${label}`;
-		if (devKind === 'self' && !selfDev) return `Record self development to move to ${label}`;
+		// A current/forward lab/self status with no backing dev record → clicking opens
+		// the dev form (handleStatusClick's devKind guard). This includes the roll
+		// stranded AT a lab/self status with no record — the one orphan-recovery state
+		// the bare "Current status" label left unexplained (kammerz-6ih).
+		if (devRecordMissing) {
+			const kindLabel = devKind === 'lab' ? 'lab' : 'self';
+			return roll?.status === status
+				? `Record ${kindLabel} development for ${label} (current status)`
+				: `Record ${kindLabel} development to move to ${label}`;
+		}
+		if (roll?.status === status) return `Current status: ${label}`;
 		// Forward into a date-bearing status whose date isn't recorded yet → prompts.
 		const target = STATUS_DATE_TARGET[status];
 		if (target && !targetDate(target)) return `Move to ${label} (asks for a date)`;
