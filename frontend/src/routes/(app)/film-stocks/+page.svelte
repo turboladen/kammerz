@@ -170,10 +170,13 @@
 
 	async function confirmDelete() {
 		if (!deletingStock) return;
+		const stock = deletingStock;
+		// Close the dialog before the request — a failure is reported via the
+		// page error banner, and the dialog stays re-openable.
+		deletingStock = null;
 		error = '';
 		try {
-			await deleteFilmStock(deletingStock.id);
-			deletingStock = null;
+			await deleteFilmStock(stock.id);
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);

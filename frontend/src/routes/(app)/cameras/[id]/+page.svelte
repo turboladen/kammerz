@@ -224,6 +224,9 @@
 	}
 
 	async function confirmDelete() {
+		// ConfirmDialog no longer closes itself on confirm — the parent owns
+		// closing, so reset the bound state before the request.
+		showDeleteConfirm = false;
 		error = '';
 		try {
 			await deleteCamera(id);
@@ -263,10 +266,13 @@
 
 	async function confirmRemoveMaintenance() {
 		if (deletingMaintenanceId === null) return;
+		const maintId = deletingMaintenanceId;
+		// Close the dialog before the request — a failure is reported via the
+		// page error banner, and the dialog stays re-openable.
+		deletingMaintenanceId = null;
 		error = '';
 		try {
-			await deleteMaintenance(deletingMaintenanceId);
-			deletingMaintenanceId = null;
+			await deleteMaintenance(maintId);
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);

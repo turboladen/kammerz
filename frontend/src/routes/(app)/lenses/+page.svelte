@@ -236,10 +236,13 @@
 
 	async function confirmDelete() {
 		if (!deletingLens) return;
+		const lens = deletingLens;
+		// Close the dialog before the request — a failure is reported via the
+		// page error banner, and the dialog stays re-openable.
+		deletingLens = null;
 		error = '';
 		try {
-			await deleteLens(deletingLens.id);
-			deletingLens = null;
+			await deleteLens(lens.id);
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);

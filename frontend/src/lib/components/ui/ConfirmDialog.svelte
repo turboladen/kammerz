@@ -29,8 +29,13 @@
 		oncancel();
 	}
 
+	// Deliberately does NOT set `open = false` here: most call sites render this
+	// component as `{#if guard}<ConfirmDialog open={true} ...>` (no bind:), so a
+	// child-side assignment only flips the local copy. If the parent's async
+	// onconfirm then fails and leaves its guard truthy, the dialog would be
+	// stuck mounted-but-closed and unre-openable. The parent owns closing — its
+	// onconfirm handler must reset the guard / bound `open` on every path.
 	function handleConfirm() {
-		open = false;
 		onconfirm();
 	}
 
