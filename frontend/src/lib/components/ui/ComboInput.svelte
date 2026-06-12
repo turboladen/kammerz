@@ -13,9 +13,10 @@
 	let highlightIndex = $state(-1);
 	let inputEl: HTMLInputElement | undefined = $state();
 
-	// Unique per-instance id base so listbox/option ids don't collide when
-	// multiple ComboInputs render on one page (e.g. Brand + Purchased From).
+	// Unique per-instance id base so input/listbox/option ids don't collide
+	// when multiple ComboInputs render on one page (e.g. Brand + Purchased From).
 	const uid = $props.id();
+	const inputId = `${uid}-input`;
 	const listboxId = `${uid}-listbox`;
 	const optionId = (i: number) => `${uid}-option-${i}`;
 
@@ -90,13 +91,14 @@
 	}
 </script>
 
-<label class="relative flex flex-col gap-1.5">
+<div class="relative flex flex-col gap-1.5">
 	{#if label}
-		<span class="text-xs font-medium text-text-muted">{label}</span>
+		<label for={inputId} class="text-xs font-medium text-text-muted">{label}</label>
 	{/if}
 	<input
 		bind:this={inputEl}
 		bind:value
+		id={inputId}
 		{placeholder}
 		onfocus={handleFocus}
 		onblur={handleBlur}
@@ -134,4 +136,4 @@
 	{#if hint}
 		<span class="text-xs text-text-faint">{hint}</span>
 	{/if}
-</label>
+</div>
