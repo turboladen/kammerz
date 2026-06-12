@@ -18,6 +18,17 @@ pub enum AppError {
     /// see a retry-able 503 rather than a 500.
     ServiceUnavailable(String),
     Internal(String),
+    /// An axum extractor rejection (malformed JSON, wrong types, invalid enum,
+    /// non-numeric path id, missing query param) re-wrapped into the standard
+    /// envelope by [`crate::extract`]. Carries axum's own status and diagnostic
+    /// text verbatim so the client sees a real message (not opaque `statusText`)
+    /// and the status it would have produced anyway (kammerz-4lr). The message is
+    /// a request-shape complaint, not a leaked internal — safe to surface.
+    Rejection {
+        status: StatusCode,
+        code: &'static str,
+        message: String,
+    },
 }
 
 impl IntoResponse for AppError {
@@ -53,6 +64,11 @@ impl IntoResponse for AppError {
                     "An internal error occurred".to_string(),
                 )
             }
+            AppError::Rejection {
+                status,
+                code,
+                message,
+            } => (status, code, message),
         };
         (
             status,

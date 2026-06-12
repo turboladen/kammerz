@@ -2,7 +2,6 @@ use std::net::SocketAddr;
 
 use axum::extract::{ConnectInfo, State};
 use axum::http::HeaderMap;
-use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tower_sessions::Session;
@@ -11,6 +10,7 @@ use crate::auth::middleware::{clear_session, is_authed, set_authed};
 use crate::auth::password::verify_password;
 use crate::config::AppConfig;
 use crate::error::{AppError, AppResult};
+use crate::extract::Json;
 
 #[derive(Deserialize)]
 pub struct LoginRequest {
