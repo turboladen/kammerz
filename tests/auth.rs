@@ -47,9 +47,8 @@ async fn test_app_cfg(password_hash: Option<String>, trust_proxy: bool) -> axum:
     let db = kammerz::db::init("sqlite::memory:").await.unwrap();
     let config = kammerz::config::AppConfig {
         password_hash,
-        anthropic_api_key: None,
-        secure_cookies: false,
         trust_proxy,
+        ..kammerz::config::AppConfig::default()
     };
     // Build router WITH a session layer backed by an in-memory DB. min_connections(1)
     // keeps the in-memory DB alive for the life of the pool.
