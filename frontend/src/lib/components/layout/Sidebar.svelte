@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
+	import { auth } from '$lib/stores/auth.svelte';
 	import {
 		LayoutDashboard,
 		Search,
@@ -10,7 +12,8 @@
 		FlaskConical,
 		TestTube2,
 		BarChart3,
-		Plus
+		Plus,
+		LogOut
 	} from 'lucide-svelte';
 
 	// Core data entity navigation
@@ -33,6 +36,23 @@
 	function isActive(href: string): boolean {
 		if (href === '/') return page.url.pathname === '/';
 		return page.url.pathname.startsWith(href);
+	}
+
+	// Sign-out is only meaningful when a password is configured (auth.authRequired).
+	// In open LAN-trust mode there is no session to end, so the control is hidden.
+	let signingOut = $state(false);
+	async function signOut() {
+		if (signingOut) return;
+		signingOut = true;
+		try {
+			await auth.logout();
+		} catch {
+			// Swallow: a failed server logout shouldn't trap the user. The redirect
+			// below sends them to /login, and the layout guard re-checks the session.
+		} finally {
+			await goto('/login');
+			signingOut = false;
+		}
 	}
 </script>
 
@@ -85,4 +105,19 @@
 			Quick Entry
 		</a>
 	</div>
+
+	{#if auth.authRequired}
+		<!-- Sign out -->
+		<div class="border-t border-border-subtle p-3">
+			<button
+				type="button"
+				onclick={signOut}
+				disabled={signingOut}
+				class="flex w-full items-center gap-3 rounded-lg border-l-2 border-transparent px-3 py-2 text-sm font-medium text-text-muted transition-all duration-150 hover:bg-surface-overlay hover:text-text disabled:cursor-not-allowed disabled:opacity-60"
+			>
+				<LogOut size={16} strokeWidth={1.75} class="text-text-faint" />
+				{signingOut ? 'Signing out…' : 'Sign out'}
+			</button>
+		</div>
+	{/if}
 </nav>
