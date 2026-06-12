@@ -400,6 +400,98 @@ async fn update_lab_dev_clears_received_date_leaves_scanned_untouched() {
     );
 }
 
+// kammerz-ysw: lab and self dev are mutually exclusive — the backend must
+// reject a self dev when a lab dev already exists (the UI hides the "+ Self"
+// button, but a stale tab on another device or a raw API call bypasses that).
+// Without the guard the roll's status strands on the first path and deleting
+// either record can never auto-revert it.
+#[tokio::test]
+async fn create_self_dev_rejected_when_lab_dev_exists() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "DEV-EXCL-LAB-FIRST").await;
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/lab",
+            &json!({ "roll_id": roll_pk }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    assert_eq!(roll_status(&app, roll_pk).await, "at-lab");
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/self",
+            &json!({ "roll_id": roll_pk, "developer": "HC-110" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "VALIDATION_ERROR");
+    assert_eq!(
+        body["error"]["message"],
+        "This roll already has a lab development record — delete it first."
+    );
+
+    // Nothing was inserted and the roll stays on the lab flow.
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/development/self/for-roll/{roll_pk}")))
+        .await
+        .unwrap();
+    let sd: Value = json_body(res).await;
+    assert!(sd.is_null(), "rejected self dev must not be persisted");
+    assert_eq!(roll_status(&app, roll_pk).await, "at-lab");
+}
+
+// kammerz-ysw: mirror case — a lab dev is rejected when a self dev exists.
+#[tokio::test]
+async fn create_lab_dev_rejected_when_self_dev_exists() {
+    let app = open_app().await;
+    let roll_pk = create_shot_roll(&app, "DEV-EXCL-SELF-FIRST").await;
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/self",
+            &json!({ "roll_id": roll_pk, "developer": "Rodinal" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    assert_eq!(roll_status(&app, roll_pk).await, "developing");
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/lab",
+            &json!({ "roll_id": roll_pk, "cost": 12.5 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "VALIDATION_ERROR");
+    assert_eq!(
+        body["error"]["message"],
+        "This roll already has a self development record — delete it first."
+    );
+
+    // Nothing was inserted and the roll stays on the self flow.
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/development/lab/for-roll/{roll_pk}")))
+        .await
+        .unwrap();
+    let ld: Value = json_body(res).await;
+    assert!(ld.is_null(), "rejected lab dev must not be persisted");
+    assert_eq!(roll_status(&app, roll_pk).await, "developing");
+}
+
 // kammerz-rwa: deleting a lab dev that doesn't exist (e.g. a stale-id
 // double-delete from the frontend) must return 404 NOT_FOUND, not 422. The
 // lookup runs inside the txn closure; or_404_db + friendly_txn_err classify the

@@ -115,14 +115,18 @@ pub fn friendly_err(context: &str, e: impl std::fmt::Display) -> String {
 
 /// Classify a transaction error into the right HTTP status. A not-found lookup
 /// inside the closure — `DbErr::RecordNotFound`, produced by
-/// [`crate::error::DbOptionExt::or_404_db`] — becomes a 404; every other error
-/// stays a friendly 422. The transactional delete handlers (shots, lab/self dev)
-/// use this so a double-delete of a stale id returns NOT_FOUND, matching the
-/// non-transactional handlers' `or_404`. The inner message is taken directly
-/// (not via `Display`) to avoid SeaORM's "RecordNotFound Error: " prefix.
+/// [`crate::error::DbOptionExt::or_404_db`] — becomes a 404; a `DbErr::Custom`
+/// (an already-friendly business-rule rejection raised inside the closure, e.g.
+/// the lab/self dev mutual-exclusion guard) passes through verbatim as a 422;
+/// every other error stays a friendly 422. The transactional delete handlers
+/// (shots, lab/self dev) use this so a double-delete of a stale id returns
+/// NOT_FOUND, matching the non-transactional handlers' `or_404`. The inner
+/// messages are taken directly (not via `Display`) to avoid SeaORM's
+/// "RecordNotFound Error: " / "Custom Error: " prefixes.
 pub fn friendly_txn_err(context: &str, e: TransactionError<DbErr>) -> AppError {
     match e {
         TransactionError::Transaction(DbErr::RecordNotFound(m)) => AppError::NotFound(m),
+        TransactionError::Transaction(DbErr::Custom(m)) => AppError::UnprocessableEntity(m),
         other => AppError::UnprocessableEntity(friendly_err(context, other)),
     }
 }
