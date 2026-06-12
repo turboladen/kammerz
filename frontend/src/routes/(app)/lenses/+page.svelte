@@ -179,7 +179,12 @@
 		purchasedFrom = '';
 		dateSold = '';
 		notes = '';
+	}
+
+	function openAddDialog() {
+		resetForm();
 		error = '';
+		showAddDialog = true;
 	}
 
 	function buildInsert(): LensInsert {
@@ -222,6 +227,7 @@
 	}
 
 	function startEdit(lens: Lens) {
+		error = '';
 		editingLens = lens;
 		brand = lens.brand;
 		lensMountId = String(lens.lens_mount_id);
@@ -284,13 +290,7 @@
 </script>
 
 <PageHeader title="Lenses" description="Your lens collection">
-	<Button
-		variant="primary"
-		onclick={() => {
-			resetForm();
-			showAddDialog = true;
-		}}>+ Add Lens</Button
-	>
+	<Button variant="primary" onclick={openAddDialog}>+ Add Lens</Button>
 </PageHeader>
 
 <div class="p-6">
@@ -327,7 +327,7 @@
 	{:else if resultCount === 0 && lenses.length === 0}
 		<EmptyState title="No Lenses" message="Add your first lens to get started.">
 			{#snippet icon()}<Aperture size={24} strokeWidth={1.5} />{/snippet}
-			<Button variant="primary" onclick={() => (showAddDialog = true)}>+ Add Lens</Button>
+			<Button variant="primary" onclick={openAddDialog}>+ Add Lens</Button>
 		</EmptyState>
 	{:else if resultCount === 0}
 		<p class="mt-6 text-center text-sm text-text-muted">

@@ -37,7 +37,12 @@
 		location = '';
 		website = '';
 		notes = '';
+	}
+
+	function openAddDialog() {
+		resetForm();
 		error = '';
+		showAddDialog = true;
 	}
 
 	async function handleAdd() {
@@ -59,6 +64,7 @@
 	}
 
 	function startEdit(lab: Lab) {
+		error = '';
 		editingLab = lab;
 		name = lab.name;
 		location = lab.location ?? '';
@@ -109,13 +115,7 @@
 </script>
 
 <PageHeader title="Labs" description="Development labs you use">
-	<Button
-		variant="primary"
-		onclick={() => {
-			resetForm();
-			showAddDialog = true;
-		}}>+ Add Lab</Button
-	>
+	<Button variant="primary" onclick={openAddDialog}>+ Add Lab</Button>
 </PageHeader>
 
 <div class="p-6">
@@ -128,7 +128,7 @@
 	{:else if labs.length === 0}
 		<EmptyState title="No Labs" message="Add the labs you use for film development.">
 			{#snippet icon()}<FlaskConical size={24} strokeWidth={1.5} />{/snippet}
-			<Button variant="primary" onclick={() => (showAddDialog = true)}>+ Add Lab</Button>
+			<Button variant="primary" onclick={openAddDialog}>+ Add Lab</Button>
 		</EmptyState>
 	{:else}
 		<div class="grid gap-3">
