@@ -137,3 +137,23 @@ test('roll detail page loads without an infinite fetch loop (kammerz-8k5)', asyn
 	// Tidy up the throwaway roll so it can't perturb other assertions.
 	await page.request.delete(`${BASE}/api/rolls/${id}`);
 });
+
+/**
+ * Regression guard for kammerz-b21: an uncaught route error must render the
+ * themed root +error.svelte (status + headline + a way back), not SvelteKit's
+ * bare unstyled "Internal Error" fallback. An unmatched route is the simplest
+ * uncaught error to trigger; it resolves at the same root boundary that covers
+ * the print summary route's +page@ layout reset. (We do NOT assert zero console
+ * errors here: a 404 navigation inherently logs SvelteKit's own "Not found" plus
+ * the unmatched-resource fetch — those are expected, not page defects.)
+ */
+test('unmatched route renders the themed error boundary (kammerz-b21)', async ({ page }) => {
+	// The release binary serves the SPA fallback (HTTP 200 + index) for unmatched
+	// routes, so the client router — not the HTTP status — produces the 404. Assert
+	// the client-rendered themed boundary, which holds regardless of transport.
+	await page.goto(`${BASE}/this-route-does-not-exist`);
+	await expect(page).toHaveTitle(/404 — Kammerz/);
+	await expect(page.locator('h1')).toContainText(/page not found/i);
+	// The themed boundary offers a way back; the bare fallback does not.
+	await expect(page.getByRole('link', { name: /back to dashboard/i })).toBeVisible();
+});
