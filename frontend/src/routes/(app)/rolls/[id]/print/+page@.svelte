@@ -109,11 +109,17 @@
 		return dev ? dev.cost : null;
 	});
 
+	// Auto-open the print dialog ONLY when explicitly opted in via ?autoprint=1
+	// (the detail-page "Print summary" button passes it). A bare visit — or a
+	// browser back/forward onto this URL — renders quietly so the page can be read
+	// or copied without the modal, and stays loadable under automation. Captured
+	// once at mount; the visible Print button covers the manual path (kammerz-9qb).
+	const autoPrint = page.url.searchParams.get('autoprint') === '1';
+
 	onMount(() => {
 		load().then(() => {
-			// Auto-open the print dialog once data has rendered. Guard so it only
-			// fires once, and only when the roll actually loaded.
-			if (roll && !printed) {
+			// Fire once, only when opted in and the roll actually loaded.
+			if (autoPrint && roll && !printed) {
 				printed = true;
 				// Defer a tick so the DOM paints before the dialog snapshots it.
 				requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
