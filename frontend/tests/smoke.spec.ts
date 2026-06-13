@@ -139,6 +139,40 @@ test('roll detail page loads without an infinite fetch loop (kammerz-8k5)', asyn
 });
 
 /**
+ * Regression guard for kammerz-fxl: the Timeline must not offer a date editor for
+ * milestones the roll hasn't reached yet. Back-filling a future rung's date (e.g.
+ * Scanned while the roll is only Shot) bypasses the proper path — advancing the
+ * status, which writes the date AND runs the backend auto-sync. A roll at `shot`
+ * (undecided path) has reached Loaded + Finished shooting but not Scanned /
+ * Post-processed / Archived, so those rungs must render as plain undated rows with
+ * no edit button while the reached rungs stay editable.
+ */
+test('timeline hides date editor on not-yet-reached milestones (kammerz-fxl)', async ({ page }) => {
+	const created = await page.request.post(`${BASE}/api/rolls`, {
+		data: { roll_id: `E2E-FXL-${Date.now()}`, status: 'shot', date_loaded: '2026-05-31', date_finished: '2026-06-02' }
+	});
+	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
+	const id: number = await created.json();
+
+	await page.goto(`${BASE}/rolls/${id}`);
+	await expect(page.getByRole('heading', { name: 'Timeline' })).toBeVisible();
+
+	// Reached rungs keep their inline editor.
+	await expect(page.getByRole('button', { name: /Loaded date/i })).toBeVisible();
+	await expect(page.getByRole('button', { name: /Finished shooting date/i })).toBeVisible();
+
+	// Future rungs offer no editor — neither a "Set" nor an "Edit" affordance.
+	for (const rung of ['Scanned', 'Post-processed', 'Archived']) {
+		await expect(
+			page.getByRole('button', { name: new RegExp(`(Set|Edit) ${rung} date`, 'i') }),
+			`${rung} must not be date-editable before the roll reaches it`
+		).toHaveCount(0);
+	}
+
+	await page.request.delete(`${BASE}/api/rolls/${id}`);
+});
+
+/**
  * Regression guard for kammerz-b21: an uncaught route error must render the
  * themed root +error.svelte (status + headline + a way back), not SvelteKit's
  * bare unstyled "Internal Error" fallback. An unmatched route is the simplest

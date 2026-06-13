@@ -1,5 +1,5 @@
 import type { RollWithDetails, DevelopmentLab, DevelopmentSelf, RollStatus } from '$lib/types';
-import type { DevPath } from './status';
+import { allStatusOrder, type DevPath } from './status';
 
 /** Where a milestone's date is stored, so the editor/prompt can write it back. */
 export type DateTarget =
@@ -18,7 +18,9 @@ export interface TimelineMilestone {
 	date: string | null;
 	/** Which record + column this date lives in (edit/transition write target). */
 	target: DateTarget;
-	/** False when the backing record doesn't exist yet (lab/self before a dev record). */
+	/** Whether this date can be set/edited inline. False when the backing record doesn't
+	 *  exist yet (lab/self before a dev record) OR the roll hasn't reached this rung yet —
+	 *  future dates are recorded by advancing the status, not back-filled (kammerz-fxl). */
 	editable: boolean;
 }
 
@@ -61,6 +63,33 @@ const MILESTONE_ORDER: Record<DevPath, MilestoneKey[]> = {
 	undecided: ['loaded', 'finished-shooting', 'scanned', 'post-processed', 'archived']
 };
 
+/**
+ * The status whose arrival marks each milestone as reached. A milestone's date is only
+ * editable once the roll has advanced to (or past) this status — recording a future rung's
+ * date is done by advancing the status (which writes the date AND runs backend auto-sync),
+ * never by back-filling a date on a state the roll isn't in (kammerz-fxl). The lab/self
+ * middle uses the entry status of its dev work (at-lab / developed) so the date can be
+ * corrected as soon as that stage is current.
+ */
+const MILESTONE_STATUS: Record<MilestoneKey, RollStatus> = {
+	loaded: 'loaded',
+	'finished-shooting': 'shot',
+	'dropped-off': 'at-lab',
+	received: 'lab-done',
+	developed: 'developed',
+	scanned: 'scanned',
+	'post-processed': 'post-processed',
+	archived: 'archived'
+};
+
+/** Whether the roll has reached a milestone's rung, using the canonical union ordering so the
+ *  comparison is robust regardless of dev path. An unknown current status (not in the order)
+ *  counts as before everything, so only already-dated milestones stay editable. */
+function milestoneReached(key: MilestoneKey, status: RollStatus): boolean {
+	const current = allStatusOrder.indexOf(status);
+	return current >= 0 && current >= allStatusOrder.indexOf(MILESTONE_STATUS[key]);
+}
+
 /** Read a target's current date from whichever record owns it. A lab/self target with no
  *  dev record reads as null (the column lives on that record). */
 export function readDateTarget(
@@ -88,9 +117,11 @@ export function dateTargetEditable(
 
 /**
  * Build the ordered, path-aware lifecycle timeline for a roll. Each milestone's label and
- * target come from MILESTONE_DEFS; its date and editability are derived from the target via
- * the shared helpers above. A null date renders as an undated milestone — either not yet
- * reached, or reached but cleared from the Timeline.
+ * target come from MILESTONE_DEFS; its date comes from the target and its editability from
+ * both the target's backing record AND whether the roll has reached that rung. A null date
+ * renders as an undated milestone — either not yet reached, or reached but cleared from the
+ * Timeline. Not-yet-reached rungs are non-editable: their date is set by advancing the
+ * status, not by back-filling here (kammerz-fxl).
  */
 export function buildRollTimeline(
 	roll: RollWithDetails,
@@ -105,7 +136,7 @@ export function buildRollTimeline(
 			label,
 			target,
 			date: readDateTarget(target, roll, labDev, selfDev),
-			editable: dateTargetEditable(target, labDev, selfDev)
+			editable: dateTargetEditable(target, labDev, selfDev) && milestoneReached(key, roll.status)
 		};
 	});
 }
