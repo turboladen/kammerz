@@ -165,9 +165,6 @@ function assertStatusFixture(): void {
 
 assertStatusFixture();
 
-/** @deprecated Use allStatusOrder or getFlowForPath() for path-specific rendering. */
-export const statusOrder = allStatusOrder;
-
 // ---------------------------------------------------------------------------
 // Path determination
 // ---------------------------------------------------------------------------

@@ -56,7 +56,7 @@
 		PushPull,
 		LensMount
 	} from '$lib/types';
-	import { Trash2, CircleHelp } from 'lucide-svelte';
+	import { Trash2, CircleHelp, Printer } from 'lucide-svelte';
 
 	const id = $derived(Number(page.params.id));
 
@@ -363,14 +363,15 @@
 			// into one. Reference catalogs are loaded separately in loadRefData().
 			const detail = await getRollDetail(id);
 			roll = detail.roll;
-			rollFullDismissed = false;
-			// Seed the nudge's finish date ONCE per roll: reflect an already-set
+			// Reset per-roll nudge state ONCE per roll: reflect an already-set
 			// date_finished (e.g. entered via the Edit form) instead of misleadingly
-			// showing today, but don't re-seed on same-roll mutation reloads, which
-			// would clobber an in-progress edit.
+			// showing today, and clear a stale roll-full dismissal — but NOT on
+			// same-roll mutation reloads, which would clobber an in-progress finish-date
+			// edit or resurrect a banner the user just dismissed (kammerz-hf4).
 			if (roll.id !== finishDateSeededFor) {
 				finishDateSeededFor = roll.id;
 				finishDate = roll.date_finished ?? todayLocal();
+				rollFullDismissed = false;
 			}
 			shots = detail.shots;
 			labDev = detail.lab_dev;
@@ -835,6 +836,9 @@
 	</div>
 {:else}
 	<PageHeader title="Roll {roll.roll_id}" backHref={backNav.href} backLabel={backNav.label}>
+		<Button variant="ghost" href="/rolls/{roll.id}/print"
+			><Printer size={16} strokeWidth={2} aria-hidden="true" />Print summary</Button
+		>
 		<Button variant="danger" onclick={handleDelete}
 			><Trash2 size={16} strokeWidth={2} aria-hidden="true" />Delete</Button
 		>
