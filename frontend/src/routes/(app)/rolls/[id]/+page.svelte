@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
@@ -816,13 +817,22 @@
 	// Page load: on mount and whenever the roll id changes (navigation), fetch
 	// reference catalogs and roll detail together, gating `loading` until BOTH
 	// resolve. This keeps reference data fresh on every page entry while never
-	// rendering the roll with empty dropdowns / lens lookups. The $effect tracks
-	// `id` via loadRollData's synchronous read of it. Mutations bypass this and
-	// call loadRollData() directly, so they refresh only the roll's /detail.
+	// rendering the roll with empty dropdowns / lens lookups. Mutations bypass this
+	// and call loadRollData() directly, so they refresh only the roll's /detail.
+	//
+	// Track ONLY `id` (the `void id` read), then untrack the loaders: Svelte 5
+	// tracks every reactive read in an effect's synchronous run — INCLUDING the
+	// sync prefix of an async fn it calls. loadRollData()'s prefix reads `roll`
+	// (the prevStatus snapshot) and then rewrites `roll` post-fetch, so without
+	// untrack the effect depends on a value it mutates → unbounded re-fetch loop
+	// on every roll-detail visit (kammerz-8k5).
 	$effect(() => {
-		loading = true;
-		Promise.all([loadRefData(), loadRollData()]).finally(() => {
-			loading = false;
+		void id;
+		untrack(() => {
+			loading = true;
+			Promise.all([loadRefData(), loadRollData()]).finally(() => {
+				loading = false;
+			});
 		});
 	});
 </script>

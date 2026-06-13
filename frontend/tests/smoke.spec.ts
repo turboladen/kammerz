@@ -99,3 +99,41 @@ for (const { path, heading } of sections) {
 		expect(consoleErrors, `console errors on ${path}`).toEqual([]);
 	});
 }
+
+/**
+ * Regression guard for kammerz-8k5: the roll-detail page-load $effect must fetch
+ * each catalog + the roll's /detail a BOUNDED number of times. The bug was an
+ * effect that tracked `roll` (via loadRollData's prevStatus snapshot) and then
+ * rewrote it post-fetch, looping forever — dozens of /api/rolls/{id}/detail hits
+ * per second. The section loop above visits /rolls (the list) but never a detail
+ * page, so it couldn't catch this. We create a throwaway roll (the e2e seed has
+ * none), open it, and assert /detail is requested no more than a couple of times.
+ */
+test('roll detail page loads without an infinite fetch loop (kammerz-8k5)', async ({ page }) => {
+	const created = await page.request.post(`${BASE}/api/rolls`, {
+		data: { roll_id: `E2E-LOOP-${Date.now()}`, status: 'loaded' }
+	});
+	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
+	const id: number = await created.json();
+
+	let detailCount = 0;
+	const consoleErrors: string[] = [];
+	page.on('request', (req) => {
+		if (req.url().includes(`/api/rolls/${id}/detail`)) detailCount++;
+	});
+	page.on('console', (msg) => {
+		if (msg.type() === 'error') consoleErrors.push(msg.text());
+	});
+
+	await page.goto(`${BASE}/rolls/${id}`);
+	await expect(page.locator('h1').first()).toContainText(`E2E-LOOP-`);
+	await page.waitForLoadState('networkidle');
+	// A loop keeps firing past networkidle — give it a fixed window to manifest.
+	await page.waitForTimeout(1500);
+
+	expect(detailCount, 'roll /detail should be fetched a bounded number of times, not looped').toBeLessThanOrEqual(2);
+	expect(consoleErrors, 'console errors on roll detail').toEqual([]);
+
+	// Tidy up the throwaway roll so it can't perturb other assertions.
+	await page.request.delete(`${BASE}/api/rolls/${id}`);
+});
