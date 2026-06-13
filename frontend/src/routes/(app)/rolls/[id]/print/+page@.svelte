@@ -24,7 +24,6 @@
 	let cameras: Camera[] = $state([]);
 	let loading = $state(true);
 	let error = $state('');
-	let printed = $state(false);
 
 	// Reuse the SAME composite endpoint the detail page uses, plus the reference
 	// catalogs needed to render lens display names, the disambiguated camera label,
@@ -109,23 +108,12 @@
 		return dev ? dev.cost : null;
 	});
 
-	// Auto-open the print dialog ONLY when explicitly opted in via ?autoprint=1
-	// (the detail-page "Print summary" button passes it). A bare visit — or a
-	// browser back/forward onto this URL — renders quietly so the page can be read
-	// or copied without the modal, and stays loadable under automation. Captured
-	// once at mount; the visible Print button covers the manual path (kammerz-9qb).
-	const autoPrint = page.url.searchParams.get('autoprint') === '1';
-
-	onMount(() => {
-		load().then(() => {
-			// Fire once, only when opted in and the roll actually loaded.
-			if (autoPrint && roll && !printed) {
-				printed = true;
-				// Defer a tick so the DOM paints before the dialog snapshots it.
-				requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
-			}
-		});
-	});
+	// The summary page never opens the print dialog on its own — navigating here
+	// (from the detail page's "Print summary" button, a bookmark, or browser
+	// back/forward) just renders the page so it can be read, copied, or printed
+	// on demand. The visible Print button is the only path to the dialog
+	// (kammerz-k79, superseding the old ?autoprint=1 auto-open from kammerz-9qb).
+	onMount(load);
 </script>
 
 <svelte:head>
