@@ -53,6 +53,16 @@
 <Dialog bind:open {title} onclose={oncancel}>
 	<div class="space-y-4">
 		<DateInput label="Date" bind:value={draft} />
+		{#if !allowClear}
+			<!-- Transition prompt (no Clear button): surface the otherwise-invisible
+			     escape hatches — fuzzy dates are accepted by dateFieldError, and an
+			     undated milestone can be edited or cleared later from the Timeline.
+			     (kammerz-cb7) -->
+			<p class="text-xs text-text-muted">
+				A rough date is fine — enter just a year (2024) or year-month (2024-03). You can change or clear it later from
+				the Timeline.
+			</p>
+		{/if}
 		<div class="flex justify-end gap-2">
 			{#if allowClear}
 				<Button variant="ghost" onclick={() => onconfirm(null)}>Clear</Button>

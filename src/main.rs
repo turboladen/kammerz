@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 use std::str::FromStr;
+use std::time::Duration as StdDuration;
 
 use axum::http::{HeaderMap, StatusCode, Uri};
 use axum::response::IntoResponse;
@@ -7,7 +8,9 @@ use rust_embed::Embed;
 use sqlx::sqlite::SqliteConnectOptions;
 use time::Duration as TimeDuration;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
-use tower_sessions::{Expiry, SessionManagerLayer, cookie::SameSite};
+use tower_sessions::{
+    Expiry, SessionManagerLayer, cookie::SameSite, session_store::ExpiredDeletion,
+};
 use tower_sessions_sqlx_store::SqliteStore;
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
@@ -138,6 +141,20 @@ async fn main() {
         .migrate()
         .await
         .expect("session store migrate");
+
+    // The SqliteStore filters expired sessions on load, but never deletes their
+    // rows — so expired session records (stale auth artifacts) accumulate in the
+    // SQLite file the operator backs up and carries around. Spawn tower-sessions'
+    // recurring cleanup to purge them hourly. Clone the store first since the
+    // layer takes ownership below. The loop exits on the first deletion error
+    // (e.g. the DB file vanishing); we don't join the handle, so a stranded task
+    // just stops purging — expired rows are still filtered out on load, never
+    // served. (kammerz-135)
+    tokio::task::spawn(
+        session_store
+            .clone()
+            .continuously_delete_expired(StdDuration::from_secs(60 * 60)),
+    );
 
     let session_layer = SessionManagerLayer::new(session_store)
         .with_secure(config.secure_cookies)
