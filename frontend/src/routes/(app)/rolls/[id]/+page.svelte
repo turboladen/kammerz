@@ -836,7 +836,7 @@
 	</div>
 {:else}
 	<PageHeader title="Roll {roll.roll_id}" backHref={backNav.href} backLabel={backNav.label}>
-		<Button variant="ghost" href="/rolls/{roll.id}/print"
+		<Button variant="ghost" href="/rolls/{roll.id}/print?autoprint=1"
 			><Printer size={16} strokeWidth={2} aria-hidden="true" />Print summary</Button
 		>
 		<Button variant="danger" onclick={handleDelete}
