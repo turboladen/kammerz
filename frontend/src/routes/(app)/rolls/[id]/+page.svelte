@@ -1172,20 +1172,35 @@
 			{#if shotError}
 				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{shotError}</div>
 			{/if}
-			<div class="flex justify-end gap-2 pt-2">
-				<Button
-					variant="ghost"
-					onclick={() => {
-						showShotDialog = false;
-						resetShotForm();
-					}}>Cancel</Button
-				>
-				{#if !editingShotId}
-					<Button variant="ghost" disabled={!!shotDateError} onclick={handleSaveShotAndNext}>Save & Next</Button>
+			<div class="flex items-center justify-between gap-2 pt-2">
+				{#if editingShotId}
+					<Button
+						variant="danger"
+						onclick={() => {
+							const sid = editingShotId;
+							showShotDialog = false;
+							resetShotForm();
+							deletingShotId = sid;
+						}}>Delete</Button
+					>
+				{:else}
+					<span></span>
 				{/if}
-				<Button variant="primary" disabled={!!shotDateError} onclick={handleSaveShot}>
-					{editingShotId ? 'Save' : 'Add Shot'}
-				</Button>
+				<div class="flex gap-2">
+					<Button
+						variant="ghost"
+						onclick={() => {
+							showShotDialog = false;
+							resetShotForm();
+						}}>Cancel</Button
+					>
+					{#if !editingShotId}
+						<Button variant="ghost" disabled={!!shotDateError} onclick={handleSaveShotAndNext}>Save & Next</Button>
+					{/if}
+					<Button variant="primary" disabled={!!shotDateError} onclick={handleSaveShot}>
+						{editingShotId ? 'Save' : 'Add Shot'}
+					</Button>
+				</div>
 			</div>
 		</div>
 	</Dialog>
