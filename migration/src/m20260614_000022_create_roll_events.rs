@@ -40,11 +40,15 @@ impl MigrationTrait for Migration {
 
         manager
             .create_index(
+                // Composite to serve list_for_roll's `WHERE roll_id = ? ORDER BY
+                // occurred_at DESC, id DESC` from the index alone (no filesort).
                 Index::create()
                     .if_not_exists()
-                    .name("idx_roll_events_roll_id")
+                    .name("idx_roll_events_roll_occurred")
                     .table(RollEvents::Table)
                     .col(RollEvents::RollId)
+                    .col(RollEvents::OccurredAt)
+                    .col(RollEvents::Id)
                     .to_owned(),
             )
             .await?;

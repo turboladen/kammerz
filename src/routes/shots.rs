@@ -105,8 +105,6 @@ async fn create(
     validate_lon("gps_lon", data.gps_lon)?;
 
     let now = now_string();
-    let frame_label = data.frame_number.trim().to_string();
-    let roll_id = data.roll_id;
 
     let result_id = db
         .transaction::<_, i32, DbErr>(|txn| {
@@ -145,13 +143,13 @@ async fn create(
 
                 RollEventService::record(
                     txn,
-                    roll_id,
+                    data.roll_id,
                     entity::roll_event::RollEventType::ShotLogged,
                     None,
                     None,
                     Some(entity::roll_event::RefKind::Shot),
                     Some(result.id),
-                    format!("Frame {frame_label} logged"),
+                    format!("Frame {} logged", result.frame_number),
                 )
                 .await?;
 
