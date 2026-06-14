@@ -15,16 +15,8 @@
 		onchoosepath: (path: 'lab' | 'self') => void;
 	}
 
-	let {
-		statusFlow,
-		currentStatus,
-		currentStatusIdx,
-		devPath,
-		pathLabel,
-		hintFor,
-		onmove,
-		onchoosepath
-	}: Props = $props();
+	let { statusFlow, currentStatus, currentStatusIdx, devPath, pathLabel, hintFor, onmove, onchoosepath }: Props =
+		$props();
 
 	let showStatusHelp = $state(false);
 	let showDevPathMenu = $state(false);

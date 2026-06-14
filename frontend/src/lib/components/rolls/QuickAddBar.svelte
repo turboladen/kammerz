@@ -122,9 +122,7 @@
 		{#if isFixedLens}
 			<div class="flex flex-col gap-1">
 				<span class="text-xs font-medium text-text-muted">Lens</span>
-				<div
-					class="flex h-[38px] items-center rounded-lg border border-border bg-surface px-3 text-sm text-text-muted"
-				>
+				<div class="flex h-[38px] items-center rounded-lg border border-border bg-surface px-3 text-sm text-text-muted">
 					<span class="truncate max-w-[10rem]">{fixedLensLabel || 'Fixed lens'}</span>
 				</div>
 			</div>

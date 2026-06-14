@@ -32,6 +32,7 @@
 ## Task 1: Event TS types + `events` on `RollDetail`
 
 **Files:**
+
 - Modify: `frontend/src/lib/types/index.ts`
 
 - [ ] **Step 1: Add the event types**
@@ -96,6 +97,7 @@ git commit -m "feat(types): RollEvent + events on RollDetail (kammerz-3hq)"
 ## Task 2: Activity grouping util
 
 **Files:**
+
 - Create: `frontend/src/lib/utils/activity.ts`
 
 The journal groups events by calendar day (descending) and rolls up same-day shot events into one summarized line (spec decision A). Events arrive newest-first from the backend.
@@ -169,6 +171,7 @@ git commit -m "feat(activity): groupActivity util for the journal (kammerz-3hq)"
 ## Task 3: Shared shot-entry helper
 
 **Files:**
+
 - Create: `frontend/src/lib/utils/shot-entry.ts`
 - Modify: `frontend/src/routes/(app)/quick-entry/+page.svelte` (call the helper)
 
@@ -227,46 +230,46 @@ export async function logShot(input: QuickShotInput): Promise<string> {
 In `frontend/src/routes/(app)/quick-entry/+page.svelte`, replace the inline `createShot({...})` + `suggestNextFrame` block inside `handleSave` with:
 
 ```ts
-		frameNumber = await import('$lib/utils/shot-entry').then(() => undefined) as never; // placeholder line — see below
+frameNumber = await import('$lib/utils/shot-entry').then(() => undefined) as never; // placeholder line — see below
 ```
 
 …actually import at top: add `import { logShot } from '$lib/utils/shot-entry';` to the imports, then the body of `handleSave` becomes (preserving the existing session-count, success message, reload, focus, and lens-retention behavior):
 
 ```ts
-	async function handleSave() {
-		if (!selectedRollId || !frameNumber.trim()) {
-			error = 'Please select a roll and enter a frame number.';
-			return;
-		}
-		error = '';
-		saving = true;
-		try {
-			const nextFrame = await logShot({
-				rollId: Number(selectedRollId),
-				frameNumber,
-				aperture,
-				shutterSpeed,
-				lensId: selectedLensId,
-				notes
-			});
-			sessionCount++;
-			lastSavedFrame = frameNumber.trim();
-			successMessage = `Frame ${frameNumber} saved`;
-			setTimeout(() => (successMessage = ''), 2000);
-			[shots, rolls] = await Promise.all([listShotsForRoll(Number(selectedRollId)), listRolls()]);
-			aperture = '';
-			shutterSpeed = '';
-			notes = '';
-			frameNumber = nextFrame;
-			setTimeout(() => {
-				document.querySelector<HTMLInputElement>('[data-field="aperture"]')?.focus();
-			}, 50);
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
-		} finally {
-			saving = false;
-		}
+async function handleSave() {
+	if (!selectedRollId || !frameNumber.trim()) {
+		error = 'Please select a roll and enter a frame number.';
+		return;
 	}
+	error = '';
+	saving = true;
+	try {
+		const nextFrame = await logShot({
+			rollId: Number(selectedRollId),
+			frameNumber,
+			aperture,
+			shutterSpeed,
+			lensId: selectedLensId,
+			notes
+		});
+		sessionCount++;
+		lastSavedFrame = frameNumber.trim();
+		successMessage = `Frame ${frameNumber} saved`;
+		setTimeout(() => (successMessage = ''), 2000);
+		[shots, rolls] = await Promise.all([listShotsForRoll(Number(selectedRollId)), listRolls()]);
+		aperture = '';
+		shutterSpeed = '';
+		notes = '';
+		frameNumber = nextFrame;
+		setTimeout(() => {
+			document.querySelector<HTMLInputElement>('[data-field="aperture"]')?.focus();
+		}, 50);
+	} catch (err) {
+		error = err instanceof Error ? err.message : String(err);
+	} finally {
+		saving = false;
+	}
+}
 ```
 
 Remove the now-unused direct `createShot`/`suggestNextFrame` imports **only if** no longer referenced elsewhere in the file (Grep first; `suggestNextFrame` is also used on roll change — keep that import if so).
@@ -285,6 +288,7 @@ git commit -m "refactor(shots): shared logShot helper for quick-entry + bar (kam
 ## Task 4: `RollStatusControl.svelte` (chevron transition control)
 
 **Files:**
+
 - Create: `frontend/src/lib/components/rolls/RollStatusControl.svelte`
 
 Extract the existing chevron bar verbatim into a component. It is **transition-only** (no dates). It receives the flow + current status + a `hintFor` callback and emits `onmove`/`onchoosepath`; all decision logic stays in the parent's `handleStatusClick`.
@@ -324,6 +328,7 @@ git commit -m "feat(ui): RollStatusControl chevron transition control (kammerz-3
 ## Task 5: `FrameStrip.svelte`
 
 **Files:**
+
 - Create: `frontend/src/lib/components/rolls/FrameStrip.svelte`
 
 Horizontal scrolling sprocketed strip of frame cells, sized to the roll's frame count, with a trailing **＋** for over-roll frames. Pure presentation; emits selection.
@@ -344,6 +349,7 @@ interface Props {
 ```
 
 The **parent** builds `frames` (Task 7) so the slot logic is testable and centralized:
+
 - N = `roll.frame_count ?? <film-stock default or 36>`; slots `"1".."N"`.
 - Map each logged shot to its slot by `frame_number`; shots whose `frame_number` isn't an integer in `1..N` (e.g. `"00"`, `"37"`, `"36A"`) are appended as extra cells after slot N.
 - `isNext` = the first open (shot===null) slot in `1..N`, else none.
@@ -368,6 +374,7 @@ git commit -m "feat(ui): FrameStrip horizontal frame strip (kammerz-3hq)"
 ## Task 6: `QuickAddBar.svelte`
 
 **Files:**
+
 - Create: `frontend/src/lib/components/rolls/QuickAddBar.svelte`
 
 Always-on inline entry pinned above the strip, pre-aimed at the next open frame, Save & Next (⌘/Ctrl+Enter), with a "⋯ more" expander for date/location/notes.
@@ -415,6 +422,7 @@ git commit -m "feat(ui): QuickAddBar always-on inline shot entry (kammerz-3hq)"
 ## Task 7: `RollActivity.svelte` (the journal)
 
 **Files:**
+
 - Create: `frontend/src/lib/components/rolls/RollActivity.svelte`
 
 Render the grouped activity. Status events show from→to (with a distinct backward affordance); dev events are click-through to their editor; shot rollups show a quiet per-day line.
@@ -431,6 +439,7 @@ interface Props {
 - [ ] **Step 2: Write the component**
 
 Use `groupActivity(events)` from `$lib/utils/activity`. Render `{#each days}` with a day header (`ledger-line` style) then `{#each day.rows}`:
+
 - `kind: 'event'` + `event_type === 'status_changed'`: show the status move. Use `getStatusLabel(to_status)`; if `from_status`/`to_status` indices imply a backward move (compare via `allStatusOrder` from `$lib/utils/status`), render a distinct ↩ icon/label ("Moved back to X"); else "Status → X". Color the dot via `getStatusColor(to_status)`.
 - `kind: 'event'` + `event_type` in (`lab_dev_added`,`lab_dev_edited`): a clickable row (button) → `onopendev('lab_dev')`; `self_dev_*` (added/edited) → `onopendev('self_dev')`. `*_removed` rows are non-clickable (record gone). Use the event `summary` as the label.
 - `kind: 'event'` + `roll_loaded`: "Roll loaded" with a neutral dot.
@@ -454,6 +463,7 @@ git commit -m "feat(ui): RollActivity journal (kammerz-3hq)"
 ## Task 8: Rewire `+page.svelte` into the two-pane layout
 
 **Files:**
+
 - Modify: `frontend/src/routes/(app)/rolls/[id]/+page.svelte`
 
 - [ ] **Step 1: Add the events derived + frame-cell builder + dev-open helper**
@@ -461,75 +471,75 @@ git commit -m "feat(ui): RollActivity journal (kammerz-3hq)"
 In the script: keep all existing state/handlers. Add:
 
 ```ts
-	import RollStatusControl from '$lib/components/rolls/RollStatusControl.svelte';
-	import FrameStrip from '$lib/components/rolls/FrameStrip.svelte';
-	import QuickAddBar from '$lib/components/rolls/QuickAddBar.svelte';
-	import RollActivity from '$lib/components/rolls/RollActivity.svelte';
-	import type { RollEvent } from '$lib/types';
+import RollStatusControl from '$lib/components/rolls/RollStatusControl.svelte';
+import FrameStrip from '$lib/components/rolls/FrameStrip.svelte';
+import QuickAddBar from '$lib/components/rolls/QuickAddBar.svelte';
+import RollActivity from '$lib/components/rolls/RollActivity.svelte';
+import type { RollEvent } from '$lib/types';
 ```
 
 Add an `events` state, populated in `loadRollData` from `detail.events` (alongside shots/labDev/etc.):
 
 ```ts
-	let events: RollEvent[] = $state([]);
-	// ...in loadRollData, after fetching `detail`:
-	events = detail.events ?? [];
+let events: RollEvent[] = $state([]);
+// ...in loadRollData, after fetching `detail`:
+events = detail.events ?? [];
 ```
 
 Build the frame cells (the slot logic from Task 5):
 
 ```ts
-	const DEFAULT_FRAMES = 36;
-	const frameCells = $derived.by(() => {
-		const n = roll?.frame_count ?? DEFAULT_FRAMES;
-		const byFrame = new Map<string, Shot>();
-		for (const s of shots) byFrame.set(s.frame_number.trim(), s);
-		const cells: { frameNumber: string; shot: Shot | null; isNext: boolean }[] = [];
-		let nextAssigned = false;
-		for (let i = 1; i <= n; i++) {
-			const fn = String(i);
-			const shot = byFrame.get(fn) ?? null;
-			const isNext = !shot && !nextAssigned;
-			if (isNext) nextAssigned = true;
-			cells.push({ frameNumber: fn, shot, isNext });
-			byFrame.delete(fn);
-		}
-		// Extras: any shot whose frame_number wasn't a 1..n slot (e.g. "37", "00", "36A").
-		for (const [fn, shot] of byFrame) cells.push({ frameNumber: fn, shot, isNext: false });
-		return cells;
-	});
-	const nextFrameNumber = $derived(frameCells.find((c) => c.isNext)?.frameNumber ?? '');
+const DEFAULT_FRAMES = 36;
+const frameCells = $derived.by(() => {
+	const n = roll?.frame_count ?? DEFAULT_FRAMES;
+	const byFrame = new Map<string, Shot>();
+	for (const s of shots) byFrame.set(s.frame_number.trim(), s);
+	const cells: { frameNumber: string; shot: Shot | null; isNext: boolean }[] = [];
+	let nextAssigned = false;
+	for (let i = 1; i <= n; i++) {
+		const fn = String(i);
+		const shot = byFrame.get(fn) ?? null;
+		const isNext = !shot && !nextAssigned;
+		if (isNext) nextAssigned = true;
+		cells.push({ frameNumber: fn, shot, isNext });
+		byFrame.delete(fn);
+	}
+	// Extras: any shot whose frame_number wasn't a 1..n slot (e.g. "37", "00", "36A").
+	for (const [fn, shot] of byFrame) cells.push({ frameNumber: fn, shot, isNext: false });
+	return cells;
+});
+const nextFrameNumber = $derived(frameCells.find((c) => c.isNext)?.frameNumber ?? '');
 ```
 
 Add the dev-open-from-journal helper (reuses the `autoPrompt` bridge — see DevelopmentSection): clicking a lab/self dev journal event opens its editor. Since `autoPrompt` opens the dialog seeded for the **existing** record when one exists, a bare `{ kind }` is enough:
 
 ```ts
-	function openDevFromEvent(refKind: 'lab_dev' | 'self_dev') {
-		devAutoPrompt = { kind: refKind === 'lab_dev' ? 'lab' : 'self' };
-	}
+function openDevFromEvent(refKind: 'lab_dev' | 'self_dev') {
+	devAutoPrompt = { kind: refKind === 'lab_dev' ? 'lab' : 'self' };
+}
 ```
 
 Add a quick-add save handler bridging `QuickAddBar` → the shared helper:
 
 ```ts
-	let quickSaving = $state(false);
-	let quickError = $state('');
-	async function handleQuickAdd(entry: {
-		frameNumber: string; aperture: string; shutterSpeed: string;
-		lensId: string; date: string; location: string; notes: string;
-	}) {
-		if (!roll || !entry.frameNumber.trim()) return;
-		quickError = '';
-		quickSaving = true;
-		try {
-			await logShot({ rollId: roll.id, ...entry });
-			await loadRollData('shot-add');
-		} catch (err) {
-			quickError = err instanceof Error ? err.message : String(err);
-		} finally {
-			quickSaving = false;
-		}
+let quickSaving = $state(false);
+let quickError = $state('');
+async function handleQuickAdd(entry: {
+	frameNumber: string; aperture: string; shutterSpeed: string;
+	lensId: string; date: string; location: string; notes: string;
+}) {
+	if (!roll || !entry.frameNumber.trim()) return;
+	quickError = '';
+	quickSaving = true;
+	try {
+		await logShot({ rollId: roll.id, ...entry });
+		await loadRollData('shot-add');
+	} catch (err) {
+		quickError = err instanceof Error ? err.message : String(err);
+	} finally {
+		quickSaving = false;
 	}
+}
 ```
 
 Add `import { logShot } from '$lib/utils/shot-entry';`. Keep `openEditShotDialog` for editing a filled frame (FrameStrip `onselect` with a non-null shot calls it; an open-slot select can pre-fill the Add Shot dialog at that frame or focus the bar — open-slot → `openAddShotDialog()` with the frame pre-set).
@@ -588,6 +598,7 @@ git commit -m "feat(ui): two-pane roll detail (status control + frames + activit
 ## Task 9: Remove dead code
 
 **Files:**
+
 - Delete: `frontend/src/lib/components/rolls/RollTimeline.svelte`
 - Modify: `frontend/src/lib/utils/timeline.ts`
 
@@ -609,6 +620,7 @@ git commit -m "chore(ui): remove RollTimeline + dead timeline utils (kammerz-3hq
 ## Task 10: e2e coverage + final gate
 
 **Files:**
+
 - Modify: `frontend/tests/smoke.spec.ts`
 
 - [ ] **Step 1: Replace the obsolete timeline e2e**
@@ -654,6 +666,7 @@ git commit -m "test(e2e): roll detail redesign smoke (kammerz-3hq)"
 ## Verification (end-to-end, manual)
 
 `just dev`, open a roll at each stage:
+
 1. **Lab-Done roll** (seed TEST-0e5 if present, else create + advance): chevron control shows the lab flow with the current rung highlighted; clicking a future rung prompts for a date (DateConfirm), a past rung asks to confirm (ConfirmDialog), and a lab/self rung with no record opens the dev dialog. The activity journal shows roll_loaded + status changes + dev events; clicking a "Lab development" journal event opens the lab editor.
 2. **Frames:** the strip shows 36 slots, the next open frame ringed and auto-centered; clicking a filled frame opens the edit dialog; clicking an open frame logs at that frame; ＋ appends an extra. The quick-add bar logs the next frame with Save & Next (⌘/Ctrl+Enter), clears per-shot fields, keeps lens, and the new frame appears in the strip + a shot rollup appears in the journal.
 3. **Undecided roll** at `shot`: the Develop ▾ chooser appears in the control; picking Lab/Self opens the dev dialog and re-renders the flow.

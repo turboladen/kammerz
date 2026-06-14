@@ -139,35 +139,36 @@ test('roll detail page loads without an infinite fetch loop (kammerz-8k5)', asyn
 });
 
 /**
- * Regression guard for kammerz-fxl: the Timeline must not offer a date editor for
- * milestones the roll hasn't reached yet. Back-filling a future rung's date (e.g.
- * Scanned while the roll is only Shot) bypasses the proper path — advancing the
- * status, which writes the date AND runs the backend auto-sync. A roll at `shot`
- * (undecided path) has reached Loaded + Finished shooting but not Scanned /
- * Post-processed / Archived, so those rungs must render as plain undated rows with
- * no edit button while the reached rungs stay editable.
+ * Smoke test for kammerz-3hq: the two-pane roll detail redesign. The old Timeline
+ * section (kammerz-fxl) is replaced by an activity journal; the chevron status
+ * control, QuickAddBar, FrameStrip, and RollActivity components replace the former
+ * stacked Status + Timeline + Shots sections. Assert the new UI structure is present
+ * and the founding "Roll loaded" activity entry appears.
  */
-test('timeline hides date editor on not-yet-reached milestones (kammerz-fxl)', async ({ page }) => {
+test('roll detail shows status control, frame strip, quick-add, and activity (kammerz-3hq)', async ({ page }) => {
 	const created = await page.request.post(`${BASE}/api/rolls`, {
-		data: { roll_id: `E2E-FXL-${Date.now()}`, status: 'shot', date_loaded: '2026-05-31', date_finished: '2026-06-02' }
+		data: { roll_id: `E2E-P2-${Date.now()}`, status: 'loaded', frame_count: 36 }
 	});
 	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
 	const id: number = await created.json();
 
 	await page.goto(`${BASE}/rolls/${id}`);
-	await expect(page.getByRole('heading', { name: 'Timeline' })).toBeVisible();
+	await page.waitForLoadState('networkidle');
 
-	// Reached rungs keep their inline editor.
-	await expect(page.getByRole('button', { name: /Loaded date/i })).toBeVisible();
-	await expect(page.getByRole('button', { name: /Finished shooting date/i })).toBeVisible();
+	// RollStatusControl renders an h2 with text "Status" (ledger-line header).
+	await expect(page.getByRole('heading', { name: 'Status' })).toBeVisible();
 
-	// Future rungs offer no editor — neither a "Set" nor an "Edit" affordance.
-	for (const rung of ['Scanned', 'Post-processed', 'Archived']) {
-		await expect(
-			page.getByRole('button', { name: new RegExp(`(Set|Edit) ${rung} date`, 'i') }),
-			`${rung} must not be date-editable before the roll reaches it`
-		).toHaveCount(0);
-	}
+	// At least one chevron button is present. For a `loaded` roll the current rung
+	// aria-label is "Current status: Loaded"; other rungs say "Move to …".
+	await expect(page.getByRole('button', { name: /Current status:|Move to/i }).first()).toBeVisible();
+
+	// Activity journal shows the founding "Roll loaded" entry (RollActivity.svelte
+	// renders it as a <span class="text-xs text-text-muted">Roll loaded</span>).
+	await expect(page.getByText('Roll loaded')).toBeVisible();
+
+	// QuickAddBar is present: it renders a "Frame" label above the frame number
+	// display and a "Save & Next" primary button.
+	await expect(page.getByRole('button', { name: /Save & Next/i })).toBeVisible();
 
 	await page.request.delete(`${BASE}/api/rolls/${id}`);
 });
