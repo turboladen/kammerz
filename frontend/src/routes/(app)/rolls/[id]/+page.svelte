@@ -339,7 +339,7 @@
 	// it did. 'explicit' = a user-driven status move (chevron / nudge): suppress the
 	// notice even when the status changes. The rest name the mutation that ran so the
 	// message can be specific; an undiffed status (no change) shows nothing regardless.
-	type ReloadReason = 'navigate' | 'explicit' | 'shot-add' | 'shot-delete' | 'dev' | 'timeline' | 'roll-edit';
+	type ReloadReason = 'navigate' | 'explicit' | 'shot-add' | 'shot-delete' | 'dev' | 'roll-edit';
 
 	// Direction of an auto-change, judged WITHIN a single dev flow. The canonical full
 	// status order interleaves the lab and self branches (at-lab, lab-done, developing,
@@ -599,27 +599,6 @@
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
-	}
-
-	function getShotLensDisplay(shotId: number): { name: string; isDefault: boolean } | null {
-		const ids = shotLensMap[shotId] ?? [];
-		if (ids.length > 0) {
-			// Per-shot override
-			const names = ids
-				.map((lid) => allLenses.find((l) => l.id === lid))
-				.filter(Boolean)
-				.map((l) => lensDisplayName(l!))
-				.join(', ');
-			return { name: names, isDefault: false };
-		}
-		// Fall back to roll default
-		if (roll?.lens_id) {
-			const defaultLens = allLenses.find((l) => l.id === roll?.lens_id);
-			if (defaultLens) {
-				return { name: lensDisplayName(defaultLens), isDefault: true };
-			}
-		}
-		return null;
 	}
 
 	// Commit a status change. When `date` is provided (from the prompt or the
@@ -1052,9 +1031,8 @@
 			</div>
 		</FadeIn>
 
-		<!-- DevelopmentSection: mounted for its dialogs/delete confirms; visually hidden
-		     (no section header). Dev record display is superseded by the Activity journal;
-		     dialogs are opened from chevron clicks and journal-event clicks via autoPrompt. -->
+		<!-- DevelopmentSection: the compact Development panel + its create/edit/delete dialogs.
+		     Dialogs are also opened from chevron clicks and from journal dev-event clicks via the autoPrompt bridge. -->
 		<DevelopmentSection
 			rollId={id}
 			{labs}
