@@ -16,8 +16,6 @@
 	let { frames, onselect, onaddextra }: Props = $props();
 
 	// Track the next-frame element via a Svelte action
-	const nextFrameNumber = $derived(frames.find((c) => c.isNext)?.frameNumber ?? null);
-
 	function nextFrameAction(node: HTMLButtonElement, isNext: boolean) {
 		function maybeScroll(active: boolean) {
 			if (active) {
@@ -39,7 +37,7 @@
 	<div class="film-perfs-x h-3.5 w-full" aria-hidden="true"></div>
 
 	<!-- Scrollable frame row -->
-	<div class="overflow-x-auto px-2 py-1" aria-label="Film frames">
+	<div class="overflow-x-auto px-2 py-1" role="group" aria-label="Film frames">
 		<ul class="flex items-stretch gap-1">
 			{#each frames as cell}
 				<li>
