@@ -79,6 +79,7 @@ pub struct RollDetail {
     pub lab_dev: Option<development_lab::Model>,
     pub self_dev: Option<development_self::Model>,
     pub dev_stages: Vec<dev_stage::Model>,
+    pub events: Vec<entity::roll_event::Model>,
 }
 
 // --- Router ---
@@ -282,6 +283,8 @@ async fn get_detail(
         vec![]
     };
 
+    let events = crate::services::roll_event_service::RollEventService::list_for_roll(&db, id).await?;
+
     Ok(Json(RollDetail {
         roll,
         shots,
@@ -289,5 +292,6 @@ async fn get_detail(
         lab_dev,
         self_dev,
         dev_stages,
+        events,
     }))
 }
