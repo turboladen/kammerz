@@ -5,6 +5,7 @@ pub mod import_service;
 pub mod lab_service;
 pub mod lens_mount_service;
 pub mod lens_service;
+pub mod roll_event_service;
 pub mod roll_service;
 pub mod search_service;
 pub mod settings_service;

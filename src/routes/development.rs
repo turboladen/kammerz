@@ -19,6 +19,7 @@ use crate::routes::{Op, friendly_err, friendly_txn_err};
 use crate::services::development_service::{
     DevelopmentService, LabDevListItem, SelfDevWithStages, StageInput,
 };
+use crate::services::roll_event_service::RollEventService;
 use crate::services::roll_service::RollService;
 use crate::validate::{
     require_nonempty, validate_date_opt, validate_non_negative_f64, validate_non_negative_i32,
@@ -233,6 +234,18 @@ async fn create_lab_dev(
                 )
                 .await?;
 
+                RollEventService::record(
+                    txn,
+                    data.roll_id,
+                    entity::roll_event::RollEventType::LabDevAdded,
+                    None,
+                    None,
+                    Some(entity::roll_event::RefKind::LabDev),
+                    Some(result.id),
+                    "Lab development added".to_string(),
+                )
+                .await?;
+
                 Ok(result.id)
             })
         })
@@ -305,6 +318,18 @@ async fn update_lab_dev(
                     .await?;
             }
 
+            RollEventService::record(
+                txn,
+                result.roll_id,
+                entity::roll_event::RollEventType::LabDevEdited,
+                None,
+                None,
+                Some(entity::roll_event::RefKind::LabDev),
+                Some(id),
+                "Lab development edited".to_string(),
+            )
+            .await?;
+
             Ok(())
         })
     })
@@ -351,6 +376,18 @@ async fn delete_lab_dev(
                 )
                 .await?;
             }
+
+            RollEventService::record(
+                txn,
+                roll_id,
+                entity::roll_event::RollEventType::LabDevRemoved,
+                None,
+                None,
+                None,
+                None,
+                "Lab development removed".to_string(),
+            )
+            .await?;
 
             Ok(())
         })
@@ -437,6 +474,18 @@ async fn create_self_dev(
                     txn,
                     data.roll_id,
                     result.date_processed.is_some(),
+                )
+                .await?;
+
+                RollEventService::record(
+                    txn,
+                    data.roll_id,
+                    entity::roll_event::RollEventType::SelfDevAdded,
+                    None,
+                    None,
+                    Some(entity::roll_event::RefKind::SelfDev),
+                    Some(result.id),
+                    "Self development added".to_string(),
                 )
                 .await?;
 
@@ -529,6 +578,18 @@ async fn update_self_dev(
                     .await?;
             }
 
+            RollEventService::record(
+                txn,
+                result.roll_id,
+                entity::roll_event::RollEventType::SelfDevEdited,
+                None,
+                None,
+                Some(entity::roll_event::RefKind::SelfDev),
+                Some(id),
+                "Self development edited".to_string(),
+            )
+            .await?;
+
             Ok(())
         })
     })
@@ -575,6 +636,18 @@ async fn delete_self_dev(
                 )
                 .await?;
             }
+
+            RollEventService::record(
+                txn,
+                roll_id,
+                entity::roll_event::RollEventType::SelfDevRemoved,
+                None,
+                None,
+                None,
+                None,
+                "Self development removed".to_string(),
+            )
+            .await?;
 
             Ok(())
         })

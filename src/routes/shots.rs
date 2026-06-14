@@ -14,6 +14,7 @@ use crate::error::{AppError, AppResult, DbOptionExt, OptionExt};
 use crate::extract::{Json, Path};
 use crate::patch::{double_option, now_string, trim, trim_opt};
 use crate::routes::{Op, friendly_err, friendly_txn_err};
+use crate::services::roll_event_service::RollEventService;
 use crate::services::roll_service::RollService;
 use crate::services::shot_service::ShotService;
 use crate::validate::{require_nonempty, validate_date_opt, validate_lat, validate_lon};
@@ -140,6 +141,18 @@ async fn create(
                 )
                 .await?;
 
+                RollEventService::record(
+                    txn,
+                    data.roll_id,
+                    entity::roll_event::RollEventType::ShotLogged,
+                    None,
+                    None,
+                    Some(entity::roll_event::RefKind::Shot),
+                    Some(result.id),
+                    format!("Frame {} logged", result.frame_number),
+                )
+                .await?;
+
                 Ok(result.id)
             })
         })
@@ -158,6 +171,7 @@ async fn update(
     Json(data): Json<UpdateShotDto>,
 ) -> AppResult<StatusCode> {
     let existing = ShotService::get_by_id(&db, id).await?.or_404("Shot", id)?;
+    let roll_id = existing.roll_id;
 
     if let Some(v) = &data.date {
         validate_date_opt("date", v)?;
@@ -213,6 +227,18 @@ async fn update(
                 ShotService::set_lenses_for_shot(txn, id, lens_ids).await?;
             }
 
+            RollEventService::record(
+                txn,
+                roll_id,
+                entity::roll_event::RollEventType::ShotEdited,
+                None,
+                None,
+                Some(entity::roll_event::RefKind::Shot),
+                Some(id),
+                "Shot edited".to_string(),
+            )
+            .await?;
+
             Ok(())
         })
     })
@@ -256,6 +282,18 @@ async fn delete_one(
                 )
                 .await?;
             }
+
+            RollEventService::record(
+                txn,
+                roll_id,
+                entity::roll_event::RollEventType::ShotDeleted,
+                None,
+                None,
+                None,
+                None,
+                format!("Frame {} deleted", shot_record.frame_number),
+            )
+            .await?;
 
             Ok(())
         })

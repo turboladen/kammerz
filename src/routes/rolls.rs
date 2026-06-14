@@ -2,7 +2,7 @@ use axum::Router;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::get;
-use sea_orm::{DatabaseConnection, EntityTrait, Set};
+use sea_orm::{DatabaseConnection, DbErr, EntityTrait, Set, TransactionTrait};
 use serde::{Deserialize, Serialize};
 
 use crate::AppState;
@@ -12,6 +12,7 @@ use crate::extract::{Json, Path};
 use crate::patch::{double_option, now_string, trim_opt};
 use crate::routes::{friendly_delete_err, friendly_err};
 use crate::services::development_service::DevelopmentService;
+use crate::services::roll_event_service::RollEventService;
 use crate::services::roll_service::{RollService, RollWithDetails};
 use crate::services::shot_service::ShotService;
 use crate::validate::{require_nonempty, validate_date_opt, validate_non_negative_i32};
@@ -79,6 +80,7 @@ pub struct RollDetail {
     pub lab_dev: Option<development_lab::Model>,
     pub self_dev: Option<development_self::Model>,
     pub dev_stages: Vec<dev_stage::Model>,
+    pub events: Vec<entity::roll_event::Model>,
 }
 
 // --- Router ---
@@ -142,10 +144,27 @@ async fn create(
         updated_at: Set(now),
         ..Default::default()
     };
-    let result = RollService::create(&db, model)
+    let result_id = db
+        .transaction::<_, i32, DbErr>(|txn| {
+            Box::pin(async move {
+                let result = RollService::create(txn, model).await?;
+                RollEventService::record(
+                    txn,
+                    result.id,
+                    entity::roll_event::RollEventType::RollLoaded,
+                    None,
+                    None,
+                    None,
+                    None,
+                    "Roll loaded".to_string(),
+                )
+                .await?;
+                Ok(result.id)
+            })
+        })
         .await
         .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
-    Ok((StatusCode::CREATED, Json(result.id)))
+    Ok((StatusCode::CREATED, Json(result_id)))
 }
 
 async fn update(
@@ -158,6 +177,8 @@ async fn update(
         .one(&db)
         .await?
         .or_404("Roll", id)?;
+    let prev_status = existing.status.clone();
+    let requested_status = data.status.clone();
 
     if let Some(v) = &data.date_loaded {
         validate_date_opt("date_loaded", v)?;
@@ -225,9 +246,20 @@ async fn update(
     }
     model.updated_at = Set(now);
 
-    RollService::update(&db, model)
-        .await
-        .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
+    db.transaction::<_, (), DbErr>(|txn| {
+        Box::pin(async move {
+            RollService::update(txn, model).await?;
+            if let Some(new_status) = requested_status {
+                if new_status != prev_status {
+                    RollEventService::record_status_change(txn, id, prev_status, new_status)
+                        .await?;
+                }
+            }
+            Ok(())
+        })
+    })
+    .await
+    .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -282,6 +314,8 @@ async fn get_detail(
         vec![]
     };
 
+    let events = RollEventService::list_for_roll(&db, id).await?;
+
     Ok(Json(RollDetail {
         roll,
         shots,
@@ -289,5 +323,6 @@ async fn get_detail(
         lab_dev,
         self_dev,
         dev_stages,
+        events,
     }))
 }

@@ -2,8 +2,10 @@ use sea_orm::*;
 use serde::Serialize;
 
 use crate::patch::now_string;
+use crate::services::roll_event_service::RollEventService;
 use crate::services::shot_service::ShotService;
 use ::entity::roll::{self, Entity as Roll, PushPull, RollStatus};
+use ::entity::roll_event::RollEventType;
 use ::entity::shot;
 use ::entity::{development_lab, development_self};
 
@@ -136,7 +138,7 @@ impl RollService {
     }
 
     pub async fn create(
-        db: &DatabaseConnection,
+        db: &impl ConnectionTrait,
         model: roll::ActiveModel,
     ) -> Result<roll::Model, DbErr> {
         model.insert(db).await
@@ -183,6 +185,21 @@ impl RollService {
                 Box::pin(async move {
                     let roll_result = roll_model.insert(txn).await?;
                     let new_roll_id = roll_result.id;
+
+                    // Bulk import emits only the founding roll_loaded event — per-shot
+                    // events are intentionally NOT logged, so an imported timeline has a
+                    // sensible start without dozens of shot entries.
+                    RollEventService::record(
+                        txn,
+                        new_roll_id,
+                        RollEventType::RollLoaded,
+                        None,
+                        None,
+                        None,
+                        None,
+                        "Roll loaded".to_string(),
+                    )
+                    .await?;
 
                     let now = now_string();
 
@@ -235,11 +252,13 @@ impl RollService {
             .ok_or_else(|| DbErr::Custom(format!("Roll {roll_id} not found")))?;
 
         if from_statuses.contains(&roll_record.status) {
+            let from = roll_record.status.clone();
             let now = now_string();
             let mut model: roll::ActiveModel = roll_record.into();
-            model.status = Set(to_status);
+            model.status = Set(to_status.clone());
             model.updated_at = Set(now);
             model.update(db).await?;
+            RollEventService::record_status_change(db, roll_id, from, to_status).await?;
             Ok(true)
         } else {
             Ok(false)
@@ -269,11 +288,13 @@ impl RollService {
 
         match (current_idx, target_idx) {
             (Some(cur), Some(tgt)) if cur < tgt => {
+                let from = roll_record.status.clone();
                 let now = now_string();
                 let mut model: roll::ActiveModel = roll_record.into();
-                model.status = Set(target);
+                model.status = Set(target.clone());
                 model.updated_at = Set(now);
                 model.update(db).await?;
+                RollEventService::record_status_change(db, roll_id, from, target).await?;
                 Ok(true)
             }
             _ => Ok(false),

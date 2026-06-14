@@ -105,6 +105,8 @@ pub enum Relation {
     DevelopmentLabs,
     #[sea_orm(has_many = "super::development_self::Entity")]
     DevelopmentSelfs,
+    #[sea_orm(has_many = "super::roll_event::Entity")]
+    RollEvents,
 }
 
 impl Related<super::camera::Entity> for Entity {
@@ -140,6 +142,12 @@ impl Related<super::development_lab::Entity> for Entity {
 impl Related<super::development_self::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::DevelopmentSelfs.def()
+    }
+}
+
+impl Related<super::roll_event::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::RollEvents.def()
     }
 }
 
