@@ -170,6 +170,34 @@ export interface RollWithDetails extends Roll {
 	shot_count: number;
 }
 
+export type RollEventType =
+	| 'roll_loaded'
+	| 'status_changed'
+	| 'shot_logged'
+	| 'shot_edited'
+	| 'shot_deleted'
+	| 'lab_dev_added'
+	| 'lab_dev_edited'
+	| 'lab_dev_removed'
+	| 'self_dev_added'
+	| 'self_dev_edited'
+	| 'self_dev_removed';
+
+export type RollEventRefKind = 'lab_dev' | 'self_dev' | 'shot';
+
+export interface RollEvent {
+	id: number;
+	roll_id: number;
+	event_type: RollEventType;
+	from_status: RollStatus | null;
+	to_status: RollStatus | null;
+	ref_kind: RollEventRefKind | null;
+	ref_id: number | null;
+	summary: string;
+	occurred_at: string;
+	created_at: string;
+}
+
 // Composite roll detail (single IPC call for roll detail page)
 export interface RollDetail {
 	roll: RollWithDetails;
@@ -178,6 +206,7 @@ export interface RollDetail {
 	lab_dev: DevelopmentLab | null;
 	self_dev: DevelopmentSelf | null;
 	dev_stages: DevStage[];
+	events: RollEvent[];
 }
 
 // --- Shots ---

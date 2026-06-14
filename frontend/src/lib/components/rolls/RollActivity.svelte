@@ -1,0 +1,159 @@
+<script lang="ts">
+	import { CornerDownLeft } from 'lucide-svelte';
+	import { groupActivity } from '$lib/utils/activity';
+	import { getStatusLabel, getStatusColor, allStatusOrder } from '$lib/utils/status';
+	import type { RollEvent, RollStatus } from '$lib/types';
+
+	interface Props {
+		events: RollEvent[];
+		onopendev: (refKind: 'lab_dev' | 'self_dev') => void;
+	}
+
+	let { events, onopendev }: Props = $props();
+
+	const days = $derived(groupActivity(events));
+
+	/**
+	 * Returns true if to_status comes before from_status in the canonical order
+	 * (i.e., moving backward through the roll lifecycle).
+	 */
+	function isBackwardMove(from: RollStatus | null, to: RollStatus | null): boolean {
+		if (!from || !to) return false;
+		const fromIdx = allStatusOrder.indexOf(from);
+		const toIdx = allStatusOrder.indexOf(to);
+		return fromIdx > toIdx;
+	}
+
+	/** Format an occurred_at timestamp ("YYYY-MM-DD HH:MM:SS") into a readable day label. */
+	function formatDay(day: string): string {
+		// day is already "YYYY-MM-DD"
+		try {
+			const d = new Date(day + 'T00:00:00');
+			return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+		} catch {
+			return day;
+		}
+	}
+
+	/** Format a short time from occurred_at "YYYY-MM-DD HH:MM:SS". */
+	function formatTime(occurredAt: string): string {
+		// occurredAt = "YYYY-MM-DD HH:MM:SS"
+		return occurredAt.slice(11, 16); // "HH:MM"
+	}
+
+	/** Whether this event type represents a dev record that still exists (clickable). */
+	function isDevClickable(eventType: RollEvent['event_type']): boolean {
+		return (
+			eventType === 'lab_dev_added' ||
+			eventType === 'lab_dev_edited' ||
+			eventType === 'self_dev_added' ||
+			eventType === 'self_dev_edited'
+		);
+	}
+
+	/** Which dev kind this event relates to, for the click handler. */
+	function devRefKind(eventType: RollEvent['event_type']): 'lab_dev' | 'self_dev' | null {
+		if (eventType === 'lab_dev_added' || eventType === 'lab_dev_edited') return 'lab_dev';
+		if (eventType === 'self_dev_added' || eventType === 'self_dev_edited') return 'self_dev';
+		return null;
+	}
+</script>
+
+{#if days.length === 0}
+	<div class="py-6 text-center text-sm text-text-faint">No activity yet.</div>
+{:else}
+	<div class="space-y-5">
+		{#each days as day}
+			<!-- Day header — ledger-line style -->
+			<div>
+				<h3 class="mb-2 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+					{formatDay(day.day)}
+					<div class="flex-1 border-b border-border-subtle"></div>
+				</h3>
+
+				<ul class="space-y-1.5">
+					{#each day.rows as row}
+						<li>
+							{#if row.kind === 'shots'}
+								<!-- Shot rollup — quiet, faint -->
+								<div class="flex items-center gap-2 px-1 py-0.5">
+									<span class="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-border" aria-hidden="true"></span>
+									<span class="text-xs text-text-faint">
+										{row.count} frame change{row.count > 1 ? 's' : ''}
+									</span>
+									<span class="ml-auto font-mono text-[10px] text-text-faint/60">
+										{formatTime(row.latest.occurred_at)}
+									</span>
+								</div>
+							{:else if row.event.event_type === 'status_changed'}
+								<!-- Status change event — prominent dot + label -->
+								{@const backward = isBackwardMove(row.event.from_status, row.event.to_status)}
+								{@const toStatus = row.event.to_status}
+								<div class="flex items-center gap-2 px-1 py-0.5">
+									<!-- Status color dot -->
+									{#if toStatus}
+										<span
+											class="h-2 w-2 flex-shrink-0 rounded-full"
+											style="background-color: {getStatusColor(toStatus)}"
+											aria-hidden="true"
+										></span>
+									{:else}
+										<span class="h-2 w-2 flex-shrink-0 rounded-full bg-border" aria-hidden="true"></span>
+									{/if}
+									<span class="text-xs text-text">
+										{#if backward}
+											<span class="inline-flex items-center gap-1">
+												<CornerDownLeft size={11} class="text-text-faint" aria-hidden="true" />
+												Moved back to {toStatus ? getStatusLabel(toStatus) : '–'}
+											</span>
+										{:else}
+											Status → {toStatus ? getStatusLabel(toStatus) : '–'}
+										{/if}
+									</span>
+									<span class="ml-auto font-mono text-[10px] text-text-faint/60">
+										{formatTime(row.event.occurred_at)}
+									</span>
+								</div>
+							{:else if row.event.event_type === 'roll_loaded'}
+								<!-- Roll loaded — neutral dot -->
+								<div class="flex items-center gap-2 px-1 py-0.5">
+									<span class="h-2 w-2 flex-shrink-0 rounded-full bg-text-faint/40" aria-hidden="true"></span>
+									<span class="text-xs text-text-muted">Roll loaded</span>
+									<span class="ml-auto font-mono text-[10px] text-text-faint/60">
+										{formatTime(row.event.occurred_at)}
+									</span>
+								</div>
+							{:else if isDevClickable(row.event.event_type)}
+								<!-- Dev add/edit — clickable button opens the dev editor -->
+								{@const kind = devRefKind(row.event.event_type)}
+								<button
+									onclick={() => kind && onopendev(kind)}
+									class="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left transition-colors hover:bg-surface-overlay"
+									title="Open {kind === 'lab_dev' ? 'lab' : 'self'} development details"
+									aria-label="Open {kind === 'lab_dev' ? 'lab' : 'self'} development details"
+								>
+									<span class="h-2 w-2 flex-shrink-0 rounded-full bg-accent/60" aria-hidden="true"></span>
+									<span class="text-xs text-text-muted hover:text-text">
+										{row.event.summary}
+									</span>
+									<span class="ml-auto font-mono text-[10px] text-text-faint/60">
+										{formatTime(row.event.occurred_at)}
+									</span>
+								</button>
+							{:else}
+								<!-- All other events (dev removed, shot events that aren't grouped, etc.) — non-clickable -->
+								<div class="flex items-center gap-2 px-1 py-0.5">
+									<span class="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-border" aria-hidden="true"></span>
+									<span class="text-xs text-text-faint">{row.event.summary}</span>
+									<span class="ml-auto font-mono text-[10px] text-text-faint/60">
+										{formatTime(row.event.occurred_at)}
+									</span>
+								</div>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/each}
+	</div>
+{/if}

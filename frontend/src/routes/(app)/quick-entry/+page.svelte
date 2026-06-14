@@ -11,7 +11,8 @@
 	import { listRolls, updateRoll } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import { listLenses } from '$lib/api/lenses';
-	import { listShotsForRoll, createShot, suggestNextFrame } from '$lib/api/shots';
+	import { listShotsForRoll, suggestNextFrame } from '$lib/api/shots';
+	import { logShot } from '$lib/utils/shot-entry';
 	import { buildLensOptions, lensDisplayName } from '$lib/utils/lens';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import { getStatusLabel } from '$lib/utils/status';
@@ -161,43 +162,25 @@
 		error = '';
 		saving = true;
 		try {
-			const lensIds = selectedLensId ? [Number(selectedLensId)] : [];
-			await createShot({
-				roll_id: Number(selectedRollId),
-				frame_number: frameNumber.trim(),
-				aperture: aperture || null,
-				shutter_speed: shutterSpeed || null,
-				date: null,
-				date_fuzzy: null,
-				location: null,
-				gps_lat: null,
-				gps_lon: null,
-				notes: notes || null,
-				lens_ids: lensIds
+			const nextFrame = await logShot({
+				rollId: Number(selectedRollId),
+				frameNumber,
+				aperture,
+				shutterSpeed,
+				lensId: selectedLensId,
+				notes
 			});
-
 			sessionCount++;
 			lastSavedFrame = frameNumber.trim();
 			successMessage = `Frame ${frameNumber} saved`;
 			setTimeout(() => (successMessage = ''), 2000);
-
-			// Auto-advance: reload shots + rolls (status may have changed), clear fields, keep lens, suggest next frame
 			[shots, rolls] = await Promise.all([listShotsForRoll(Number(selectedRollId)), listRolls()]);
 			aperture = '';
 			shutterSpeed = '';
 			notes = '';
-			// Keep selectedLensId — photographer usually uses the same lens per roll
-
-			try {
-				frameNumber = await suggestNextFrame(Number(selectedRollId));
-			} catch {
-				frameNumber = '';
-			}
-
-			// Focus the aperture field after save
+			frameNumber = nextFrame;
 			setTimeout(() => {
-				const apertureInput = document.querySelector<HTMLInputElement>('[data-field="aperture"]');
-				apertureInput?.focus();
+				document.querySelector<HTMLInputElement>('[data-field="aperture"]')?.focus();
 			}, 50);
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);

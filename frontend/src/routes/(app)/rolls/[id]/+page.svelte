@@ -15,12 +15,16 @@
 	import DevelopmentSection from '$lib/components/rolls/DevelopmentSection.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import InlineNotice from '$lib/components/ui/InlineNotice.svelte';
-	import RollTimeline from '$lib/components/rolls/RollTimeline.svelte';
+	import RollStatusControl from '$lib/components/rolls/RollStatusControl.svelte';
+	import FrameStrip from '$lib/components/rolls/FrameStrip.svelte';
+	import QuickAddBar from '$lib/components/rolls/QuickAddBar.svelte';
+	import RollActivity from '$lib/components/rolls/RollActivity.svelte';
 	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
 	import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
 	import { getRollDetail, updateRoll, deleteRoll } from '$lib/api/rolls';
 	import { updateLabDev, updateSelfDev } from '$lib/api/development';
-	import type { TimelineMilestone, DateTarget } from '$lib/utils/timeline';
+	import type { DateTarget } from '$lib/utils/timeline';
+	import { logShot } from '$lib/utils/shot-entry';
 	import { listCameras } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
 	import { listLenses } from '$lib/api/lenses';
@@ -40,7 +44,7 @@
 		selfFlow,
 		type DevAutoPrompt
 	} from '$lib/utils/status';
-	import { buildRollTimeline, readDateTarget, STATUS_DATE_TARGET } from '$lib/utils/timeline';
+	import { readDateTarget, STATUS_DATE_TARGET } from '$lib/utils/timeline';
 	import { todayLocal, dateFieldError } from '$lib/utils/date';
 	import type {
 		RollWithDetails,
@@ -55,9 +59,10 @@
 		DevStage,
 		RollStatus,
 		PushPull,
-		LensMount
+		LensMount,
+		RollEvent
 	} from '$lib/types';
-	import { Trash2, CircleHelp, Printer } from 'lucide-svelte';
+	import { Trash2, Printer } from 'lucide-svelte';
 
 	const id = $derived(Number(page.params.id));
 
@@ -134,9 +139,6 @@
 	const statusFlow = $derived(getFlowForPath(devPath));
 	const pathLabel = $derived(getPathLabel(devPath));
 
-	// Ordered lifecycle dates (path-aware) for the read-only timeline section.
-	const timeline = $derived(roll ? buildRollTimeline(roll, labDev, selfDev, devPath) : []);
-
 	// Helper: the current value of a status's target date (for the forward+empty check).
 	// STATUS_DATE_TARGET and the read dispatch live in timeline.ts so the status→date
 	// facts have a single source of truth (see kammerz-mfj).
@@ -173,12 +175,6 @@
 	const showRollFullNudge = $derived(
 		roll?.status === 'shooting' && frameProgress !== null && shots.length >= frameProgress.total && !rollFullDismissed
 	);
-
-	// Development-path picker popover (the live "Develop" chevron in the undecided flow).
-	let showDevPathMenu = $state(false);
-
-	// Help disclosure on the Status header — explains the chevron bar's click behaviors.
-	let showStatusHelp = $state(false);
 
 	// Status auto-sync (advance on create, revert on delete) is handled by the
 	// backend commands transactionally. The frontend just calls loadRollData()
@@ -275,6 +271,44 @@
 	// Shot-level lens dropdown options (uses the saved camera, not the edit form camera)
 	const shotLensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens', lensMounts));
 
+	// Activity journal events (populated from /detail after each load)
+	let events: RollEvent[] = $state([]);
+
+	// Frame cells: map shots onto numbered slots, extras appended after
+	const DEFAULT_FRAMES = 36;
+	const frameCells = $derived.by(() => {
+		const n = roll?.frame_count ?? DEFAULT_FRAMES;
+		const byFrame = new Map<string, Shot>();
+		for (const s of shots) byFrame.set(s.frame_number.trim(), s);
+		const cells: { frameNumber: string; shot: Shot | null; isNext: boolean }[] = [];
+		let nextAssigned = false;
+		for (let i = 1; i <= n; i++) {
+			const fn = String(i);
+			const shot = byFrame.get(fn) ?? null;
+			const isNext = !shot && !nextAssigned;
+			if (isNext) nextAssigned = true;
+			cells.push({ frameNumber: fn, shot, isNext });
+			byFrame.delete(fn);
+		}
+		// Extras: any shot whose frame_number wasn't a 1..n slot (e.g. "37", "00", "36A").
+		for (const [fn, shot] of byFrame) cells.push({ frameNumber: fn, shot, isNext: false });
+		return cells;
+	});
+	const nextFrameNumber = $derived(frameCells.find((c) => c.isNext)?.frameNumber ?? '');
+
+	// QuickAddBar save state
+	let quickSaving = $state(false);
+	let quickError = $state('');
+
+	// Default lens id for the QuickAddBar (mirrors the shot dialog's smart cascade,
+	// minus the last-used-on-roll part which is session state — use roll/camera default)
+	const quickDefaultLensId = $derived.by(() => {
+		if (fixedLens) return String(fixedLens.id);
+		if (roll?.lens_id) return String(roll.lens_id);
+		if (selectedCamera?.default_lens_id) return String(selectedCamera.default_lens_id);
+		return '';
+	});
+
 	// Reference catalogs (cameras, film stocks, lenses, labs, lens mounts) are
 	// loaded by the page-load $effect — on mount and on roll-id navigation — but
 	// NOT by the mutation refresh path (loadRollData), since no mutation on this
@@ -305,7 +339,7 @@
 	// it did. 'explicit' = a user-driven status move (chevron / nudge): suppress the
 	// notice even when the status changes. The rest name the mutation that ran so the
 	// message can be specific; an undiffed status (no change) shows nothing regardless.
-	type ReloadReason = 'navigate' | 'explicit' | 'shot-add' | 'shot-delete' | 'dev' | 'timeline' | 'roll-edit';
+	type ReloadReason = 'navigate' | 'explicit' | 'shot-add' | 'shot-delete' | 'dev' | 'roll-edit';
 
 	// Direction of an auto-change, judged WITHIN a single dev flow. The canonical full
 	// status order interleaves the lab and self branches (at-lab, lab-done, developing,
@@ -378,6 +412,7 @@
 			labDev = detail.lab_dev;
 			selfDev = detail.self_dev;
 			devStages = detail.dev_stages;
+			events = detail.events ?? [];
 
 			// Map the batched shot-lens associations by shot id
 			const map: Record<number, number[]> = {};
@@ -412,7 +447,7 @@
 		shotError = '';
 	}
 
-	async function openAddShotDialog() {
+	async function openAddShotDialog(frame?: string) {
 		resetShotForm();
 		editingShotId = null;
 
@@ -443,10 +478,16 @@
 			shotLensId = String(selectedCamera.default_lens_id);
 		}
 
-		try {
-			shotFrameNumber = await suggestNextFrame(id);
-		} catch {
-			shotFrameNumber = '';
+		// If a specific frame was requested (e.g. from FrameStrip open-slot click or ＋),
+		// use it; otherwise fall back to suggestNextFrame.
+		if (frame) {
+			shotFrameNumber = frame;
+		} else {
+			try {
+				shotFrameNumber = await suggestNextFrame(id);
+			} catch {
+				shotFrameNumber = '';
+			}
 		}
 		showShotDialog = true;
 	}
@@ -560,27 +601,6 @@
 		}
 	}
 
-	function getShotLensDisplay(shotId: number): { name: string; isDefault: boolean } | null {
-		const ids = shotLensMap[shotId] ?? [];
-		if (ids.length > 0) {
-			// Per-shot override
-			const names = ids
-				.map((lid) => allLenses.find((l) => l.id === lid))
-				.filter(Boolean)
-				.map((l) => lensDisplayName(l!))
-				.join(', ');
-			return { name: names, isDefault: false };
-		}
-		// Fall back to roll default
-		if (roll?.lens_id) {
-			const defaultLens = allLenses.find((l) => l.id === roll?.lens_id);
-			if (defaultLens) {
-				return { name: lensDisplayName(defaultLens), isDefault: true };
-			}
-		}
-		return null;
-	}
-
 	// Commit a status change. When `date` is provided (from the prompt or the
 	// roll-full nudge) and the move is a forward advance, also write it to the
 	// status's target record. Backward moves never write a date.
@@ -631,17 +651,6 @@
 			await updateLabDev(labDev.id, { [t.field]: date });
 		} else if (t.kind === 'self' && selfDev) {
 			await updateSelfDev(selfDev.id, { [t.field]: date });
-		}
-	}
-
-	// Persist an inline Timeline date edit, then refresh.
-	async function saveTimelineDate(milestone: TimelineMilestone, date: string | null) {
-		error = '';
-		try {
-			await writeDateTarget(milestone.target, date);
-			await loadRollData('timeline');
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
 		}
 	}
 
@@ -730,7 +739,6 @@
 	// auto-prompt wiring: opening + saving a dev record makes getDevPath resolve to
 	// this path, the backend auto-syncs status, and the chevron bar re-renders.
 	function chooseDevPath(path: 'lab' | 'self') {
-		showDevPathMenu = false;
 		statusNotice = '';
 		devAutoPrompt = { kind: path };
 	}
@@ -811,6 +819,44 @@
 			goto('/rolls');
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	// Open the dev dialog from an activity-journal event click. Reuses the autoPrompt
+	// bridge: DevelopmentSection seeds its form from the existing record when present.
+	function openDevFromEvent(refKind: 'lab_dev' | 'self_dev') {
+		devAutoPrompt = { kind: refKind === 'lab_dev' ? 'lab' : 'self' };
+	}
+
+	// QuickAddBar → logShot → reload
+	async function handleQuickAdd(entry: {
+		frameNumber: string;
+		aperture: string;
+		shutterSpeed: string;
+		lensId: string;
+		date: string;
+		location: string;
+		notes: string;
+	}) {
+		if (!roll || !entry.frameNumber.trim()) return;
+		quickError = '';
+		quickSaving = true;
+		try {
+			await logShot({ rollId: roll.id, ...entry });
+			await loadRollData('shot-add');
+		} catch (err) {
+			quickError = err instanceof Error ? err.message : String(err);
+		} finally {
+			quickSaving = false;
+		}
+	}
+
+	// FrameStrip selection: filled frame → edit dialog; open slot → add dialog pre-seeded
+	function handleFrameSelect(frameNumber: string, shot: Shot | null) {
+		if (shot) {
+			openEditShotDialog(shot);
+		} else {
+			openAddShotDialog(frameNumber);
 		}
 	}
 
@@ -963,118 +1009,20 @@
 			</div>
 		</FadeIn>
 
-		<!-- Status Progression -->
+		<!-- Status Control -->
 		<FadeIn delay={50}>
 			<div class="mb-6">
-				<div class="mb-3 flex items-center gap-2">
-					<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Status</h2>
-					<div class="relative inline-flex">
-						<button
-							onclick={() => (showStatusHelp = !showStatusHelp)}
-							title="How the status bar works"
-							aria-label="How the status bar works"
-							aria-expanded={showStatusHelp}
-							class="inline-flex items-center text-text-faint transition-colors hover:text-text"
-						>
-							<CircleHelp size={14} strokeWidth={2} aria-hidden="true" />
-						</button>
-						{#if showStatusHelp}
-							<!-- click-away catcher -->
-							<button
-								class="fixed inset-0 z-10 cursor-default"
-								aria-label="Close status help"
-								onclick={() => (showStatusHelp = false)}
-							></button>
-							<div
-								class="absolute left-0 top-full z-20 mt-1.5 w-72 rounded-lg border border-border bg-surface-overlay p-3 text-xs text-text-muted shadow-lg"
-							>
-								<p class="mb-2 text-text">Click a step to move the roll there.</p>
-								<ul class="space-y-1.5">
-									<li>Forward steps apply instantly.</li>
-									<li>A later step that needs a date asks for one first.</li>
-									<li>An earlier step moves the roll back and asks to confirm.</li>
-									<li>Lab and self steps open a development form when no record exists yet.</li>
-								</ul>
-							</div>
-						{/if}
-					</div>
-					<div class="flex-1 border-b border-border-subtle"></div>
-				</div>
-				{#if pathLabel}
-					<p class="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-text-faint/70">{pathLabel}</p>
-				{/if}
-				<div class="flex flex-wrap items-center gap-[2px] gap-y-1">
-					{#each statusFlow as status, idx}
-						{@const isFirst = idx === 0}
-						{@const isLast = idx === statusFlow.length - 1}
-						{@const clipPath = isFirst
-							? 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%)'
-							: isLast
-								? 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 8px 50%)'
-								: 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)'}
-						<button
-							onclick={() => handleStatusClick(status)}
-							title={statusHint(status)}
-							aria-label={statusHint(status)}
-							style="clip-path: {clipPath}"
-							class="whitespace-nowrap py-1.5 text-xs font-medium transition-colors
-							{isFirst ? 'pl-3 pr-4' : isLast ? 'pl-4 pr-3' : 'px-4'}
-							{roll.status === status
-								? 'bg-accent text-surface'
-								: idx < currentStatusIdx
-									? 'bg-surface-overlay text-accent hover:bg-surface-overlay/80'
-									: 'bg-surface-raised text-text-muted hover:text-text'}"
-						>
-							{statusConfig[status].label}
-						</button>
-						{#if devPath === 'undecided' && status === 'shot'}
-							<!-- Live next-step: the development decision happens here, in the flow,
-						     rather than as disconnected dead placeholders. Choosing a path
-						     opens the matching dev dialog and re-renders the bar to that flow. -->
-							<div class="relative">
-								<button
-									onclick={() => (showDevPathMenu = !showDevPathMenu)}
-									title="Choose a development path (lab or self) to start tracking development"
-									aria-haspopup="menu"
-									aria-expanded={showDevPathMenu}
-									style="clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)"
-									class="px-4 py-1.5 text-xs font-medium transition-colors hover:bg-accent/25
-									{showDevPathMenu ? 'bg-accent/25 text-accent' : 'bg-accent/15 text-accent'}"
-								>
-									Develop<span aria-hidden="true">&nbsp;⌄</span>
-								</button>
-								{#if showDevPathMenu}
-									<!-- click-away catcher -->
-									<button
-										class="fixed inset-0 z-10 cursor-default"
-										aria-label="Close development menu"
-										onclick={() => (showDevPathMenu = false)}
-									></button>
-									<div
-										role="menu"
-										class="absolute left-1/2 top-full z-20 mt-1.5 -translate-x-1/2 overflow-hidden rounded-lg border border-border bg-surface-overlay shadow-lg"
-									>
-										<button
-											role="menuitem"
-											onclick={() => chooseDevPath('lab')}
-											class="block w-full whitespace-nowrap px-4 py-2 text-left text-xs font-medium text-text-muted transition-colors hover:bg-accent/15 hover:text-accent"
-											>Lab</button
-										>
-										<button
-											role="menuitem"
-											onclick={() => chooseDevPath('self')}
-											class="block w-full whitespace-nowrap border-t border-border-subtle px-4 py-2 text-left text-xs font-medium text-text-muted transition-colors hover:bg-accent/15 hover:text-accent"
-											>Self / Home</button
-										>
-									</div>
-								{/if}
-							</div>
-						{/if}
-					{/each}
-				</div>
-				{#if statusNotice}
-					<p class="mt-2 text-xs text-text-faint">{statusNotice}</p>
-				{/if}
+				<RollStatusControl
+					{statusFlow}
+					currentStatus={roll.status}
+					{currentStatusIdx}
+					{devPath}
+					{pathLabel}
+					hintFor={statusHint}
+					onmove={handleStatusClick}
+					onchoosepath={chooseDevPath}
+				/>
+				{#if statusNotice}<p class="mt-2 text-xs text-text-faint">{statusNotice}</p>{/if}
 				{#if autoStatusNotice}
 					<div class="mt-2">
 						<InlineNotice bind:message={autoStatusNotice} seq={autoStatusNoticeSeq} />
@@ -1083,152 +1031,104 @@
 			</div>
 		</FadeIn>
 
-		<!-- Lifecycle Timeline -->
-		<FadeIn delay={75}>
-			<div class="mb-6">
-				<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
-					Timeline
-					<div class="flex-1 border-b border-border-subtle"></div>
-				</h2>
-				<RollTimeline milestones={timeline} onedit={saveTimelineDate} />
-			</div>
-		</FadeIn>
+		<!-- DevelopmentSection: the compact Development panel + its create/edit/delete dialogs.
+		     Dialogs are also opened from chevron clicks and from journal dev-event clicks via the autoPrompt bridge. -->
+		<DevelopmentSection
+			rollId={id}
+			{labs}
+			bind:labDev
+			bind:selfDev
+			bind:devStages
+			bind:autoPrompt={devAutoPrompt}
+			currentStatus={roll?.status ?? null}
+			defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
+			onchange={() => loadRollData('dev')}
+			onpromptcancel={() => {
+				statusNotice = 'Status unchanged — no development record was saved.';
+			}}
+		/>
 
-		<!-- Development -->
+		<!-- Two-pane: Frames + Activity -->
 		<FadeIn delay={100}>
-			<DevelopmentSection
-				rollId={id}
-				{labs}
-				bind:labDev
-				bind:selfDev
-				bind:devStages
-				bind:autoPrompt={devAutoPrompt}
-				currentStatus={roll?.status ?? null}
-				defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
-				onchange={() => loadRollData('dev')}
-				onpromptcancel={() => {
-					statusNotice = 'Status unchanged — no development record was saved.';
-				}}
-			/>
-		</FadeIn>
-
-		<!-- Shots -->
-		<FadeIn delay={150}>
-			<div>
-				<div class="mb-3 flex items-center justify-between">
-					<div class="flex items-center gap-3">
-						<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Shots</h2>
-						{#if frameProgress}
-							<div class="flex items-center gap-2">
-								<span class="text-xs text-text-faint">{frameProgress.current}/{frameProgress.total}</span>
-								<div class="h-1.5 w-24 overflow-hidden rounded-full bg-surface-overlay">
-									<div
-										class="h-full rounded-full transition-all duration-300 {frameProgress.current > frameProgress.total
-											? 'bg-danger'
-											: 'bg-accent'}"
-										style="width: {Math.min((frameProgress.current / frameProgress.total) * 100, 100)}%"
-									></div>
-								</div>
-							</div>
-						{/if}
-					</div>
-					<div class="flex gap-2">
+			<div class="grid gap-6 lg:grid-cols-2">
+				<!-- Frames pane -->
+				<section>
+					<div class="mb-3 flex items-center justify-between">
+						<h2 class="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+							Frames
+							{#if frameProgress}
+								<span class="font-mono text-[10px] normal-case tracking-normal text-text-faint">
+									{frameProgress.current}/{frameProgress.total}
+								</span>
+								<div class="flex-1 border-b border-border-subtle"></div>
+							{:else}
+								<div class="flex-1 border-b border-border-subtle"></div>
+							{/if}
+						</h2>
 						<Button size="sm" variant="ghost" href="/quick-entry?roll={roll?.id}">Quick Entry</Button>
-						<Button size="sm" onclick={openAddShotDialog}>+ Add Shot</Button>
 					</div>
-				</div>
 
-				{#if showRollFullNudge}
-					<div
-						class="mb-3 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3"
-					>
-						<div class="flex flex-col gap-2">
-							<div>
-								<p class="text-sm font-medium text-accent">Roll complete</p>
-								<p class="text-xs text-accent/70">
-									All {frameProgress?.total} frames shot. When did you finish it?
-								</p>
-							</div>
-							<div class="w-44">
-								<DateInput label="Finished shooting" bind:value={finishDate} />
-							</div>
-						</div>
-						<div class="flex items-center gap-2">
-							<Button
-								size="sm"
-								variant="primary"
-								disabled={!finishDate.trim() || !!finishDateError}
-								onclick={() => updateStatus('shot', finishDate)}>Mark as Shot</Button
-							>
-							<button
-								onclick={() => {
-									rollFullDismissed = true;
-								}}
-								class="text-accent/60 hover:text-accent transition-colors text-lg leading-none px-1"
-								aria-label="Dismiss">&times;</button
-							>
-						</div>
-					</div>
-				{:else if frameProgress && shots.length > frameProgress.total}
-					<div class="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
-						More shots ({shots.length}) than the roll's frame count ({frameProgress.total}). This may indicate extra
-						frames or a counting error.
-					</div>
-				{/if}
-
-				{#if shots.length === 0}
-					<p class="text-sm text-text-faint">No shots logged yet. Add your first shot to start tracking frames.</p>
-				{:else}
-					<div class="space-y-1.5">
-						{#each shots as shot}
-							{@const lensDisplay = getShotLensDisplay(shot.id)}
-							<div
-								class="group flex items-start justify-between rounded-lg border border-border bg-surface-raised px-4 py-2.5 transition-all duration-150 hover:border-accent/40"
-							>
-								<div class="flex items-start gap-3">
-									<span
-										class="mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded bg-accent/15 px-1.5 font-mono text-xs font-medium text-accent"
-									>
-										{shot.frame_number}
-									</span>
-									<div>
-										<div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm">
-											{#if shot.aperture}
-												<span class="text-text-muted">f/{shot.aperture}</span>
-											{/if}
-											{#if shot.shutter_speed}
-												<span class="text-text-muted">{shot.shutter_speed}</span>
-											{/if}
-											{#if lensDisplay}
-												<span class="text-text-faint">
-													{lensDisplay.name}
-													{#if lensDisplay.isDefault}
-														<span class="text-text-faint/60 italic">(roll default)</span>
-													{/if}
-												</span>
-											{/if}
-											{#if shot.date}
-												<span class="text-text-faint">{shot.date}</span>
-											{/if}
-											{#if shot.location}
-												<span class="text-text-faint">{shot.location}</span>
-											{/if}
-										</div>
-										{#if shot.notes}
-											<p class="mt-0.5 text-xs text-text-faint">{shot.notes}</p>
-										{/if}
-									</div>
+					{#if showRollFullNudge}
+						<div
+							class="mb-3 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3"
+						>
+							<div class="flex flex-col gap-2">
+								<div>
+									<p class="text-sm font-medium text-accent">Roll complete</p>
+									<p class="text-xs text-accent/70">
+										All {frameProgress?.total} frames shot. When did you finish it?
+									</p>
 								</div>
-								<div
-									class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
+								<div class="w-44">
+									<DateInput label="Finished shooting" bind:value={finishDate} />
+								</div>
+							</div>
+							<div class="flex items-center gap-2">
+								<Button
+									size="sm"
+									variant="primary"
+									disabled={!finishDate.trim() || !!finishDateError}
+									onclick={() => updateStatus('shot', finishDate)}>Mark as Shot</Button
 								>
-									<Button size="sm" variant="ghost" onclick={() => openEditShotDialog(shot)}>Edit</Button>
-									<Button size="sm" variant="ghost" onclick={() => (deletingShotId = shot.id)}>&times;</Button>
-								</div>
+								<button
+									onclick={() => {
+										rollFullDismissed = true;
+									}}
+									class="px-1 text-lg leading-none text-accent/60 transition-colors hover:text-accent"
+									aria-label="Dismiss">&times;</button
+								>
 							</div>
-						{/each}
+						</div>
+					{:else if frameProgress && shots.length > frameProgress.total}
+						<div class="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+							More shots ({shots.length}) than the roll's frame count ({frameProgress.total}). This may indicate extra
+							frames or a counting error.
+						</div>
+					{/if}
+
+					<div class="space-y-2">
+						<QuickAddBar
+							frameNumber={nextFrameNumber}
+							lensOptions={shotLensOptions}
+							lensId={quickDefaultLensId}
+							isFixedLens={isFixedLensCamera}
+							fixedLensLabel={fixedLens ? lensDisplayName(fixedLens) : ''}
+							saving={quickSaving}
+							error={quickError}
+							onsave={handleQuickAdd}
+						/>
+						<FrameStrip frames={frameCells} onselect={handleFrameSelect} onaddextra={() => openAddShotDialog()} />
 					</div>
-				{/if}
+				</section>
+
+				<!-- Activity pane -->
+				<section>
+					<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+						Activity
+						<div class="flex-1 border-b border-border-subtle"></div>
+					</h2>
+					<RollActivity {events} onopendev={openDevFromEvent} />
+				</section>
 			</div>
 		</FadeIn>
 	</div>
@@ -1272,20 +1172,35 @@
 			{#if shotError}
 				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{shotError}</div>
 			{/if}
-			<div class="flex justify-end gap-2 pt-2">
-				<Button
-					variant="ghost"
-					onclick={() => {
-						showShotDialog = false;
-						resetShotForm();
-					}}>Cancel</Button
-				>
-				{#if !editingShotId}
-					<Button variant="ghost" disabled={!!shotDateError} onclick={handleSaveShotAndNext}>Save & Next</Button>
+			<div class="flex items-center justify-between gap-2 pt-2">
+				{#if editingShotId}
+					<Button
+						variant="danger"
+						onclick={() => {
+							const sid = editingShotId;
+							showShotDialog = false;
+							resetShotForm();
+							deletingShotId = sid;
+						}}>Delete</Button
+					>
+				{:else}
+					<span></span>
 				{/if}
-				<Button variant="primary" disabled={!!shotDateError} onclick={handleSaveShot}>
-					{editingShotId ? 'Save' : 'Add Shot'}
-				</Button>
+				<div class="flex gap-2">
+					<Button
+						variant="ghost"
+						onclick={() => {
+							showShotDialog = false;
+							resetShotForm();
+						}}>Cancel</Button
+					>
+					{#if !editingShotId}
+						<Button variant="ghost" disabled={!!shotDateError} onclick={handleSaveShotAndNext}>Save & Next</Button>
+					{/if}
+					<Button variant="primary" disabled={!!shotDateError} onclick={handleSaveShot}>
+						{editingShotId ? 'Save' : 'Add Shot'}
+					</Button>
+				</div>
 			</div>
 		</div>
 	</Dialog>
