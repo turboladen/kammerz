@@ -1,5 +1,5 @@
 import type { RollWithDetails, DevelopmentLab, DevelopmentSelf, RollStatus } from '$lib/types';
-import { allStatusOrder, type DevPath } from './status';
+import { allStatusOrder, getFlowForPath, statusConfig, type DevPath } from './status';
 
 /** Where a milestone's date is stored, so the editor/prompt can write it back. */
 export type DateTarget =
@@ -139,6 +139,51 @@ export function buildRollTimeline(
 			editable: dateTargetEditable(target, labDev, selfDev) && milestoneReached(key, roll.status)
 		};
 	});
+}
+
+/** Progression state of a lifecycle rung relative to the roll's current status. */
+export type RungState = 'past' | 'current' | 'future';
+
+/**
+ * One rung of the unified lifecycle stepper: a status (the transition target) joined to its
+ * dated milestone, if it has one. Statuses that carry no date of their own — `shooting`,
+ * `developing` — have `milestone: null` and render dateless. The status is the key (so the
+ * rung stays clickable to transition); the milestone supplies the date + inline editor.
+ */
+export interface LifecycleRung {
+	status: RollStatus;
+	/** Status label (statusConfig) — the rung is a transition target, so it reads as the status. */
+	label: string;
+	state: RungState;
+	milestone: TimelineMilestone | null;
+}
+
+/**
+ * Build the unified, path-aware lifecycle: every status in the roll's flow, each joined to its
+ * dated milestone for display + inline editing. Reuses `buildRollTimeline` for the milestone
+ * data (dates + the kammerz-fxl editability gating) and indexes it by status via
+ * `MILESTONE_STATUS`, so the date shown on a rung is the event that lands the roll there
+ * (e.g. `at-lab` shows "Dropped off at lab", `lab-done` shows "Received back"). Merges what
+ * used to be two separate sections (the STATUS chevron bar and the TIMELINE list) — kammerz-06i.
+ */
+export function buildRollLifecycle(
+	roll: RollWithDetails,
+	labDev: DevelopmentLab | null,
+	selfDev: DevelopmentSelf | null,
+	devPath: DevPath
+): LifecycleRung[] {
+	const byStatus = new Map<RollStatus, TimelineMilestone>();
+	for (const m of buildRollTimeline(roll, labDev, selfDev, devPath)) {
+		byStatus.set(MILESTONE_STATUS[m.key], m);
+	}
+	const flow = getFlowForPath(devPath);
+	const currentIdx = flow.indexOf(roll.status);
+	return flow.map((status, idx) => ({
+		status,
+		label: statusConfig[status].label,
+		state: idx === currentIdx ? 'current' : idx < currentIdx ? 'past' : 'future',
+		milestone: byStatus.get(status) ?? null
+	}));
 }
 
 /**

@@ -139,15 +139,18 @@ test('roll detail page loads without an infinite fetch loop (kammerz-8k5)', asyn
 });
 
 /**
- * Regression guard for kammerz-fxl: the Timeline must not offer a date editor for
- * milestones the roll hasn't reached yet. Back-filling a future rung's date (e.g.
- * Scanned while the roll is only Shot) bypasses the proper path — advancing the
- * status, which writes the date AND runs the backend auto-sync. A roll at `shot`
- * (undecided path) has reached Loaded + Finished shooting but not Scanned /
- * Post-processed / Archived, so those rungs must render as plain undated rows with
- * no edit button while the reached rungs stay editable.
+ * Regression guard for the merged lifecycle stepper (kammerz-06i) + its date gating
+ * (kammerz-fxl). The roll-detail page now shows ONE "Status" lifecycle stepper that
+ * carries both the per-rung transition control AND that rung's date — no separate
+ * "Timeline" section. The stepper must not offer a date editor for rungs the roll
+ * hasn't reached yet: back-filling a future rung's date (e.g. Scanned while the roll
+ * is only Shot) bypasses the proper path — advancing the status, which writes the
+ * date AND runs the backend auto-sync. A roll at `shot` (undecided path) has reached
+ * Loaded + Finished shooting but not Scanned / Post-processed / Archived.
  */
-test('timeline hides date editor on not-yet-reached milestones (kammerz-fxl)', async ({ page }) => {
+test('lifecycle stepper merges progression + dates, gates unreached rungs (kammerz-06i, kammerz-fxl)', async ({
+	page
+}) => {
 	const created = await page.request.post(`${BASE}/api/rolls`, {
 		data: { roll_id: `E2E-FXL-${Date.now()}`, status: 'shot', date_loaded: '2026-05-31', date_finished: '2026-06-02' }
 	});
@@ -155,13 +158,17 @@ test('timeline hides date editor on not-yet-reached milestones (kammerz-fxl)', a
 	const id: number = await created.json();
 
 	await page.goto(`${BASE}/rolls/${id}`);
-	await expect(page.getByRole('heading', { name: 'Timeline' })).toBeVisible();
+	// One merged section headed "Status"; the old separate "Timeline" section is gone.
+	await expect(page.getByRole('heading', { name: 'Status' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Timeline' })).toHaveCount(0);
 
-	// Reached rungs keep their inline editor.
+	// Progression and dates live in the same component: a future rung's transition
+	// control and a reached rung's date editor are both present.
+	await expect(page.getByRole('button', { name: /Move to Scanned/i })).toBeVisible();
 	await expect(page.getByRole('button', { name: /Loaded date/i })).toBeVisible();
 	await expect(page.getByRole('button', { name: /Finished shooting date/i })).toBeVisible();
 
-	// Future rungs offer no editor — neither a "Set" nor an "Edit" affordance.
+	// Future rungs offer no date editor — neither a "Set" nor an "Edit" affordance.
 	for (const rung of ['Scanned', 'Post-processed', 'Archived']) {
 		await expect(
 			page.getByRole('button', { name: new RegExp(`(Set|Edit) ${rung} date`, 'i') }),

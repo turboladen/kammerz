@@ -15,7 +15,7 @@
 	import DevelopmentSection from '$lib/components/rolls/DevelopmentSection.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import InlineNotice from '$lib/components/ui/InlineNotice.svelte';
-	import RollTimeline from '$lib/components/rolls/RollTimeline.svelte';
+	import LifecycleStepper from '$lib/components/rolls/LifecycleStepper.svelte';
 	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
 	import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
 	import { getRollDetail, updateRoll, deleteRoll } from '$lib/api/rolls';
@@ -40,7 +40,7 @@
 		selfFlow,
 		type DevAutoPrompt
 	} from '$lib/utils/status';
-	import { buildRollTimeline, readDateTarget, STATUS_DATE_TARGET } from '$lib/utils/timeline';
+	import { buildRollLifecycle, readDateTarget, STATUS_DATE_TARGET } from '$lib/utils/timeline';
 	import { todayLocal, dateFieldError } from '$lib/utils/date';
 	import type {
 		RollWithDetails,
@@ -134,8 +134,9 @@
 	const statusFlow = $derived(getFlowForPath(devPath));
 	const pathLabel = $derived(getPathLabel(devPath));
 
-	// Ordered lifecycle dates (path-aware) for the read-only timeline section.
-	const timeline = $derived(roll ? buildRollTimeline(roll, labDev, selfDev, devPath) : []);
+	// The unified, path-aware lifecycle: every status rung joined to its dated milestone,
+	// rendered by the merged STATUS+TIMELINE stepper (kammerz-06i).
+	const lifecycle = $derived(roll ? buildRollLifecycle(roll, labDev, selfDev, devPath) : []);
 
 	// Helper: the current value of a status's target date (for the forward+empty check).
 	// STATUS_DATE_TARGET and the read dispatch live in timeline.ts so the status→date
@@ -174,10 +175,7 @@
 		roll?.status === 'shooting' && frameProgress !== null && shots.length >= frameProgress.total && !rollFullDismissed
 	);
 
-	// Development-path picker popover (the live "Develop" chevron in the undecided flow).
-	let showDevPathMenu = $state(false);
-
-	// Help disclosure on the Status header — explains the chevron bar's click behaviors.
+	// Help disclosure on the Status header — explains the stepper's click behaviors.
 	let showStatusHelp = $state(false);
 
 	// Status auto-sync (advance on create, revert on delete) is handled by the
@@ -726,11 +724,10 @@
 		datePromptStatus = null;
 	}
 
-	// Commit to a development path from the "Develop" chevron. Reuses the dev-dialog
-	// auto-prompt wiring: opening + saving a dev record makes getDevPath resolve to
-	// this path, the backend auto-syncs status, and the chevron bar re-renders.
+	// Commit to a development path from the stepper's "Develop" chooser. Reuses the
+	// dev-dialog auto-prompt wiring: opening + saving a dev record makes getDevPath
+	// resolve to this path, the backend auto-syncs status, and the stepper re-renders.
 	function chooseDevPath(path: 'lab' | 'self') {
-		showDevPathMenu = false;
 		statusNotice = '';
 		devAutoPrompt = { kind: path };
 	}
@@ -963,16 +960,20 @@
 			</div>
 		</FadeIn>
 
-		<!-- Status Progression -->
+		<!-- Lifecycle: progression + dated milestones in one stepper (kammerz-06i) -->
 		<FadeIn delay={50}>
 			<div class="mb-6">
 				<div class="mb-3 flex items-center gap-2">
 					<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Status</h2>
+					{#if pathLabel}
+						<span class="text-xs text-text-faint/70" aria-hidden="true">·</span>
+						<span class="text-[10px] font-medium uppercase tracking-widest text-text-faint/70">{pathLabel}</span>
+					{/if}
 					<div class="relative inline-flex">
 						<button
 							onclick={() => (showStatusHelp = !showStatusHelp)}
-							title="How the status bar works"
-							aria-label="How the status bar works"
+							title="How the status timeline works"
+							aria-label="How the status timeline works"
 							aria-expanded={showStatusHelp}
 							class="inline-flex items-center text-text-faint transition-colors hover:text-text"
 						>
@@ -994,84 +995,21 @@
 									<li>A later step that needs a date asks for one first.</li>
 									<li>An earlier step moves the roll back and asks to confirm.</li>
 									<li>Lab and self steps open a development form when no record exists yet.</li>
+									<li>Click a date to edit it.</li>
 								</ul>
 							</div>
 						{/if}
 					</div>
 					<div class="flex-1 border-b border-border-subtle"></div>
 				</div>
-				{#if pathLabel}
-					<p class="mb-1.5 text-[10px] font-medium uppercase tracking-widest text-text-faint/70">{pathLabel}</p>
-				{/if}
-				<div class="flex flex-wrap items-center gap-[2px] gap-y-1">
-					{#each statusFlow as status, idx}
-						{@const isFirst = idx === 0}
-						{@const isLast = idx === statusFlow.length - 1}
-						{@const clipPath = isFirst
-							? 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%)'
-							: isLast
-								? 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 8px 50%)'
-								: 'polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)'}
-						<button
-							onclick={() => handleStatusClick(status)}
-							title={statusHint(status)}
-							aria-label={statusHint(status)}
-							style="clip-path: {clipPath}"
-							class="whitespace-nowrap py-1.5 text-xs font-medium transition-colors
-							{isFirst ? 'pl-3 pr-4' : isLast ? 'pl-4 pr-3' : 'px-4'}
-							{roll.status === status
-								? 'bg-accent text-surface'
-								: idx < currentStatusIdx
-									? 'bg-surface-overlay text-accent hover:bg-surface-overlay/80'
-									: 'bg-surface-raised text-text-muted hover:text-text'}"
-						>
-							{statusConfig[status].label}
-						</button>
-						{#if devPath === 'undecided' && status === 'shot'}
-							<!-- Live next-step: the development decision happens here, in the flow,
-						     rather than as disconnected dead placeholders. Choosing a path
-						     opens the matching dev dialog and re-renders the bar to that flow. -->
-							<div class="relative">
-								<button
-									onclick={() => (showDevPathMenu = !showDevPathMenu)}
-									title="Choose a development path (lab or self) to start tracking development"
-									aria-haspopup="menu"
-									aria-expanded={showDevPathMenu}
-									style="clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%)"
-									class="px-4 py-1.5 text-xs font-medium transition-colors hover:bg-accent/25
-									{showDevPathMenu ? 'bg-accent/25 text-accent' : 'bg-accent/15 text-accent'}"
-								>
-									Develop<span aria-hidden="true">&nbsp;⌄</span>
-								</button>
-								{#if showDevPathMenu}
-									<!-- click-away catcher -->
-									<button
-										class="fixed inset-0 z-10 cursor-default"
-										aria-label="Close development menu"
-										onclick={() => (showDevPathMenu = false)}
-									></button>
-									<div
-										role="menu"
-										class="absolute left-1/2 top-full z-20 mt-1.5 -translate-x-1/2 overflow-hidden rounded-lg border border-border bg-surface-overlay shadow-lg"
-									>
-										<button
-											role="menuitem"
-											onclick={() => chooseDevPath('lab')}
-											class="block w-full whitespace-nowrap px-4 py-2 text-left text-xs font-medium text-text-muted transition-colors hover:bg-accent/15 hover:text-accent"
-											>Lab</button
-										>
-										<button
-											role="menuitem"
-											onclick={() => chooseDevPath('self')}
-											class="block w-full whitespace-nowrap border-t border-border-subtle px-4 py-2 text-left text-xs font-medium text-text-muted transition-colors hover:bg-accent/15 hover:text-accent"
-											>Self / Home</button
-										>
-									</div>
-								{/if}
-							</div>
-						{/if}
-					{/each}
-				</div>
+				<LifecycleStepper
+					rungs={lifecycle}
+					{devPath}
+					hintFor={statusHint}
+					onmove={handleStatusClick}
+					oneditdate={saveTimelineDate}
+					onchoosepath={chooseDevPath}
+				/>
 				{#if statusNotice}
 					<p class="mt-2 text-xs text-text-faint">{statusNotice}</p>
 				{/if}
@@ -1080,17 +1018,6 @@
 						<InlineNotice bind:message={autoStatusNotice} seq={autoStatusNoticeSeq} />
 					</div>
 				{/if}
-			</div>
-		</FadeIn>
-
-		<!-- Lifecycle Timeline -->
-		<FadeIn delay={75}>
-			<div class="mb-6">
-				<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
-					Timeline
-					<div class="flex-1 border-b border-border-subtle"></div>
-				</h2>
-				<RollTimeline milestones={timeline} onedit={saveTimelineDate} />
 			</div>
 		</FadeIn>
 

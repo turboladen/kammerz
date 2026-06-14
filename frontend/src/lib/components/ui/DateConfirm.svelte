@@ -3,7 +3,7 @@
 	// confirm-on-transition prompt. Seeds an editable date (default today from the
 	// caller), Confirm commits it, Cancel aborts. Inline edits also offer Clear
 	// (commit null). There is no "Skip" — callers that want a blank date clear it
-	// from the Timeline afterward.
+	// from the status timeline afterward.
 	import Dialog from './Dialog.svelte';
 	import DateInput from './DateInput.svelte';
 	import Button from './Button.svelte';
@@ -56,11 +56,11 @@
 		{#if !allowClear}
 			<!-- Transition prompt (no Clear button): surface the otherwise-invisible
 			     escape hatches — fuzzy dates are accepted by dateFieldError, and an
-			     undated milestone can be edited or cleared later from the Timeline.
+			     undated milestone can be edited or cleared later from the status timeline.
 			     (kammerz-cb7) -->
 			<p class="text-xs text-text-muted">
 				A rough date is fine — enter just a year (2024) or year-month (2024-03). You can change or clear it later from
-				the Timeline.
+				the status timeline.
 			</p>
 		{/if}
 		<div class="flex justify-end gap-2">
