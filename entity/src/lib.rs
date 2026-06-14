@@ -9,6 +9,7 @@ pub mod lab;
 pub mod lens;
 pub mod lens_mount;
 pub mod roll;
+pub mod roll_event;
 pub mod setting;
 pub mod shot;
 pub mod shot_lens;
