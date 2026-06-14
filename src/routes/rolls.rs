@@ -12,6 +12,7 @@ use crate::extract::{Json, Path};
 use crate::patch::{double_option, now_string, trim_opt};
 use crate::routes::{friendly_delete_err, friendly_err};
 use crate::services::development_service::DevelopmentService;
+use crate::services::roll_event_service::RollEventService;
 use crate::services::roll_service::{RollService, RollWithDetails};
 use crate::services::shot_service::ShotService;
 use crate::validate::{require_nonempty, validate_date_opt, validate_non_negative_i32};
@@ -146,6 +147,17 @@ async fn create(
     let result = RollService::create(&db, model)
         .await
         .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
+    RollEventService::record(
+        &db,
+        result.id,
+        entity::roll_event::RollEventType::RollLoaded,
+        None,
+        None,
+        None,
+        None,
+        "Roll loaded".to_string(),
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(result.id)))
 }
 
@@ -159,6 +171,8 @@ async fn update(
         .one(&db)
         .await?
         .or_404("Roll", id)?;
+    let prev_status = existing.status.clone();
+    let requested_status = data.status.clone();
 
     if let Some(v) = &data.date_loaded {
         validate_date_opt("date_loaded", v)?;
@@ -229,6 +243,11 @@ async fn update(
     RollService::update(&db, model)
         .await
         .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
+    if let Some(new_status) = requested_status {
+        if new_status != prev_status {
+            RollEventService::record_status_change(&db, id, prev_status, new_status).await?;
+        }
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

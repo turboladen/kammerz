@@ -2,6 +2,7 @@ use sea_orm::*;
 use serde::Serialize;
 
 use crate::patch::now_string;
+use crate::services::roll_event_service::RollEventService;
 use crate::services::shot_service::ShotService;
 use ::entity::roll::{self, Entity as Roll, PushPull, RollStatus};
 use ::entity::shot;
@@ -235,11 +236,13 @@ impl RollService {
             .ok_or_else(|| DbErr::Custom(format!("Roll {roll_id} not found")))?;
 
         if from_statuses.contains(&roll_record.status) {
+            let from = roll_record.status.clone();
             let now = now_string();
             let mut model: roll::ActiveModel = roll_record.into();
-            model.status = Set(to_status);
+            model.status = Set(to_status.clone());
             model.updated_at = Set(now);
             model.update(db).await?;
+            RollEventService::record_status_change(db, roll_id, from, to_status).await?;
             Ok(true)
         } else {
             Ok(false)
@@ -269,11 +272,13 @@ impl RollService {
 
         match (current_idx, target_idx) {
             (Some(cur), Some(tgt)) if cur < tgt => {
+                let from = roll_record.status.clone();
                 let now = now_string();
                 let mut model: roll::ActiveModel = roll_record.into();
-                model.status = Set(target);
+                model.status = Set(target.clone());
                 model.updated_at = Set(now);
                 model.update(db).await?;
+                RollEventService::record_status_change(db, roll_id, from, target).await?;
                 Ok(true)
             }
             _ => Ok(false),
