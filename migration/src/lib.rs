@@ -21,6 +21,7 @@ mod m20260222_000018_trim_brand_whitespace;
 mod m20260222_000019_schema_hardening;
 mod m20260223_000020_repair_fixed_lens_data;
 mod m20260602_000021_add_roll_lifecycle_dates;
+mod m20260614_000022_create_roll_events;
 
 pub struct Migrator;
 
@@ -49,6 +50,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260222_000019_schema_hardening::Migration),
             Box::new(m20260223_000020_repair_fixed_lens_data::Migration),
             Box::new(m20260602_000021_add_roll_lifecycle_dates::Migration),
+            Box::new(m20260614_000022_create_roll_events::Migration),
         ]
     }
 }
