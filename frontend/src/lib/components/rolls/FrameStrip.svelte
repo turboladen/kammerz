@@ -37,7 +37,7 @@
 	<div class="film-perfs-x h-3.5 w-full" aria-hidden="true"></div>
 
 	<!-- Scrollable frame row -->
-	<div class="overflow-x-auto px-2 py-1" role="group" aria-label="Film frames">
+	<div class="frame-scroll overflow-x-auto px-2 py-1" role="group" aria-label="Film frames">
 		<ul class="flex items-stretch gap-1">
 			{#each frames as cell}
 				<li>
@@ -107,3 +107,26 @@
 	<!-- Bottom sprocket rail -->
 	<div class="film-perfs-x h-3.5 w-full" aria-hidden="true"></div>
 </div>
+
+<style>
+	/* Theme the horizontal scrollbar to match the dark surface — the native bar
+	   reads as a bright white slab against the film strip. Thin, with a graphite
+	   thumb on a transparent track that brightens slightly on hover. */
+	.frame-scroll {
+		scrollbar-width: thin; /* Firefox */
+		scrollbar-color: var(--color-border) transparent;
+	}
+	.frame-scroll::-webkit-scrollbar {
+		height: 8px;
+	}
+	.frame-scroll::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	.frame-scroll::-webkit-scrollbar-thumb {
+		background: var(--color-border);
+		border-radius: 9999px;
+	}
+	.frame-scroll:hover::-webkit-scrollbar-thumb {
+		background: var(--color-text-faint);
+	}
+</style>
