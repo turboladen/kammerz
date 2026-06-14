@@ -31,6 +31,7 @@
 ## Task 1: `roll_event` entity
 
 **Files:**
+
 - Create: `entity/src/roll_event.rs`
 - Modify: `entity/src/lib.rs`
 
@@ -160,6 +161,7 @@ git commit -m "feat(entity): roll_event activity-log entity (kammerz-06i)"
 ## Task 2: create-table migration
 
 **Files:**
+
 - Create: `migration/src/m20260614_000022_create_roll_events.rs`
 - Modify: `migration/src/lib.rs`
 
@@ -263,7 +265,7 @@ mod m20260614_000022_create_roll_events;
 and add to the `migrations()` vec, after the `m20260602_000021…` `Box::new`:
 
 ```rust
-            Box::new(m20260614_000022_create_roll_events::Migration),
+Box::new(m20260614_000022_create_roll_events::Migration),
 ```
 
 - [ ] **Step 3: Verify migration applies (it runs in every test's DB init)**
@@ -283,6 +285,7 @@ git commit -m "feat(migration): create roll_events table (kammerz-06i)"
 ## Task 3: `RollEventService`
 
 **Files:**
+
 - Create: `src/services/roll_event_service.rs`
 - Modify: `src/services/mod.rs`
 
@@ -410,6 +413,7 @@ git commit -m "feat(service): RollEventService for the activity log (kammerz-06i
 ## Task 4: expose `events` on the detail endpoint
 
 **Files:**
+
 - Modify: `src/routes/rolls.rs` (`RollDetail` struct + `get_detail`)
 - Test: `tests/roll_events.rs`
 
@@ -479,28 +483,28 @@ Expected: FAIL — `events` key missing (and `roll_loaded` not emitted yet; emit
 In `src/routes/rolls.rs`, add the field to the struct (after `dev_stages`):
 
 ```rust
-    pub dev_stages: Vec<dev_stage::Model>,
-    pub events: Vec<entity::roll_event::Model>,
+pub dev_stages: Vec<dev_stage::Model>,
+pub events: Vec<entity::roll_event::Model>,
 ```
 
 In `get_detail`, before the `Ok(Json(RollDetail {` block, add:
 
 ```rust
-    let events = crate::services::roll_event_service::RollEventService::list_for_roll(&db, id).await?;
+let events = crate::services::roll_event_service::RollEventService::list_for_roll(&db, id).await?;
 ```
 
 and add `events,` to the struct literal:
 
 ```rust
-    Ok(Json(RollDetail {
-        roll,
-        shots,
-        shot_lens_pairs,
-        lab_dev,
-        self_dev,
-        dev_stages,
-        events,
-    }))
+Ok(Json(RollDetail {
+    roll,
+    shots,
+    shot_lens_pairs,
+    lab_dev,
+    self_dev,
+    dev_stages,
+    events,
+}))
 ```
 
 > The test still fails until Task 5 emits `roll_loaded`, but the `events` array now serializes. That's expected; we finish this test green in Task 5.
@@ -517,6 +521,7 @@ git commit -m "feat(api): add events to roll detail response (kammerz-06i)"
 ## Task 5: emit status + roll_loaded events
 
 **Files:**
+
 - Modify: `src/services/roll_service.rs` (`auto_sync_status`, `advance_status_along`)
 - Modify: `src/routes/rolls.rs` (`create`, `update`)
 - Test: `tests/roll_events.rs`
@@ -572,25 +577,25 @@ Expected: FAIL — no status_changed/roll_loaded events yet.
 In `src/routes/rolls.rs` `create`, replace the final return with an event emission first. After:
 
 ```rust
-    let result = RollService::create(&db, model)
-        .await
-        .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
+let result = RollService::create(&db, model)
+    .await
+    .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
 ```
 
 add:
 
 ```rust
-    RollEventService::record(
-        &db,
-        result.id,
-        entity::roll_event::RollEventType::RollLoaded,
-        None,
-        None,
-        None,
-        None,
-        "Roll loaded".to_string(),
-    )
-    .await?;
+RollEventService::record(
+    &db,
+    result.id,
+    entity::roll_event::RollEventType::RollLoaded,
+    None,
+    None,
+    None,
+    None,
+    "Roll loaded".to_string(),
+)
+.await?;
 ```
 
 (leave `Ok((StatusCode::CREATED, Json(result.id)))` as the return).
@@ -600,18 +605,18 @@ add:
 In `src/routes/rolls.rs` `update`, capture the previous + requested status. Right after `let existing = … .or_404("Roll", id)?;` add:
 
 ```rust
-    let prev_status = existing.status.clone();
-    let requested_status = data.status.clone();
+let prev_status = existing.status.clone();
+let requested_status = data.status.clone();
 ```
 
 Then after the `RollService::update(&db, model)…?;` call (before `Ok(StatusCode::NO_CONTENT)`), add:
 
 ```rust
-    if let Some(new_status) = requested_status {
-        if new_status != prev_status {
-            RollEventService::record_status_change(&db, id, prev_status, new_status).await?;
-        }
+if let Some(new_status) = requested_status {
+    if new_status != prev_status {
+        RollEventService::record_status_change(&db, id, prev_status, new_status).await?;
     }
+}
 ```
 
 - [ ] **Step 5: Emit `status_changed` inside the auto-sync funnels**
@@ -619,33 +624,33 @@ Then after the `RollService::update(&db, model)…?;` call (before `Ok(StatusCod
 In `src/services/roll_service.rs` `auto_sync_status`, in the `if from_statuses.contains(&roll_record.status)` branch, capture the old status before consuming `roll_record` and emit after the update. Replace the branch body:
 
 ```rust
-        if from_statuses.contains(&roll_record.status) {
-            let from = roll_record.status.clone();
-            let now = now_string();
-            let mut model: roll::ActiveModel = roll_record.into();
-            model.status = Set(to_status.clone());
-            model.updated_at = Set(now);
-            model.update(db).await?;
-            RollEventService::record_status_change(db, roll_id, from, to_status).await?;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+if from_statuses.contains(&roll_record.status) {
+    let from = roll_record.status.clone();
+    let now = now_string();
+    let mut model: roll::ActiveModel = roll_record.into();
+    model.status = Set(to_status.clone());
+    model.updated_at = Set(now);
+    model.update(db).await?;
+    RollEventService::record_status_change(db, roll_id, from, to_status).await?;
+    Ok(true)
+} else {
+    Ok(false)
+}
 ```
 
 In `advance_status_along`, the matching arm:
 
 ```rust
-            (Some(cur), Some(tgt)) if cur < tgt => {
-                let from = roll_record.status.clone();
-                let now = now_string();
-                let mut model: roll::ActiveModel = roll_record.into();
-                model.status = Set(target.clone());
-                model.updated_at = Set(now);
-                model.update(db).await?;
-                RollEventService::record_status_change(db, roll_id, from, target).await?;
-                Ok(true)
-            }
+(Some(cur), Some(tgt)) if cur < tgt => {
+    let from = roll_record.status.clone();
+    let now = now_string();
+    let mut model: roll::ActiveModel = roll_record.into();
+    model.status = Set(target.clone());
+    model.updated_at = Set(now);
+    model.update(db).await?;
+    RollEventService::record_status_change(db, roll_id, from, target).await?;
+    Ok(true)
+}
 ```
 
 Add the import near the top of `roll_service.rs` (with the other `use crate::…` lines):
@@ -681,6 +686,7 @@ git commit -m "feat(api): emit roll_loaded + status_changed events (kammerz-06i)
 ## Task 6: emit shot events
 
 **Files:**
+
 - Modify: `src/routes/shots.rs` (`create`, `update`, `delete_one`)
 - Test: `tests/roll_events.rs`
 
@@ -736,24 +742,24 @@ Expected: FAIL — no `shot_logged` event (the `status_changed` half already pas
 In `src/routes/shots.rs` `create`, capture the frame label before it's moved into the model. Immediately after `let now = now_string();` add:
 
 ```rust
-    let frame_label = data.frame_number.trim().to_string();
-    let roll_id = data.roll_id;
+let frame_label = data.frame_number.trim().to_string();
+let roll_id = data.roll_id;
 ```
 
 Inside the transaction closure, after the `RollService::auto_sync_status(…).await?;` call and before `Ok(result.id)`, add:
 
 ```rust
-                RollEventService::record(
-                    txn,
-                    roll_id,
-                    entity::roll_event::RollEventType::ShotLogged,
-                    None,
-                    None,
-                    Some(entity::roll_event::RefKind::Shot),
-                    Some(result.id),
-                    format!("Frame {frame_label} logged"),
-                )
-                .await?;
+RollEventService::record(
+    txn,
+    roll_id,
+    entity::roll_event::RollEventType::ShotLogged,
+    None,
+    None,
+    Some(entity::roll_event::RefKind::Shot),
+    Some(result.id),
+    format!("Frame {frame_label} logged"),
+)
+.await?;
 ```
 
 - [ ] **Step 4: Emit `shot_edited` in `update`**
@@ -761,23 +767,23 @@ Inside the transaction closure, after the `RollService::auto_sync_status(…).aw
 In `src/routes/shots.rs` `update`, after `let existing = … .or_404("Shot", id)?;` capture:
 
 ```rust
-    let roll_id = existing.roll_id;
+let roll_id = existing.roll_id;
 ```
 
 Inside the transaction closure, after `ShotService::update(txn, model).await?;` and the optional `set_lenses_for_shot`, before `Ok(())`, add:
 
 ```rust
-            RollEventService::record(
-                txn,
-                roll_id,
-                entity::roll_event::RollEventType::ShotEdited,
-                None,
-                None,
-                Some(entity::roll_event::RefKind::Shot),
-                Some(id),
-                "Shot edited".to_string(),
-            )
-            .await?;
+RollEventService::record(
+    txn,
+    roll_id,
+    entity::roll_event::RollEventType::ShotEdited,
+    None,
+    None,
+    Some(entity::roll_event::RefKind::Shot),
+    Some(id),
+    "Shot edited".to_string(),
+)
+.await?;
 ```
 
 - [ ] **Step 5: Emit `shot_deleted` in `delete_one`**
@@ -785,17 +791,17 @@ Inside the transaction closure, after `ShotService::update(txn, model).await?;` 
 In `src/routes/shots.rs` `delete_one`, inside the transaction closure, after the `if remaining == 0 { … }` auto-revert block and before `Ok(())`, add:
 
 ```rust
-            RollEventService::record(
-                txn,
-                roll_id,
-                entity::roll_event::RollEventType::ShotDeleted,
-                None,
-                None,
-                None,
-                None,
-                format!("Frame {} deleted", shot_record.frame_number),
-            )
-            .await?;
+RollEventService::record(
+    txn,
+    roll_id,
+    entity::roll_event::RollEventType::ShotDeleted,
+    None,
+    None,
+    None,
+    None,
+    format!("Frame {} deleted", shot_record.frame_number),
+)
+.await?;
 ```
 
 (`roll_id` and `shot_record` are already bound earlier in the closure.)
@@ -825,6 +831,7 @@ git commit -m "feat(api): emit shot_logged/edited/deleted events (kammerz-06i)"
 ## Task 7: emit development events
 
 **Files:**
+
 - Modify: `src/routes/development.rs` (`create_lab_dev`, `update_lab_dev`, `delete_lab_dev`, `create_self_dev`, `update_self_dev`, `delete_self_dev`)
 - Test: `tests/roll_events.rs`
 
@@ -879,17 +886,17 @@ In each handler's success path (inside its transaction where one exists; otherwi
 `create_lab_dev` (after the dev is created + status synced; `roll_id` = DTO, `<new_id>` = created lab dev id):
 
 ```rust
-    RollEventService::record(
-        txn, // or &db if the handler isn't transactional — match the surrounding code
-        roll_id,
-        entity::roll_event::RollEventType::LabDevAdded,
-        None,
-        None,
-        Some(entity::roll_event::RefKind::LabDev),
-        Some(new_id),
-        "Lab development added".to_string(),
-    )
-    .await?;
+RollEventService::record(
+    txn, // or &db if the handler isn't transactional — match the surrounding code
+    roll_id,
+    entity::roll_event::RollEventType::LabDevAdded,
+    None,
+    None,
+    Some(entity::roll_event::RefKind::LabDev),
+    Some(new_id),
+    "Lab development added".to_string(),
+)
+.await?;
 ```
 
 `update_lab_dev` → `RollEventType::LabDevEdited`, `RefKind::LabDev`, `ref_id = id`, summary `"Lab development edited"`.
