@@ -5,6 +5,7 @@ use crate::patch::now_string;
 use crate::services::roll_event_service::RollEventService;
 use crate::services::shot_service::ShotService;
 use ::entity::roll::{self, Entity as Roll, PushPull, RollStatus};
+use ::entity::roll_event::RollEventType;
 use ::entity::shot;
 use ::entity::{development_lab, development_self};
 
@@ -137,7 +138,7 @@ impl RollService {
     }
 
     pub async fn create(
-        db: &DatabaseConnection,
+        db: &impl ConnectionTrait,
         model: roll::ActiveModel,
     ) -> Result<roll::Model, DbErr> {
         model.insert(db).await
@@ -184,6 +185,21 @@ impl RollService {
                 Box::pin(async move {
                     let roll_result = roll_model.insert(txn).await?;
                     let new_roll_id = roll_result.id;
+
+                    // Bulk import emits only the founding roll_loaded event — per-shot
+                    // events are intentionally NOT logged, so an imported timeline has a
+                    // sensible start without dozens of shot entries.
+                    RollEventService::record(
+                        txn,
+                        new_roll_id,
+                        RollEventType::RollLoaded,
+                        None,
+                        None,
+                        None,
+                        None,
+                        "Roll loaded".to_string(),
+                    )
+                    .await?;
 
                     let now = now_string();
 

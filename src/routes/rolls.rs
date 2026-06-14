@@ -2,7 +2,7 @@ use axum::Router;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::get;
-use sea_orm::{DatabaseConnection, EntityTrait, Set};
+use sea_orm::{DatabaseConnection, DbErr, EntityTrait, Set, TransactionTrait};
 use serde::{Deserialize, Serialize};
 
 use crate::AppState;
@@ -144,21 +144,27 @@ async fn create(
         updated_at: Set(now),
         ..Default::default()
     };
-    let result = RollService::create(&db, model)
+    let result_id = db
+        .transaction::<_, i32, DbErr>(|txn| {
+            Box::pin(async move {
+                let result = RollService::create(txn, model).await?;
+                RollEventService::record(
+                    txn,
+                    result.id,
+                    entity::roll_event::RollEventType::RollLoaded,
+                    None,
+                    None,
+                    None,
+                    None,
+                    "Roll loaded".to_string(),
+                )
+                .await?;
+                Ok(result.id)
+            })
+        })
         .await
         .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
-    RollEventService::record(
-        &db,
-        result.id,
-        entity::roll_event::RollEventType::RollLoaded,
-        None,
-        None,
-        None,
-        None,
-        "Roll loaded".to_string(),
-    )
-    .await?;
-    Ok((StatusCode::CREATED, Json(result.id)))
+    Ok((StatusCode::CREATED, Json(result_id)))
 }
 
 async fn update(
@@ -240,14 +246,20 @@ async fn update(
     }
     model.updated_at = Set(now);
 
-    RollService::update(&db, model)
-        .await
-        .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
-    if let Some(new_status) = requested_status {
-        if new_status != prev_status {
-            RollEventService::record_status_change(&db, id, prev_status, new_status).await?;
-        }
-    }
+    db.transaction::<_, (), DbErr>(|txn| {
+        Box::pin(async move {
+            RollService::update(txn, model).await?;
+            if let Some(new_status) = requested_status {
+                if new_status != prev_status {
+                    RollEventService::record_status_change(txn, id, prev_status, new_status)
+                        .await?;
+                }
+            }
+            Ok(())
+        })
+    })
+    .await
+    .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -302,7 +314,7 @@ async fn get_detail(
         vec![]
     };
 
-    let events = crate::services::roll_event_service::RollEventService::list_for_roll(&db, id).await?;
+    let events = RollEventService::list_for_roll(&db, id).await?;
 
     Ok(Json(RollDetail {
         roll,

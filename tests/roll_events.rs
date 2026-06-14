@@ -55,7 +55,10 @@ async fn manual_status_change_logs_event() {
 
     let res = app
         .clone()
-        .oneshot(put_json(&format!("/api/rolls/{id}"), &json!({ "status": "shooting" })))
+        .oneshot(put_json(
+            &format!("/api/rolls/{id}"),
+            &json!({ "status": "shooting" }),
+        ))
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::NO_CONTENT);
@@ -74,11 +77,16 @@ async fn events_are_newest_first() {
     let app = open_app().await;
     let id = create_roll(&app, "EVT-3", "loaded").await;
     app.clone()
-        .oneshot(put_json(&format!("/api/rolls/{id}"), &json!({ "status": "shooting" })))
+        .oneshot(put_json(
+            &format!("/api/rolls/{id}"),
+            &json!({ "status": "shooting" }),
+        ))
         .await
         .unwrap();
     let events = events_for(&app, id).await;
-    // Most recent (status_changed) comes before the initial roll_loaded.
+    // Both events land in the same second, so this ordering relies on the
+    // `id DESC` tiebreak in `list_for_roll` (occurred_at DESC, id DESC) — the
+    // later-inserted status_changed has the higher id and sorts first.
     assert_eq!(events.first().unwrap()["event_type"], "status_changed");
     assert_eq!(events.last().unwrap()["event_type"], "roll_loaded");
 }
