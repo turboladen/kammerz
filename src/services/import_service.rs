@@ -133,13 +133,25 @@ Rules:
 - Per-shot focal_length should only be set when individual shots specify different lenses.
 - If all shots use the same lens and it's stated at the roll level, set lens_guess and leave per-shot focal_length null."#;
 
+/// Anthropic API base URL. The `*_at` methods below take this as a parameter so
+/// integration tests can point them at a local mock server (the real reqwest /
+/// serde path is then exercised, not a reimplementation).
+const ANTHROPIC_API_BASE: &str = "https://api.anthropic.com";
+
 pub struct ImportService;
 
 impl ImportService {
     /// Fetch available models from the Anthropic API.
     pub async fn list_models(api_key: &str) -> Result<Vec<ModelInfo>, String> {
+        Self::list_models_at(ANTHROPIC_API_BASE, api_key).await
+    }
+
+    /// Base-URL-injectable form of [`list_models`]. Production calls the wrapper
+    /// above; tests pass a mock-server base URL. (Same seam pattern as the
+    /// `spa` / `compression` lib modules.)
+    pub async fn list_models_at(base_url: &str, api_key: &str) -> Result<Vec<ModelInfo>, String> {
         let response = HTTP_CLIENT
-            .get("https://api.anthropic.com/v1/models")
+            .get(format!("{base_url}/v1/models"))
             .query(&[("limit", "1000")])
             .header("x-api-key", api_key)
             .header("anthropic-version", "2023-06-01")
@@ -183,6 +195,16 @@ impl ImportService {
         model: &str,
         note_text: &str,
     ) -> Result<ParsedRoll, String> {
+        Self::parse_note_at(ANTHROPIC_API_BASE, api_key, model, note_text).await
+    }
+
+    /// Base-URL-injectable form of [`parse_note`] (see [`list_models_at`]).
+    pub async fn parse_note_at(
+        base_url: &str,
+        api_key: &str,
+        model: &str,
+        note_text: &str,
+    ) -> Result<ParsedRoll, String> {
         let request = MessagesRequest {
             model: model.to_string(),
             max_tokens: 4096,
@@ -194,7 +216,7 @@ impl ImportService {
         };
 
         let response = HTTP_CLIENT
-            .post("https://api.anthropic.com/v1/messages")
+            .post(format!("{base_url}/v1/messages"))
             .header("x-api-key", api_key)
             .header("anthropic-version", "2023-06-01")
             .header("content-type", "application/json")
