@@ -184,30 +184,37 @@
 					<FadeIn delay={Math.min(i, 10) * 30}>
 						<a
 							href="/rolls/{roll.id}"
-							class="group relative flex items-center justify-between overflow-hidden rounded-lg border border-border bg-surface-raised py-2.5 pl-5 pr-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
+							class="group relative flex items-center gap-x-3 overflow-hidden rounded-lg border border-border bg-surface-raised py-2.5 pl-5 pr-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 						>
 							<FilmStrip orientation="vertical" />
-							<div class="flex items-center gap-3">
-								<span class="font-mono text-sm font-semibold">{roll.roll_id}</span>
-								<Badge status={roll.status} />
+							<span class="shrink-0 font-mono text-sm font-semibold">{roll.roll_id}</span>
+							<Badge status={roll.status} />
+							<!-- Ledger metadata: flows left-to-right with dot separators, wraps gracefully. -->
+							<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
 								{#if roll.camera_brand}
 									<span class="text-sm text-text-muted">{roll.camera_brand} {roll.camera_model}</span>
 								{:else}
 									<span class="text-sm italic text-text-faint">No camera</span>
 								{/if}
-							</div>
-							<div class="flex items-center gap-3">
 								{#if roll.film_stock_brand}
-									<span class="text-xs text-text-muted">{roll.film_stock_brand} {roll.film_stock_name}</span>
+									<span class="text-text-faint" aria-hidden="true">&middot;</span>
+									<span class="text-xs text-text-faint">{roll.film_stock_brand} {roll.film_stock_name}</span>
 								{/if}
 								{#if roll.lens_brand}
+									<span class="text-text-faint" aria-hidden="true">&middot;</span>
 									<span class="text-xs text-text-faint">{roll.lens_brand} {roll.lens_name}</span>
 								{/if}
 								{#if roll.date_loaded}
-									<span class="text-xs text-text-faint">{roll.date_loaded}</span>
+									<span class="text-text-faint" aria-hidden="true">&middot;</span>
+									<span class="font-mono text-xs text-text-faint">{roll.date_loaded}</span>
 								{/if}
+							</div>
+							<!-- Right-anchored: the frame counter is the only right element (no mid-row void). -->
+							<div class="ml-auto flex shrink-0 items-center gap-2.5">
 								<FrameCounter current={roll.shot_count} total={roll.frame_count} />
-								<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+								<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100"
+									>&rarr;</span
+								>
 							</div>
 						</a>
 					</FadeIn>
