@@ -127,6 +127,7 @@ ci-backend:
 ci-frontend:
     cd frontend && bun install --frozen-lockfile
     cd frontend && bun run check
+    cd frontend && bun run test:unit
     cd frontend && bun run build
     touch frontend/build/.gitkeep
 
@@ -214,6 +215,16 @@ coverage:
 coverage-open:
     cargo llvm-cov --workspace --html --open
     cargo llvm-cov report --summary-only
+
+# Frontend unit-test coverage (vitest + v8). Prints a per-file table and writes
+# an HTML report under frontend/coverage (gitignored). Scoped to src/lib/utils.
+# Local-only — the unit tests themselves run as a gate in `ci-frontend`; this is
+# just the coverage view. The named utils are well covered; focus.ts (a DOM
+# Svelte action) and shot-entry.ts (an API wrapper) stay at 0% by design — they
+# need a different harness and aren't in this batch's scope.
+coverage-frontend:
+    cd frontend && bun run coverage:unit
+    @echo "HTML report: frontend/coverage/index.html"
 
 migrate:
     cargo run -- # migrations run on startup; this just boots once
