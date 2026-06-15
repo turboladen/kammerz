@@ -205,11 +205,15 @@ e2e: ci-frontend
 # Backend test coverage report (cargo-llvm-cov).
 coverage:
     cargo llvm-cov --workspace --html
+    # `--html` only writes the HTML report; print the text summary from the same
+    # profdata (the `report` subcommand reuses it — no recompile or re-run).
+    cargo llvm-cov report --summary-only
     @echo "HTML report: target/llvm-cov/html/index.html"
 
 # Same as `coverage`, but opens the HTML report in a browser when it finishes.
 coverage-open:
     cargo llvm-cov --workspace --html --open
+    cargo llvm-cov report --summary-only
 
 migrate:
     cargo run -- # migrations run on startup; this just boots once
