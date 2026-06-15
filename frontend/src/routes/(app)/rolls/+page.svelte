@@ -212,9 +212,7 @@
 							<!-- Right-anchored: the frame counter is the only right element (no mid-row void). -->
 							<div class="ml-auto flex shrink-0 items-center gap-2.5">
 								<FrameCounter current={roll.shot_count} total={roll.frame_count} />
-								<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100"
-									>&rarr;</span
-								>
+								<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
 							</div>
 						</a>
 					</FadeIn>
