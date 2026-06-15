@@ -197,6 +197,24 @@ e2e: ci-frontend
         exit 1
     fi
 
+# One-time setup: `cargo install cargo-llvm-cov` + `rustup component add
+# llvm-tools-preview`. The instrumented build uses its own target subdir, so the
+# first run recompiles the workspace and won't reuse the normal build cache.
+# Writes a browseable HTML report under target/llvm-cov/html (gitignored via
+# /target) and prints a per-file + total summary. Local-only — not a CI gate.
+# Backend test coverage report (cargo-llvm-cov).
+coverage:
+    cargo llvm-cov --workspace --html
+    # `--html` only writes the HTML report; print the text summary from the same
+    # profdata (the `report` subcommand reuses it — no recompile or re-run).
+    cargo llvm-cov report --summary-only
+    @echo "HTML report: target/llvm-cov/html/index.html"
+
+# Same as `coverage`, but opens the HTML report in a browser when it finishes.
+coverage-open:
+    cargo llvm-cov --workspace --html --open
+    cargo llvm-cov report --summary-only
+
 migrate:
     cargo run -- # migrations run on startup; this just boots once
 
