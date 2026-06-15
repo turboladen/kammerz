@@ -197,15 +197,15 @@
 									<span class="text-sm italic text-text-faint">No camera</span>
 								{/if}
 								{#if roll.film_stock_brand}
-									<span class="text-text-faint" aria-hidden="true">&middot;</span>
+									<span class="text-xs text-text-faint" aria-hidden="true">&middot;</span>
 									<span class="text-xs text-text-faint">{roll.film_stock_brand} {roll.film_stock_name}</span>
 								{/if}
 								{#if roll.lens_brand}
-									<span class="text-text-faint" aria-hidden="true">&middot;</span>
+									<span class="text-xs text-text-faint" aria-hidden="true">&middot;</span>
 									<span class="text-xs text-text-faint">{roll.lens_brand} {roll.lens_name}</span>
 								{/if}
 								{#if roll.date_loaded}
-									<span class="text-text-faint" aria-hidden="true">&middot;</span>
+									<span class="text-xs text-text-faint" aria-hidden="true">&middot;</span>
 									<span class="font-mono text-xs text-text-faint">{roll.date_loaded}</span>
 								{/if}
 							</div>
