@@ -31,6 +31,7 @@
 	import { createShot, updateShot, deleteShot, suggestNextFrame } from '$lib/api/shots';
 	import { listLabs } from '$lib/api/labs';
 	import { lensDisplayName, buildLensOptions } from '$lib/utils/lens';
+	import { buildFrameCells } from '$lib/utils/frames';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import {
@@ -274,26 +275,8 @@
 	// Activity journal events (populated from /detail after each load)
 	let events: RollEvent[] = $state([]);
 
-	// Frame cells: map shots onto numbered slots, extras appended after
-	const DEFAULT_FRAMES = 36;
-	const frameCells = $derived.by(() => {
-		const n = roll?.frame_count ?? DEFAULT_FRAMES;
-		const byFrame = new Map<string, Shot>();
-		for (const s of shots) byFrame.set(s.frame_number.trim(), s);
-		const cells: { frameNumber: string; shot: Shot | null; isNext: boolean }[] = [];
-		let nextAssigned = false;
-		for (let i = 1; i <= n; i++) {
-			const fn = String(i);
-			const shot = byFrame.get(fn) ?? null;
-			const isNext = !shot && !nextAssigned;
-			if (isNext) nextAssigned = true;
-			cells.push({ frameNumber: fn, shot, isNext });
-			byFrame.delete(fn);
-		}
-		// Extras: any shot whose frame_number wasn't a 1..n slot (e.g. "37", "00", "36A").
-		for (const [fn, shot] of byFrame) cells.push({ frameNumber: fn, shot, isNext: false });
-		return cells;
-	});
+	// Frame cells: map shots onto numbered slots, extras appended after (shared util).
+	const frameCells = $derived(buildFrameCells(shots, roll?.frame_count ?? null));
 	const nextFrameNumber = $derived(frameCells.find((c) => c.isNext)?.frameNumber ?? '');
 
 	// QuickAddBar save state
