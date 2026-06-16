@@ -76,6 +76,39 @@ deploy host port='3002': ci-backend build-linux
     exit 1
 
 
+# First-time provisioning for a FRESH box — run ONCE before the first `just
+# deploy`. `deploy` is a steady-state redeploy: it assumes the kammerz user,
+# /opt/kammerz{,/data}, and /opt/kammerz/.env already exist (its first `tee
+# /opt/kammerz/kammerz.new` fails with "No such file or directory" otherwise).
+# This creates them. Idempotent — safe to re-run; it never clobbers an existing
+# /opt/kammerz/.env. Requires passwordless sudo for the remote user (same as
+# deploy). Prereq: copy deploy/.env.example → deploy/.env and fill in
+# KAMMERZ_PASSWORD_HASH (see the example for the one-liner) before running.
+bootstrap host:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    host="{{host}}"
+    if [ ! -f deploy/.env ]; then
+        echo "❌ deploy/.env not found. Copy deploy/.env.example to deploy/.env and" >&2
+        echo "   set KAMMERZ_PASSWORD_HASH before bootstrapping (it's gitignored)." >&2
+        exit 1
+    fi
+    # System user (no login, no home) the service runs as. `|| true` for re-runs.
+    ssh "$host" "sudo -n useradd --system --shell /usr/sbin/nologin kammerz 2>/dev/null || true"
+    # WorkingDirectory + the only ProtectSystem=strict-writable path (data/).
+    ssh "$host" "sudo -n mkdir -p /opt/kammerz/data && sudo -n chown -R kammerz:kammerz /opt/kammerz"
+    # Install .env only if absent — never overwrite a hand-edited secret.
+    if ssh "$host" "test -f /opt/kammerz/.env"; then
+        echo "   /opt/kammerz/.env already present — leaving it untouched."
+    else
+        ssh "$host" "sudo -n tee /opt/kammerz/.env > /dev/null && sudo -n chmod 600 /opt/kammerz/.env && sudo -n chown kammerz:kammerz /opt/kammerz/.env" < deploy/.env
+        echo "   installed /opt/kammerz/.env (mode 600, owner kammerz)"
+    fi
+    # Install + enable the unit so a reboot brings the service back.
+    ssh "$host" "sudo -n tee /etc/systemd/system/kammerz.service > /dev/null && sudo -n systemctl daemon-reload && sudo -n systemctl enable kammerz" < deploy/kammerz.service
+    echo "✅ bootstrapped $host — now run: just deploy $host"
+
+
 # Format everything in place: dprint (Markdown/JSON/TOML/YAML), Prettier
 # (frontend: Svelte/TS/CSS via prettier-plugin-svelte), rustfmt (Rust).
 # Run before committing.
