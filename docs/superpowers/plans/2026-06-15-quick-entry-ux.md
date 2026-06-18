@@ -24,6 +24,7 @@
 ## Task 1: Extract `buildFrameCells` util (TDD)
 
 **Files:**
+
 - Create: `frontend/src/lib/utils/frames.ts`
 - Test: `frontend/src/lib/utils/frames.test.ts`
 - Modify: `frontend/src/routes/(app)/rolls/[id]/+page.svelte`
@@ -197,14 +198,14 @@ import { buildFrameCells } from '$lib/utils/frames';
 Replace the local `DEFAULT_FRAMES` const and the `frameCells` `$derived.by` block (currently around lines 277–296, starting `const DEFAULT_FRAMES = 36;` through the closing `});` of `$derived.by`) with:
 
 ```ts
-	// Frame cells: map shots onto numbered slots, extras appended after (shared util).
-	const frameCells = $derived(buildFrameCells(shots, roll?.frame_count ?? null));
+// Frame cells: map shots onto numbered slots, extras appended after (shared util).
+const frameCells = $derived(buildFrameCells(shots, roll?.frame_count ?? null));
 ```
 
 Leave the existing `nextFrameNumber` derived line immediately below it unchanged:
 
 ```ts
-	const nextFrameNumber = $derived(frameCells.find((c) => c.isNext)?.frameNumber ?? '');
+const nextFrameNumber = $derived(frameCells.find((c) => c.isNext)?.frameNumber ?? '');
 ```
 
 - [ ] **Step 6: Verify roll-detail still type-checks and builds**
@@ -224,6 +225,7 @@ git commit -m "refactor(frames): extract buildFrameCells util with tests (kammer
 ## Task 2: Extract `RollRow` shared component
 
 **Files:**
+
 - Create: `frontend/src/lib/components/rolls/RollRow.svelte`
 - Modify: `frontend/src/routes/(app)/rolls/+page.svelte`
 
@@ -306,25 +308,25 @@ In `frontend/src/routes/(app)/rolls/+page.svelte`:
 Remove these three now-unused imports (they live in `RollRow` now):
 
 ```ts
-	import Badge from '$lib/components/ui/Badge.svelte';
-	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
-	import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
+import Badge from '$lib/components/ui/Badge.svelte';
+import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
+import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
 ```
 
 Add this import alongside the other component imports:
 
 ```ts
-	import RollRow from '$lib/components/rolls/RollRow.svelte';
+import RollRow from '$lib/components/rolls/RollRow.svelte';
 ```
 
 Replace the row markup — the entire `<a href="/rolls/{roll.id}" ...> ... </a>` block inside the `<FadeIn>` (currently lines ~185–218) — with:
 
 ```svelte
-						<RollRow {roll} href="/rolls/{roll.id}">
-							{#snippet trailing()}
-								<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
-							{/snippet}
-						</RollRow>
+<RollRow {roll} href="/rolls/{roll.id}">
+	{#snippet trailing()}
+		<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
+	{/snippet}
+</RollRow>
 ```
 
 (The `<FadeIn delay={...}>` wrapper and the `{#each groupRolls as roll, i}` loop stay exactly as they are.)
@@ -351,6 +353,7 @@ git commit -m "refactor(rolls): extract RollRow component (kammerz-ife)"
 ## Task 3: Rewrite the Quick Entry page
 
 **Files:**
+
 - Modify (full rewrite): `frontend/src/routes/(app)/quick-entry/+page.svelte`
 
 - [ ] **Step 1: Replace the file contents**
@@ -685,6 +688,7 @@ Expected: PASS — `fmt-check`, `ci-backend`, `ci-frontend` (svelte-check + buil
 - [ ] **Step 4: Manual smoke of Quick Entry**
 
 Run `just dev`, open `http://localhost:5273/quick-entry`, and verify:
+
 - Active rolls render as a stacked visual list (film-strip edge, badge, metadata, frame counter). Non-active rolls (archived/scanned/etc.) are absent.
 - Clicking a roll collapses the list to one row with a **Change** button; clicking **Change** returns to the list.
 - `QuickAddBar` logs a frame; the `FrameStrip` fills the slot and the next slot becomes highlighted; "N this session" increments.
@@ -709,4 +713,6 @@ git status   # if only formatting changed, amend; otherwise nothing to do
 - **Beads hygiene:** This plan is feature work. Do NOT flip `kammerz-ife` to closed inside the PR branch — closing is a separate post-merge `chore(beads)` commit on `main`. If `.beads/issues.jsonl` shows up modified, `git restore --staged .beads/issues.jsonl` before committing.
 - **Why `RollRow` uses `<svelte:element>`:** one component serves three element types — `<a>` (rolls list), `<button>` (picker select), `<div>` (collapsed row, so the inner Change `<button>` isn't an invalid nested button). The `interactive` derived gates the hover affordances to the clickable cases.
 - **Why `QuickAddBar` needs no edit support here:** its Frame field is display-only (`{frameNumber || '—'}`) and it owns its own ⌘/Ctrl+Enter handler — the page only feeds it `frameToLog` and handles `onsave`. The old page's `handleKeydown` + `<svelte:window>` and the `frameNumber`/`aperture`/`shutterSpeed`/`notes`/`selectedLensId`/`suggestNextFrame` state are intentionally gone (the bar owns all of that now).
+
+```
 ```
