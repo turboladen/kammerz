@@ -368,3 +368,38 @@ async fn import_roll_with_malformed_shot_time_is_rejected() {
         "message names the offending shot field"
     );
 }
+
+#[tokio::test]
+async fn import_roll_blank_shot_time_persists_as_null() {
+    let app = open_app().await;
+
+    // A whitespace-only time passes validation (blank is optional) but must
+    // persist as NULL — canonical-HH:MM-or-NULL — not an empty string, matching
+    // the create/update paths' trim_opt behaviour.
+    let payload = json!({
+        "roll_id": "IMPORT-BLANKTIME",
+        "status": "archived",
+        "shots": [
+            { "frame_number": "1", "time": "   " }
+        ]
+    });
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/import/roll", &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let roll_pk: i32 = json_body(res).await;
+
+    let res = app
+        .oneshot(get(&format!("/api/rolls/{roll_pk}/detail")))
+        .await
+        .unwrap();
+    let detail: Value = json_body(res).await;
+    let shots = detail["shots"].as_array().expect("shots array");
+    assert_eq!(
+        shots[0]["time"],
+        Value::Null,
+        "blank import time stored as NULL"
+    );
+}

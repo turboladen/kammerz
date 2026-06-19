@@ -391,6 +391,7 @@ async fn update_shot_sets_and_clears_time() {
         ))
         .await
         .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
     let shot_id: i32 = json_body(res).await;
 
     // Update the time to a new canonical value.
@@ -444,6 +445,7 @@ async fn update_shot_rejects_malformed_time() {
         ))
         .await
         .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
     let shot_id: i32 = json_body(res).await;
 
     let res = app

@@ -184,7 +184,18 @@ async fn import_parsed_roll(
             shutter_speed: s.shutter_speed.map(|v| v.trim().to_string()),
             date: s.date.map(|v| v.trim().to_string()),
             date_fuzzy: s.date_fuzzy.map(|v| v.trim().to_string()),
-            time: s.time.map(|v| v.trim().to_string()),
+            // `time` carries a stricter contract than its free-text siblings —
+            // canonical HH:MM or NULL (see validate_time) — so collapse a
+            // whitespace-only value to None, matching the create/update paths'
+            // trim_opt rather than persisting an empty string.
+            time: s.time.and_then(|v| {
+                let t = v.trim();
+                if t.is_empty() {
+                    None
+                } else {
+                    Some(t.to_string())
+                }
+            }),
             location: s.location.map(|v| v.trim().to_string()),
             notes: s.notes.map(|v| v.trim().to_string()),
             lens_ids: s.lens_ids,
