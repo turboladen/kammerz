@@ -54,6 +54,8 @@ pub struct UpdateShotDto {
     #[serde(deserialize_with = "double_option")]
     pub date_fuzzy: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
+    pub time: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
     pub location: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
     pub gps_lat: Option<Option<f64>>,
@@ -181,6 +183,9 @@ async fn update(
     if let Some(v) = &data.date {
         validate_date_opt("date", v)?;
     }
+    if let Some(v) = &data.time {
+        validate_time("time", v)?;
+    }
     if let Some(v) = &data.frame_number {
         require_nonempty("frame_number", v)?;
     }
@@ -211,6 +216,9 @@ async fn update(
             }
             if let Some(v) = data.date_fuzzy {
                 model.date_fuzzy = trim_opt(v);
+            }
+            if let Some(v) = data.time {
+                model.time = trim_opt(v);
             }
             if let Some(v) = data.location {
                 model.location = trim_opt(v);
