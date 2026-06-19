@@ -313,3 +313,58 @@ async fn import_roll_rejects_negative_frame_count() {
             .contains("frame_count")
     );
 }
+
+#[tokio::test]
+async fn import_roll_persists_shot_time() {
+    let app = open_app().await;
+
+    let payload = json!({
+        "roll_id": "IMPORT-TIME",
+        "status": "archived",
+        "shots": [
+            { "frame_number": "1", "time": "07:27" }
+        ]
+    });
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/import/roll", &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let roll_pk: i32 = json_body(res).await;
+
+    let res = app
+        .oneshot(get(&format!("/api/rolls/{roll_pk}/detail")))
+        .await
+        .unwrap();
+    let detail: Value = json_body(res).await;
+    let shots = detail["shots"].as_array().expect("shots array");
+    assert_eq!(shots[0]["time"], "07:27", "imported shot time persisted");
+}
+
+#[tokio::test]
+async fn import_roll_with_malformed_shot_time_is_rejected() {
+    let app = open_app().await;
+
+    let payload = json!({
+        "roll_id": "IMPORT-BADTIME",
+        "status": "archived",
+        "shots": [
+            { "frame_number": "1", "time": "7:27pm" }
+        ]
+    });
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/import/roll", &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("shots[0].time"),
+        "message names the offending shot field"
+    );
+}
