@@ -15,7 +15,9 @@ use crate::routes::friendly_err;
 use crate::services::import_service::{ImportService, ModelInfo, ParsedRoll};
 use crate::services::roll_service::{ImportShotEntry, RollService};
 use crate::services::settings_service::SettingsService;
-use crate::validate::{require_nonempty, validate_date_opt, validate_non_negative_i32};
+use crate::validate::{
+    require_nonempty, validate_date_opt, validate_non_negative_i32, validate_time,
+};
 use entity::roll::{self, PushPull, RollStatus};
 
 const DEFAULT_MODEL: &str = "claude-sonnet-4-5-20250929";
@@ -45,6 +47,7 @@ pub struct ImportShotDto {
     pub shutter_speed: Option<String>,
     pub date: Option<String>,
     pub date_fuzzy: Option<String>,
+    pub time: Option<String>,
     pub location: Option<String>,
     pub notes: Option<String>,
     pub lens_ids: Option<Vec<i32>>,
@@ -129,6 +132,7 @@ async fn import_parsed_roll(
     validate_non_negative_i32("frame_count", data.frame_count)?;
     for (i, s) in data.shots.iter().enumerate() {
         validate_date_opt(&format!("shots[{i}].date"), &s.date)?;
+        validate_time(&format!("shots[{i}].time"), &s.time)?;
     }
 
     // Pre-validate frame numbers against the UNIQUE(roll_id, frame_number) index
@@ -180,6 +184,18 @@ async fn import_parsed_roll(
             shutter_speed: s.shutter_speed.map(|v| v.trim().to_string()),
             date: s.date.map(|v| v.trim().to_string()),
             date_fuzzy: s.date_fuzzy.map(|v| v.trim().to_string()),
+            // `time` carries a stricter contract than its free-text siblings —
+            // canonical HH:MM or NULL (see validate_time) — so collapse a
+            // whitespace-only value to None, matching the create/update paths'
+            // trim_opt rather than persisting an empty string.
+            time: s.time.and_then(|v| {
+                let t = v.trim();
+                if t.is_empty() {
+                    None
+                } else {
+                    Some(t.to_string())
+                }
+            }),
             location: s.location.map(|v| v.trim().to_string()),
             notes: s.notes.map(|v| v.trim().to_string()),
             lens_ids: s.lens_ids,

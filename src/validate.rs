@@ -102,6 +102,37 @@ pub fn validate_date_opt(field: &str, value: &Option<String>) -> AppResult<()> {
     }
 }
 
+/// Validate an optional canonical 24-hour `HH:MM` time. `None`/blank are accepted
+/// (the field is optional); a present value must be exactly `HH:MM` in range.
+pub fn validate_time(field: &str, value: &Option<String>) -> AppResult<()> {
+    let Some(raw) = value else { return Ok(()) };
+    let v = raw.trim();
+    if v.is_empty() {
+        return Ok(());
+    }
+    if is_valid_time(v) {
+        Ok(())
+    } else {
+        Err(AppError::UnprocessableEntity(format!(
+            "{field}: use 24-hour HH:MM"
+        )))
+    }
+}
+
+/// True when `v` is a canonical `HH:MM` 24-hour time (two-digit hour 00–23 and
+/// two-digit minute 00–59). Assumes `v` is already trimmed and non-empty.
+fn is_valid_time(v: &str) -> bool {
+    match v.split(':').collect::<Vec<&str>>().as_slice() {
+        [h, m] => {
+            let (Some(hour), Some(minute)) = (parse_fixed(h, 2), parse_fixed(m, 2)) else {
+                return false;
+            };
+            (0..=23).contains(&hour) && (0..=59).contains(&minute)
+        }
+        _ => false,
+    }
+}
+
 /// True when `v` is a complete `YYYY`, `YYYY-MM`, or `YYYY-MM-DD` within range.
 /// Assumes `v` is already trimmed and non-empty.
 fn is_valid_date(v: &str) -> bool {
@@ -152,6 +183,52 @@ mod tests {
     }
     fn ok(field: &str, v: &str) -> bool {
         validate_date_opt(field, &Some(v.to_string())).is_ok()
+    }
+
+    fn time_err(field: &str, v: &str) -> bool {
+        validate_time(field, &Some(v.to_string())).is_err()
+    }
+    fn time_ok(field: &str, v: &str) -> bool {
+        validate_time(field, &Some(v.to_string())).is_ok()
+    }
+
+    #[test]
+    fn time_none_and_blank_are_accepted() {
+        assert!(validate_time("time", &None).is_ok());
+        assert!(time_ok("time", ""));
+        assert!(time_ok("time", "   "));
+    }
+
+    #[test]
+    fn valid_24h_times_accepted() {
+        assert!(time_ok("time", "00:00"));
+        assert!(time_ok("time", "07:27"));
+        assert!(time_ok("time", "19:27"));
+        assert!(time_ok("time", "23:59"));
+        // surrounding whitespace is trimmed like the date validator
+        assert!(time_ok("time", "  08:15  "));
+    }
+
+    #[test]
+    fn malformed_times_rejected() {
+        assert!(time_err("time", "24:00")); // hour out of range
+        assert!(time_err("time", "23:60")); // minute out of range
+        assert!(time_err("time", "7:27")); // hour must be two digits
+        assert!(time_err("time", "19:7")); // minute must be two digits
+        assert!(time_err("time", "19:27:30")); // seconds not allowed
+        assert!(time_err("time", "7:27pm")); // 12-hour notation
+        assert!(time_err("time", "1927")); // missing colon
+        assert!(time_err("time", "19-27")); // wrong separator
+        assert!(time_err("time", "morning")); // junk
+    }
+
+    #[test]
+    fn time_error_message_names_the_field() {
+        let e = validate_time("shot_time", &Some("nope".into())).unwrap_err();
+        match e {
+            AppError::UnprocessableEntity(m) => assert!(m.contains("shot_time")),
+            _ => panic!("expected UnprocessableEntity"),
+        }
     }
 
     #[test]

@@ -12,6 +12,7 @@ pub struct Model {
     pub shutter_speed: Option<String>,
     pub date: Option<String>,
     pub date_fuzzy: Option<String>,
+    pub time: Option<String>,
     pub location: Option<String>,
     pub gps_lat: Option<f64>,
     pub gps_lon: Option<f64>,
