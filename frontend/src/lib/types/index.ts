@@ -219,6 +219,9 @@ export interface Shot {
 	shutter_speed: string | null;
 	date: string | null;
 	date_fuzzy: string | null;
+	// Optional during rollout: the API always returns it (nullable), but insert
+	// sites need not set it until the entry UI lands (see feat/shot-time follow-up).
+	time?: string | null;
 	location: string | null;
 	gps_lat: number | null;
 	gps_lon: number | null;
