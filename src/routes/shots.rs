@@ -17,7 +17,9 @@ use crate::routes::{Op, friendly_err, friendly_txn_err};
 use crate::services::roll_event_service::RollEventService;
 use crate::services::roll_service::RollService;
 use crate::services::shot_service::ShotService;
-use crate::validate::{require_nonempty, validate_date_opt, validate_lat, validate_lon};
+use crate::validate::{
+    require_nonempty, validate_date_opt, validate_lat, validate_lon, validate_time,
+};
 use entity::roll::RollStatus;
 use entity::shot;
 
@@ -31,6 +33,7 @@ pub struct CreateShotDto {
     pub shutter_speed: Option<String>,
     pub date: Option<String>,
     pub date_fuzzy: Option<String>,
+    pub time: Option<String>,
     pub location: Option<String>,
     pub gps_lat: Option<f64>,
     pub gps_lon: Option<f64>,
@@ -100,6 +103,7 @@ async fn create(
     Json(data): Json<CreateShotDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
     validate_date_opt("date", &data.date)?;
+    validate_time("time", &data.time)?;
     require_nonempty("frame_number", &data.frame_number)?;
     validate_lat("gps_lat", data.gps_lat)?;
     validate_lon("gps_lon", data.gps_lon)?;
@@ -116,6 +120,7 @@ async fn create(
                     shutter_speed: trim_opt(data.shutter_speed),
                     date: trim_opt(data.date),
                     date_fuzzy: trim_opt(data.date_fuzzy),
+                    time: trim_opt(data.time),
                     location: trim_opt(data.location),
                     gps_lat: Set(data.gps_lat),
                     gps_lon: Set(data.gps_lon),

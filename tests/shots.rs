@@ -330,3 +330,50 @@ async fn update_shot_rejects_whitespace_frame_number() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+#[tokio::test]
+async fn create_shot_persists_canonical_time() {
+    let app = open_app().await;
+    let roll_pk = create_loaded_roll(&app, "SHOT-TIME").await;
+
+    let payload = json!({
+        "roll_id": roll_pk,
+        "frame_number": "1",
+        "time": "07:27"
+    });
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/shots", &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let shot_id: i32 = json_body(res).await;
+
+    // The time round-trips on the shot record.
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/shots/{shot_id}")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let shot: Value = json_body(res).await;
+    assert_eq!(shot["time"], "07:27");
+}
+
+#[tokio::test]
+async fn create_shot_rejects_malformed_time() {
+    let app = open_app().await;
+    let roll_pk = create_loaded_roll(&app, "SHOT-BADTIME").await;
+
+    let payload = json!({
+        "roll_id": roll_pk,
+        "frame_number": "1",
+        "time": "7:27pm"
+    });
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/shots", &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
