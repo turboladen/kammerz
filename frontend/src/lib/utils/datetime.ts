@@ -11,6 +11,8 @@
  * Storage stays UTC — only the rendering is localized.
  */
 
+import { toLocalDayString } from './date';
+
 /**
  * Parse a naive-UTC `"YYYY-MM-DD HH:MM:SS"` (or ISO `"...T..."`) string into a
  * `Date`, treating the wall-clock as UTC. Append a `Z` so the engine reads it as
@@ -29,11 +31,7 @@ export function parseUtcNaive(s: string): Date {
  * the day the user actually experienced it.
  */
 export function localDay(occurredAt: string): string {
-	const d = parseUtcNaive(occurredAt);
-	const yyyy = d.getFullYear();
-	const mm = String(d.getMonth() + 1).padStart(2, '0');
-	const dd = String(d.getDate()).padStart(2, '0');
-	return `${yyyy}-${mm}-${dd}`;
+	return toLocalDayString(parseUtcNaive(occurredAt));
 }
 
 /** Local `HH:MM` time of a naive-UTC timestamp. */
@@ -50,10 +48,10 @@ export function formatLocalTime(occurredAt: string): string {
  * so it's parsed as local midnight — no UTC conversion here.
  */
 export function formatLocalDayLabel(day: string): string {
-	try {
-		const d = new Date(day + 'T00:00:00');
-		return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-	} catch {
-		return day;
-	}
+	// `new Date(...)` never throws — it returns an Invalid Date for bad input —
+	// so guard explicitly to fall back to the raw string rather than render the
+	// literal "Invalid Date".
+	const d = new Date(day + 'T00:00:00');
+	if (Number.isNaN(d.getTime())) return day;
+	return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 }

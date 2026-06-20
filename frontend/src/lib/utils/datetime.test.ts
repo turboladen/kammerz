@@ -70,3 +70,15 @@ describe('in UTC', () => {
 		expect(localDay('2026-06-19 22:17:30')).toBe('2026-06-19');
 	});
 });
+
+describe('formatLocalDayLabel', () => {
+	it('renders a readable label for a valid local day', () => {
+		const label = formatLocalDayLabel('2026-06-19');
+		expect(label).toContain('June');
+		expect(label).toContain('19');
+	});
+
+	it('falls back to the raw string for an unparseable day (not "Invalid Date")', () => {
+		expect(formatLocalDayLabel('garbage')).toBe('garbage');
+	});
+});

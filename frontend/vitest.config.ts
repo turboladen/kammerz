@@ -17,6 +17,12 @@ export default defineConfig({
 		// vitest never tries to run the Playwright e2e specs under tests/ (its
 		// default glob would otherwise match tests/smoke.spec.ts).
 		include: ['src/**/*.{test,spec}.ts'],
+		// Pin a deterministic timezone for the whole suite so local-time logic
+		// (activity day bucketing, the datetime util) doesn't depend on the
+		// runner's zone — CI defaults to UTC, but a dev in a far-from-UTC zone
+		// would otherwise see spurious failures. Tests that must exercise a
+		// specific zone (datetime.test.ts) override process.env.TZ per block.
+		env: { TZ: 'UTC' },
 		coverage: {
 			provider: 'v8',
 			// Report on the logic under test, not the whole app (components/routes
