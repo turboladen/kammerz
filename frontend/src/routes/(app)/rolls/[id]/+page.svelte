@@ -1014,105 +1014,108 @@
 			</div>
 		</FadeIn>
 
-		<!-- DevelopmentSection: the compact Development panel + its create/edit/delete dialogs.
-		     Dialogs are also opened from chevron clicks and from journal dev-event clicks via the autoPrompt bridge. -->
-		<DevelopmentSection
-			rollId={id}
-			{labs}
-			bind:labDev
-			bind:selfDev
-			bind:devStages
-			bind:autoPrompt={devAutoPrompt}
-			currentStatus={roll?.status ?? null}
-			defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
-			onchange={() => loadRollData('dev')}
-			onpromptcancel={() => {
-				statusNotice = 'Status unchanged — no development record was saved.';
-			}}
-		/>
-
-		<!-- Two-pane: Frames + Activity -->
+		<!-- Frames — front-and-center: most info + the Quick Entry control. Placed
+		     above Development and Activity (kammerz-60f). -->
 		<FadeIn delay={100}>
-			<div class="grid gap-6 lg:grid-cols-2">
-				<!-- Frames pane -->
-				<section>
-					<div class="mb-3 flex items-center justify-between">
-						<h2 class="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
-							Frames
-							{#if frameProgress}
-								<span class="font-mono text-[10px] normal-case tracking-normal text-text-faint">
-									{frameProgress.current}/{frameProgress.total}
-								</span>
-								<div class="flex-1 border-b border-border-subtle"></div>
-							{:else}
-								<div class="flex-1 border-b border-border-subtle"></div>
-							{/if}
-						</h2>
-						<Button size="sm" variant="ghost" href="/quick-entry?roll={roll?.id}">Quick Entry</Button>
-					</div>
-
-					{#if showRollFullNudge}
-						<div
-							class="mb-3 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3"
-						>
-							<div class="flex flex-col gap-2">
-								<div>
-									<p class="text-sm font-medium text-accent">Roll complete</p>
-									<p class="text-xs text-accent/70">
-										All {frameProgress?.total} frames shot. When did you finish it?
-									</p>
-								</div>
-								<div class="w-44">
-									<DateInput label="Finished shooting" bind:value={finishDate} />
-								</div>
-							</div>
-							<div class="flex items-center gap-2">
-								<Button
-									size="sm"
-									variant="primary"
-									disabled={!finishDate.trim() || !!finishDateError}
-									onclick={() => updateStatus('shot', finishDate)}>Mark as Shot</Button
-								>
-								<button
-									onclick={() => {
-										rollFullDismissed = true;
-									}}
-									class="px-1 text-lg leading-none text-accent/60 transition-colors hover:text-accent"
-									aria-label="Dismiss">&times;</button
-								>
-							</div>
-						</div>
-					{:else if frameProgress && shots.length > frameProgress.total}
-						<div class="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
-							More shots ({shots.length}) than the roll's frame count ({frameProgress.total}). This may indicate extra
-							frames or a counting error.
-						</div>
-					{/if}
-
-					<div class="space-y-2">
-						<QuickAddBar
-							frameNumber={nextFrameNumber}
-							lensOptions={shotLensOptions}
-							lensId={quickDefaultLensId}
-							isFixedLens={isFixedLensCamera}
-							fixedLensLabel={fixedLens ? lensDisplayName(fixedLens) : ''}
-							saving={quickSaving}
-							error={quickError}
-							onsave={handleQuickAdd}
-						/>
-						<FrameStrip frames={frameCells} onselect={handleFrameSelect} onaddextra={() => openAddShotDialog()} />
-					</div>
-				</section>
-
-				<!-- Activity pane -->
-				<section>
-					<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
-						Activity
-						<div class="flex-1 border-b border-border-subtle"></div>
+			<section class="mb-6">
+				<div class="mb-3 flex items-center justify-between">
+					<h2 class="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+						Frames
+						{#if frameProgress}
+							<span class="font-mono text-[10px] normal-case tracking-normal text-text-faint">
+								{frameProgress.current}/{frameProgress.total}
+							</span>
+							<div class="flex-1 border-b border-border-subtle"></div>
+						{:else}
+							<div class="flex-1 border-b border-border-subtle"></div>
+						{/if}
 					</h2>
-					<RollActivity {events} onopendev={openDevFromEvent} />
-				</section>
-			</div>
+					<Button size="sm" variant="ghost" href="/quick-entry?roll={roll?.id}">Quick Entry</Button>
+				</div>
+
+				{#if showRollFullNudge}
+					<div
+						class="mb-3 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3"
+					>
+						<div class="flex flex-col gap-2">
+							<div>
+								<p class="text-sm font-medium text-accent">Roll complete</p>
+								<p class="text-xs text-accent/70">
+									All {frameProgress?.total} frames shot. When did you finish it?
+								</p>
+							</div>
+							<div class="w-44">
+								<DateInput label="Finished shooting" bind:value={finishDate} />
+							</div>
+						</div>
+						<div class="flex items-center gap-2">
+							<Button
+								size="sm"
+								variant="primary"
+								disabled={!finishDate.trim() || !!finishDateError}
+								onclick={() => updateStatus('shot', finishDate)}>Mark as Shot</Button
+							>
+							<button
+								onclick={() => {
+									rollFullDismissed = true;
+								}}
+								class="px-1 text-lg leading-none text-accent/60 transition-colors hover:text-accent"
+								aria-label="Dismiss">&times;</button
+							>
+						</div>
+					</div>
+				{:else if frameProgress && shots.length > frameProgress.total}
+					<div class="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+						More shots ({shots.length}) than the roll's frame count ({frameProgress.total}). This may indicate extra
+						frames or a counting error.
+					</div>
+				{/if}
+
+				<div class="space-y-2">
+					<QuickAddBar
+						frameNumber={nextFrameNumber}
+						lensOptions={shotLensOptions}
+						lensId={quickDefaultLensId}
+						isFixedLens={isFixedLensCamera}
+						fixedLensLabel={fixedLens ? lensDisplayName(fixedLens) : ''}
+						saving={quickSaving}
+						error={quickError}
+						onsave={handleQuickAdd}
+					/>
+					<FrameStrip frames={frameCells} onselect={handleFrameSelect} onaddextra={() => openAddShotDialog()} />
+				</div>
+			</section>
+		</FadeIn>
+
+		<!-- DevelopmentSection: the compact Development panel + its create/edit/delete dialogs.
+		     Dialogs are also opened from chevron clicks and from journal dev-event clicks via the autoPrompt bridge.
+		     NOT wrapped in FadeIn — it renders its own Dialogs, which a FadeIn transform would trap (see frontend-patterns.md). -->
+		<div class="mb-6">
+			<DevelopmentSection
+				rollId={id}
+				{labs}
+				bind:labDev
+				bind:selfDev
+				bind:devStages
+				bind:autoPrompt={devAutoPrompt}
+				currentStatus={roll?.status ?? null}
+				defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
+				onchange={() => loadRollData('dev')}
+				onpromptcancel={() => {
+					statusNotice = 'Status unchanged — no development record was saved.';
+				}}
+			/>
+		</div>
+
+		<!-- Activity -->
+		<FadeIn delay={150}>
+			<section>
+				<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+					Activity
+					<div class="flex-1 border-b border-border-subtle"></div>
+				</h2>
+				<RollActivity {events} onopendev={openDevFromEvent} />
+			</section>
 		</FadeIn>
 	</div>
 {/if}
