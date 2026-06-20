@@ -6,7 +6,15 @@
  * users behind/ahead of UTC. This builds the string from the local-time parts.
  */
 export function todayLocal(): string {
-	const d = new Date();
+	return toLocalDayString(new Date());
+}
+
+/**
+ * A `Date`'s local-time calendar day as a `YYYY-MM-DD` string, built from the
+ * local parts (never `toISOString()`, which is UTC — see `todayLocal`). Shared
+ * by `todayLocal` and the activity journal's `localDay` in `datetime.ts`.
+ */
+export function toLocalDayString(d: Date): string {
 	const mm = String(d.getMonth() + 1).padStart(2, '0');
 	const dd = String(d.getDate()).padStart(2, '0');
 	return `${d.getFullYear()}-${mm}-${dd}`;

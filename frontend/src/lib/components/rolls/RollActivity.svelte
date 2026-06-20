@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { CornerDownLeft } from 'lucide-svelte';
 	import { groupActivity } from '$lib/utils/activity';
+	import { formatLocalDayLabel, formatLocalTime } from '$lib/utils/datetime';
 	import { getStatusLabel, getStatusColor, allStatusOrder } from '$lib/utils/status';
 	import type { RollEvent, RollStatus } from '$lib/types';
 
@@ -24,22 +25,11 @@
 		return fromIdx > toIdx;
 	}
 
-	/** Format an occurred_at timestamp ("YYYY-MM-DD HH:MM:SS") into a readable day label. */
-	function formatDay(day: string): string {
-		// day is already "YYYY-MM-DD"
-		try {
-			const d = new Date(day + 'T00:00:00');
-			return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-		} catch {
-			return day;
-		}
-	}
-
-	/** Format a short time from occurred_at "YYYY-MM-DD HH:MM:SS". */
-	function formatTime(occurredAt: string): string {
-		// occurredAt = "YYYY-MM-DD HH:MM:SS"
-		return occurredAt.slice(11, 16); // "HH:MM"
-	}
+	// Day grouping and time rendering go through $lib/utils/datetime so the
+	// naive-UTC occurred_at strings are shown in the browser's local timezone
+	// (kammerz-j7s). `day.day` is already a LOCAL calendar day (from groupActivity).
+	const formatDay = formatLocalDayLabel;
+	const formatTime = formatLocalTime;
 
 	/** Whether this event type represents a dev record that still exists (clickable). */
 	function isDevClickable(eventType: RollEvent['event_type']): boolean {
