@@ -1,4 +1,5 @@
 import type { RollEvent } from '$lib/types';
+import { localDay } from '$lib/utils/datetime';
 
 /** A rendered journal row: either a single event, or a per-day rollup of shot events. */
 export type ActivityRow =
@@ -6,15 +7,20 @@ export type ActivityRow =
 	| { kind: 'shots'; day: string; count: number; latest: RollEvent };
 
 export interface ActivityDay {
-	day: string; // YYYY-MM-DD (from occurred_at)
+	day: string; // YYYY-MM-DD (the event's LOCAL calendar day)
 	rows: ActivityRow[];
 }
 
 const SHOT_TYPES = new Set(['shot_logged', 'shot_edited', 'shot_deleted']);
 
-/** The calendar day of an event (occurred_at is "YYYY-MM-DD HH:MM:SS"). */
+/**
+ * The LOCAL calendar day of an event. `occurred_at` is a naive-UTC
+ * "YYYY-MM-DD HH:MM:SS" string, so we convert to the browser's local day —
+ * otherwise an event just after UTC midnight buckets under the wrong day for
+ * users behind UTC (kammerz-j7s).
+ */
 function dayOf(e: RollEvent): string {
-	return e.occurred_at.slice(0, 10);
+	return localDay(e.occurred_at);
 }
 
 /**
