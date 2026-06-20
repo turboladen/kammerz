@@ -1,21 +1,22 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import Input from '$lib/components/ui/Input.svelte';
-	import Select from '$lib/components/ui/Select.svelte';
-	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import DateInput from '$lib/components/ui/DateInput.svelte';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+	import RollRow from '$lib/components/rolls/RollRow.svelte';
+	import QuickAddBar from '$lib/components/rolls/QuickAddBar.svelte';
+	import FrameStrip from '$lib/components/rolls/FrameStrip.svelte';
+	import { Film } from 'lucide-svelte';
 	import { listRolls, updateRoll } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import { listLenses } from '$lib/api/lenses';
-	import { listShotsForRoll, suggestNextFrame } from '$lib/api/shots';
+	import { listLensMounts } from '$lib/api/lens-mounts';
+	import { listShotsForRoll } from '$lib/api/shots';
 	import { logShot } from '$lib/utils/shot-entry';
 	import { buildLensOptions, lensDisplayName } from '$lib/utils/lens';
-	import { listLensMounts } from '$lib/api/lens-mounts';
-	import { getStatusLabel } from '$lib/utils/status';
+	import { buildFrameCells, nextExtraFrameNumber } from '$lib/utils/frames';
 	import { todayLocal, dateFieldError } from '$lib/utils/date';
 	import type { RollWithDetails, Camera, Lens, LensMount, Shot } from '$lib/types';
 
@@ -26,40 +27,23 @@
 	let selectedRollId = $state('');
 	let shots: Shot[] = $state([]);
 	let loading = $state(true);
-	let saving = $state(false);
 	let error = $state('');
-	let successMessage = $state('');
 	let sessionCount = $state(0);
-	let lastSavedFrame = $state('');
 
-	// Form fields
-	let frameNumber = $state('');
-	let aperture = $state('');
-	let shutterSpeed = $state('');
-	let selectedLensId = $state('');
-	let notes = $state('');
+	// QuickAddBar save state
+	let quickSaving = $state(false);
+	let quickError = $state('');
 
-	// Active rolls (loaded/shooting/shot) first, then others
+	// When set (via a FrameStrip click on an open slot or the "+" extra button), the
+	// QuickAddBar logs THIS frame instead of the sequential next one. Cleared after a
+	// successful save so logging returns to sequential.
+	let jumpFrame = $state('');
+
+	// Active rolls only — the ones you'd realistically log frames against.
 	const activeStatuses = ['loaded', 'shooting', 'shot'];
-	const rollOptions = $derived.by(() => {
-		const active = rolls.filter((r) => activeStatuses.includes(r.status));
-		const other = rolls.filter((r) => !activeStatuses.includes(r.status));
-		const options: { value: string; label: string; disabled?: boolean }[] = [{ value: '', label: 'Select a roll...' }];
-		for (const r of active) {
-			const filmInfo = r.film_stock_brand ? ` — ${r.film_stock_brand} ${r.film_stock_name}` : '';
-			options.push({ value: String(r.id), label: `${r.roll_id}${filmInfo} (${getStatusLabel(r.status)})` });
-		}
-		if (other.length > 0 && active.length > 0) {
-			options.push({ value: '__divider__', label: '── Other rolls ──', disabled: true });
-		}
-		for (const r of other) {
-			const filmInfo = r.film_stock_brand ? ` — ${r.film_stock_brand} ${r.film_stock_name}` : '';
-			options.push({ value: String(r.id), label: `${r.roll_id}${filmInfo} (${getStatusLabel(r.status)})` });
-		}
-		return options;
-	});
+	const activeRolls = $derived(rolls.filter((r) => activeStatuses.includes(r.status)));
 
-	const selectedRoll = $derived(rolls.find((r) => String(r.id) === selectedRollId));
+	const selectedRoll = $derived(rolls.find((r) => String(r.id) === selectedRollId) ?? null);
 
 	const selectedCamera = $derived(
 		selectedRoll?.camera_id ? (cameras.find((c) => c.id === selectedRoll.camera_id) ?? null) : null
@@ -76,21 +60,27 @@
 
 	const lensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens selected', lensMounts));
 
-	// Frame progress for selected roll
+	// Smart lens default: fixed > roll default > camera default (QuickAddBar seeds from this).
+	const quickDefaultLensId = $derived.by(() => {
+		if (fixedLens) return String(fixedLens.id);
+		if (selectedRoll?.lens_id) return String(selectedRoll.lens_id);
+		if (selectedCamera?.default_lens_id) return String(selectedCamera.default_lens_id);
+		return '';
+	});
+
+	const frameCells = $derived(selectedRoll ? buildFrameCells(shots, selectedRoll.frame_count) : []);
+	const nextFrameNumber = $derived(frameCells.find((c) => c.isNext)?.frameNumber ?? '');
+	const frameToLog = $derived(jumpFrame || nextFrameNumber);
+
+	// Frame progress for the roll-full nudge.
 	const frameInfo = $derived.by(() => {
 		if (!selectedRoll) return null;
 		const total = selectedRoll.frame_count;
-		if (!total) return { current: shots.length, total: null };
-		return { current: shots.length, total };
+		return { current: shots.length, total: total ?? null };
 	});
 
 	// Roll-full nudge state
 	let rollFullDismissed = $state(false);
-
-	// Finish date shown in the roll-complete nudge — written as date_finished when the
-	// roll is marked Shot, so the Timeline's "Finished shooting" milestone isn't left
-	// blank (kammerz-fis). Seeded per-roll in loadRollData: an already-set date_finished,
-	// else today.
 	let finishDate = $state(todayLocal());
 	const finishDateError = $derived(dateFieldError(finishDate));
 
@@ -137,90 +127,61 @@
 		error = '';
 		try {
 			shots = await listShotsForRoll(rollId);
-
-			// Seed the finish-date nudge: an already-recorded date_finished wins, else today.
-			// (Mirrors the roll-detail nudge; quick-entry shots carry no per-shot date.)
 			const roll = rolls.find((r) => r.id === rollId);
 			finishDate = roll?.date_finished ?? todayLocal();
-
-			// Suggest next frame
-			try {
-				frameNumber = await suggestNextFrame(rollId);
-			} catch {
-				frameNumber = '';
-			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
 	}
 
-	async function handleSave() {
-		if (!selectedRollId || !frameNumber.trim()) {
-			error = 'Please select a roll and enter a frame number.';
-			return;
-		}
-		error = '';
-		saving = true;
+	async function handleQuickAdd(entry: {
+		frameNumber: string;
+		aperture: string;
+		shutterSpeed: string;
+		lensId: string;
+		date: string;
+		location: string;
+		notes: string;
+	}) {
+		if (!selectedRoll || !entry.frameNumber.trim()) return;
+		quickError = '';
+		quickSaving = true;
 		try {
-			const nextFrame = await logShot({
-				rollId: Number(selectedRollId),
-				frameNumber,
-				aperture,
-				shutterSpeed,
-				lensId: selectedLensId,
-				notes
-			});
+			await logShot({ rollId: selectedRoll.id, ...entry });
 			sessionCount++;
-			lastSavedFrame = frameNumber.trim();
-			successMessage = `Frame ${frameNumber} saved`;
-			setTimeout(() => (successMessage = ''), 2000);
-			[shots, rolls] = await Promise.all([listShotsForRoll(Number(selectedRollId)), listRolls()]);
-			aperture = '';
-			shutterSpeed = '';
-			notes = '';
-			frameNumber = nextFrame;
-			setTimeout(() => {
-				document.querySelector<HTMLInputElement>('[data-field="aperture"]')?.focus();
-			}, 50);
+			jumpFrame = '';
+			[shots, rolls] = await Promise.all([listShotsForRoll(selectedRoll.id), listRolls()]);
 		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
+			quickError = err instanceof Error ? err.message : String(err);
 		} finally {
-			saving = false;
+			quickSaving = false;
 		}
 	}
 
-	function handleKeydown(e: KeyboardEvent) {
-		if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-			e.preventDefault();
-			handleSave();
-		}
+	// FrameStrip: open slot → target it next; filled frame → no-op (edit on roll page).
+	function handleFrameSelect(frameNumber: string, shot: Shot | null) {
+		if (shot === null) jumpFrame = frameNumber;
 	}
 
-	// When roll changes, reload data and auto-populate lens.
-	// Only selectedRollId is tracked — rolls/cameras reads are untracked so the
-	// rolls refetch in handleSave doesn't re-run this effect and clobber a
-	// manually selected lens or duplicate loadRollData fetches (kammerz-cpp).
+	function handleAddExtra() {
+		if (selectedRoll) jumpFrame = nextExtraFrameNumber(shots, selectedRoll.frame_count);
+	}
+
+	function changeRoll() {
+		selectedRollId = '';
+	}
+
+	// Load a roll's shots when the selection changes. Only selectedRollId is tracked;
+	// loadRollData's reactive reads happen after its first await, so this never loops.
 	$effect(() => {
 		if (selectedRollId) {
 			rollFullDismissed = false;
+			jumpFrame = '';
 			loadRollData(Number(selectedRollId));
-			untrack(() => {
-				const roll = rolls.find((r) => String(r.id) === selectedRollId);
-				const camera = roll?.camera_id ? (cameras.find((c) => c.id === roll.camera_id) ?? null) : null;
-				if (roll?.lens_id) {
-					selectedLensId = String(roll.lens_id);
-				} else if (camera?.default_lens_id) {
-					selectedLensId = String(camera.default_lens_id);
-				} else {
-					// No applicable default — clear so a lens from a previous
-					// roll (possibly a different camera system) can't carry over
-					selectedLensId = '';
-				}
-			});
 		} else {
 			shots = [];
-			frameNumber = '';
-			selectedLensId = '';
+			quickError = '';
+			error = '';
 		}
 	});
 
@@ -229,51 +190,45 @@
 	});
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
 <PageHeader title="Quick Entry" description="Rapid shot logging — one frame at a time" />
 
 <div class="p-6">
 	{#if loading}
 		<p class="text-sm text-text-muted">Loading...</p>
 	{:else}
-		<!-- Roll Selector -->
-		<div class="mb-5">
-			<Select label="Roll" bind:value={selectedRollId} options={rollOptions} />
-		</div>
+		{#if error}
+			<div class="mb-4 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+		{/if}
 
-		{#if selectedRoll}
-			<!-- Roll Info Bar -->
-			<FadeIn>
-				<div
-					class="mb-5 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface-raised px-4 py-2.5 text-sm text-text-muted"
-				>
-					{#if selectedRoll.camera_brand}
-						<span>{selectedRoll.camera_brand} {selectedRoll.camera_model}</span>
-						<span class="text-text-faint">&middot;</span>
-					{/if}
-					{#if selectedRoll.film_stock_brand}
-						<span>{selectedRoll.film_stock_brand} {selectedRoll.film_stock_name}</span>
-					{/if}
-					{#if selectedRoll.film_stock_iso}
-						<span class="text-text-faint">ISO {selectedRoll.film_stock_iso}</span>
-					{/if}
-					{#if frameInfo}
-						<span class="text-text-faint">&middot;</span>
-						<span class="text-text-faint">
-							{frameInfo.current}{frameInfo.total ? `/${frameInfo.total}` : ''} frames
-						</span>
-						{#if frameInfo.total}
-							<div class="h-1.5 w-20 overflow-hidden rounded-full bg-surface-overlay">
-								<div
-									class="h-full rounded-full bg-accent transition-all duration-300"
-									style="width: {Math.min((frameInfo.current / frameInfo.total) * 100, 100)}%"
-								></div>
-							</div>
-						{/if}
-					{/if}
+		{#if !selectedRoll}
+			<!-- Roll picker: visual list of active rolls -->
+			<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+				Active rolls
+				<div class="flex-1 border-b border-border-subtle"></div>
+			</h2>
+			{#if activeRolls.length === 0}
+				<EmptyState title="No active rolls" message="Load a roll to start logging shots.">
+					{#snippet icon()}<Film size={24} strokeWidth={1.5} />{/snippet}
+					<Button variant="primary" href="/rolls/new">+ New Roll</Button>
+				</EmptyState>
+			{:else}
+				<div class="grid gap-1.5">
+					{#each activeRolls as roll, i (roll.id)}
+						<FadeIn delay={Math.min(i, 10) * 30}>
+							<RollRow {roll} onclick={() => (selectedRollId = String(roll.id))} />
+						</FadeIn>
+					{/each}
 				</div>
-			</FadeIn>
+			{/if}
+		{:else}
+			<!-- Collapsed selected roll + Change -->
+			<div class="mb-5">
+				<RollRow roll={selectedRoll} selected>
+					{#snippet trailing()}
+						<Button size="sm" variant="ghost" onclick={changeRoll}>Change</Button>
+					{/snippet}
+				</RollRow>
+			</div>
 
 			{#if showRollFullNudge}
 				<FadeIn delay={50}>
@@ -302,7 +257,7 @@
 								onclick={() => {
 									rollFullDismissed = true;
 								}}
-								class="text-accent/60 hover:text-accent transition-colors text-lg leading-none px-1"
+								class="px-1 text-lg leading-none text-accent/60 transition-colors hover:text-accent"
 								aria-label="Dismiss">&times;</button
 							>
 						</div>
@@ -310,89 +265,26 @@
 				</FadeIn>
 			{/if}
 
-			<!-- Entry Form -->
+			<!-- Entry bar + film strip -->
 			<FadeIn delay={50}>
-				<div class="mb-6 rounded-lg border border-border bg-surface-raised p-5">
-					<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-						<Input label="Frame" bind:value={frameNumber} placeholder="1" required />
-						<Input label="f/" bind:value={aperture} placeholder="5.6" data-field="aperture" />
-						<Input label="Speed" bind:value={shutterSpeed} placeholder="1/125" />
-						{#if isFixedLens && fixedLens}
-							<div>
-								<span class="mb-1.5 block text-xs font-medium text-text-muted">Lens</span>
-								<div class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted truncate">
-									{lensDisplayName(fixedLens)} <span class="text-text-faint">(fixed)</span>
-								</div>
-							</div>
-						{:else}
-							<Select label="Lens" bind:value={selectedLensId} options={lensOptions} />
-						{/if}
-					</div>
-					<div class="mt-3">
-						<Textarea label="Notes" bind:value={notes} placeholder="Optional notes..." />
-					</div>
-
-					{#if error}
-						<div class="mt-3 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
-					{/if}
-
-					{#if successMessage}
-						{#key successMessage}
-							<div class="mt-3 animate-success-flash rounded-lg bg-green-500/15 px-3 py-2 text-sm text-green-400">
-								{successMessage}
-							</div>
-						{/key}
-					{/if}
-
-					<div class="mt-4 flex items-center justify-between">
-						<div class="flex items-center gap-3">
-							<span class="text-xs text-text-faint">
-								{navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+Enter to save
-							</span>
-							{#if sessionCount > 0}
-								<span class="font-mono text-xs text-text-faint">{sessionCount} this session</span>
-							{/if}
-						</div>
-						<Button variant="primary" onclick={handleSave} disabled={saving || !frameNumber.trim()}>
-							{saving ? 'Saving...' : 'Save & Next →'}
-						</Button>
-					</div>
+				<div class="space-y-2">
+					<QuickAddBar
+						frameNumber={frameToLog}
+						{lensOptions}
+						lensId={quickDefaultLensId}
+						{isFixedLens}
+						fixedLensLabel={fixedLens ? lensDisplayName(fixedLens) : ''}
+						saving={quickSaving}
+						error={quickError}
+						onsave={handleQuickAdd}
+					/>
+					<FrameStrip frames={frameCells} onselect={handleFrameSelect} onaddextra={handleAddExtra} />
 				</div>
 			</FadeIn>
 
-			<!-- Recent Shots -->
-			{#if shots.length > 0}
-				<div>
-					<h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-text-faint">Previous Shots</h2>
-					<div class="space-y-1">
-						{#each [...shots].reverse().slice(0, 10) as shot, i}
-							<div
-								class="flex items-center gap-3 rounded px-3 py-1.5 text-sm text-text-muted {i === 0 &&
-								shot.frame_number === lastSavedFrame
-									? 'animate-fade-in-up'
-									: ''}"
-							>
-								<span
-									class="inline-flex h-5 min-w-5 items-center justify-center rounded bg-accent/10 px-1 font-mono text-xs text-accent"
-								>
-									{shot.frame_number}
-								</span>
-								{#if shot.aperture}
-									<span>f/{shot.aperture}</span>
-								{/if}
-								{#if shot.shutter_speed}
-									<span>{shot.shutter_speed}</span>
-								{/if}
-								{#if shot.notes}
-									<span class="text-text-faint">{shot.notes}</span>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				</div>
+			{#if sessionCount > 0}
+				<p class="mt-3 font-mono text-xs text-text-faint">{sessionCount} this session</p>
 			{/if}
-		{:else}
-			<p class="text-sm text-text-faint">Select a roll to start logging shots.</p>
 		{/if}
 	{/if}
 </div>

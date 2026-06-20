@@ -1,14 +1,12 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import Badge from '$lib/components/ui/Badge.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
-	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
 	import FilmLeader from '$lib/components/ui/FilmLeader.svelte';
-	import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
 	import ListToolbar from '$lib/components/ui/ListToolbar.svelte';
 	import GroupHeader from '$lib/components/ui/GroupHeader.svelte';
+	import RollRow from '$lib/components/rolls/RollRow.svelte';
 	import { Film } from 'lucide-svelte';
 	import { listRolls } from '$lib/api/rolls';
 	import { filterBySearch, groupItems, sortByString, sortByDate } from '$lib/utils/list';
@@ -182,39 +180,11 @@
 			<div class="mb-4 grid gap-1.5">
 				{#each groupRolls as roll, i}
 					<FadeIn delay={Math.min(i, 10) * 30}>
-						<a
-							href="/rolls/{roll.id}"
-							class="group relative flex items-center gap-x-3 overflow-hidden rounded-lg border border-border bg-surface-raised py-2.5 pl-5 pr-4 transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
-						>
-							<FilmStrip orientation="vertical" />
-							<span class="shrink-0 font-mono text-sm font-semibold">{roll.roll_id}</span>
-							<Badge status={roll.status} />
-							<!-- Ledger metadata: flows left-to-right with dot separators, wraps gracefully. -->
-							<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-								{#if roll.camera_brand}
-									<span class="text-sm text-text-muted">{roll.camera_brand} {roll.camera_model}</span>
-								{:else}
-									<span class="text-sm italic text-text-faint">No camera</span>
-								{/if}
-								{#if roll.film_stock_brand}
-									<span class="text-xs text-text-faint" aria-hidden="true">&middot;</span>
-									<span class="text-xs text-text-faint">{roll.film_stock_brand} {roll.film_stock_name}</span>
-								{/if}
-								{#if roll.lens_brand}
-									<span class="text-xs text-text-faint" aria-hidden="true">&middot;</span>
-									<span class="text-xs text-text-faint">{roll.lens_brand} {roll.lens_name}</span>
-								{/if}
-								{#if roll.date_loaded}
-									<span class="text-xs text-text-faint" aria-hidden="true">&middot;</span>
-									<span class="font-mono text-xs text-text-faint">{roll.date_loaded}</span>
-								{/if}
-							</div>
-							<!-- Right-anchored: the frame counter is the only right element (no mid-row void). -->
-							<div class="ml-auto flex shrink-0 items-center gap-2.5">
-								<FrameCounter current={roll.shot_count} total={roll.frame_count} />
+						<RollRow {roll} href="/rolls/{roll.id}">
+							{#snippet trailing()}
 								<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
-							</div>
-						</a>
+							{/snippet}
+						</RollRow>
 					</FadeIn>
 				{/each}
 			</div>
