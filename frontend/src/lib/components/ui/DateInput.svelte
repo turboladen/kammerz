@@ -17,7 +17,9 @@
 		// Trim first so the live-error display matches dateFieldError (the documented
 		// source of truth, which trims) and the Save/Confirm gates — otherwise a
 		// surrounding space shows an error here while the gate stays satisfied.
-		const v = value.trim();
+		// `?? ''` keeps the prior undefined-tolerance: the bindable default only
+		// applies to an absent prop, not a parent explicitly binding `undefined`.
+		const v = (value ?? '').trim();
 		if (!v) return '';
 		// Complete pattern → defer to the shared validator (same rule the
 		// Save/Confirm gates and the backend enforce).
