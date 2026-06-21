@@ -281,6 +281,12 @@ async fn update_roll_sets_and_clears_all_lifecycle_dates() {
     assert_eq!(roll["date_scanned"], "2021-12-20");
     assert_eq!(roll["date_post_processed"], "2021-12-22");
     assert_eq!(roll["date_archived"], "2022-01-05");
+    // The Edit form sends no `status`, so setting these dates must NOT trigger any
+    // status auto-sync — the roll stays exactly where it was (kammerz-02q).
+    assert_eq!(
+        roll["status"], "loaded",
+        "editing lifecycle dates leaves status untouched (no auto-sync)"
+    );
 
     // Clearing one date with an explicit null persists as null and leaves siblings intact.
     let clear = json!({ "date_scanned": null });

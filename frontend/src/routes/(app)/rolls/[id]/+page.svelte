@@ -786,7 +786,7 @@
 			return;
 		}
 		if (hasEditDateError) {
-			error = 'Fix the highlighted dates (use YYYY-MM-DD).';
+			error = 'Fix the highlighted dates.';
 			return;
 		}
 		try {
@@ -803,11 +803,11 @@
 				date_fuzzy: editDateFuzzy || null,
 				push_pull: (editPushPull || null) as PushPull | null,
 				notes: editNotes || null,
-				date_loaded: editDateLoaded || null,
-				date_finished: editDateFinished || null,
-				date_scanned: editDateScanned || null,
-				date_post_processed: editDatePostProcessed || null,
-				date_archived: editDateArchived || null
+				date_loaded: editDateLoaded.trim() || null,
+				date_finished: editDateFinished.trim() || null,
+				date_scanned: editDateScanned.trim() || null,
+				date_post_processed: editDatePostProcessed.trim() || null,
+				date_archived: editDateArchived.trim() || null
 			});
 			editingRoll = false;
 			await loadRollData('roll-edit');
@@ -953,7 +953,10 @@
 							<Input label="Fuzzy Date" bind:value={editDateFuzzy} placeholder="e.g. 'early October 2025'" />
 						</div>
 						<div class="space-y-2">
-							<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Lifecycle dates</span>
+							<div class="flex items-center gap-3">
+								<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Lifecycle dates</span>
+								<div class="flex-1 border-b border-border-subtle"></div>
+							</div>
 							<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 								<DateInput label="Loaded" bind:value={editDateLoaded} />
 								<DateInput label="Finished shooting" bind:value={editDateFinished} />
