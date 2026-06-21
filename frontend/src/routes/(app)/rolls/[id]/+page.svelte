@@ -95,6 +95,11 @@
 	let editDateFuzzy = $state('');
 	let editPushPull = $state('');
 	let editNotes = $state('');
+	let editDateLoaded = $state('');
+	let editDateFinished = $state('');
+	let editDateScanned = $state('');
+	let editDatePostProcessed = $state('');
+	let editDateArchived = $state('');
 
 	// Shot state
 	let shots: Shot[] = $state([]);
@@ -115,6 +120,15 @@
 	let shotLensId = $state('');
 	let shotError = $state('');
 	const shotDateError = $derived(dateFieldError(shotDate));
+	const hasEditDateError = $derived(
+		!!(
+			dateFieldError(editDateLoaded) ||
+			dateFieldError(editDateFinished) ||
+			dateFieldError(editDateScanned) ||
+			dateFieldError(editDatePostProcessed) ||
+			dateFieldError(editDateArchived)
+		)
+	);
 
 	// Development state (shared with DevelopmentSection component)
 	let labs: Lab[] = $state([]);
@@ -745,6 +759,11 @@
 		editDateFuzzy = roll.date_fuzzy ?? '';
 		editPushPull = roll.push_pull ?? '';
 		editNotes = roll.notes ?? '';
+		editDateLoaded = roll.date_loaded ?? '';
+		editDateFinished = roll.date_finished ?? '';
+		editDateScanned = roll.date_scanned ?? '';
+		editDatePostProcessed = roll.date_post_processed ?? '';
+		editDateArchived = roll.date_archived ?? '';
 		editingRoll = true;
 	}
 
@@ -766,6 +785,10 @@
 			error = 'Roll ID is required.';
 			return;
 		}
+		if (hasEditDateError) {
+			error = 'Fix the highlighted dates.';
+			return;
+		}
 		try {
 			// For fixed-lens cameras the lens Select is hidden and replaced by a
 			// read-only display of the built-in lens — persist that lens, never a
@@ -779,7 +802,12 @@
 				frame_count: editFrameCount ? parseInt(editFrameCount) : null,
 				date_fuzzy: editDateFuzzy || null,
 				push_pull: (editPushPull || null) as PushPull | null,
-				notes: editNotes || null
+				notes: editNotes || null,
+				date_loaded: editDateLoaded.trim() || null,
+				date_finished: editDateFinished.trim() || null,
+				date_scanned: editDateScanned.trim() || null,
+				date_post_processed: editDatePostProcessed.trim() || null,
+				date_archived: editDateArchived.trim() || null
 			});
 			editingRoll = false;
 			await loadRollData('roll-edit');
@@ -924,6 +952,19 @@
 							<Select label="Push/Pull" bind:value={editPushPull} options={pushPullOptions} />
 							<Input label="Fuzzy Date" bind:value={editDateFuzzy} placeholder="e.g. 'early October 2025'" />
 						</div>
+						<div class="space-y-2">
+							<div class="flex items-center gap-3">
+								<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Lifecycle dates</span>
+								<div class="flex-1 border-b border-border-subtle"></div>
+							</div>
+							<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+								<DateInput label="Loaded" bind:value={editDateLoaded} />
+								<DateInput label="Finished shooting" bind:value={editDateFinished} />
+								<DateInput label="Scanned" bind:value={editDateScanned} />
+								<DateInput label="Post-processed" bind:value={editDatePostProcessed} />
+								<DateInput label="Archived" bind:value={editDateArchived} />
+							</div>
+						</div>
 						<Textarea label="Notes" bind:value={editNotes} placeholder="Any notes about this roll..." />
 						<div class="flex justify-end gap-2 pt-1">
 							<Button
@@ -932,7 +973,7 @@
 									editingRoll = false;
 								}}>Cancel</Button
 							>
-							<Button variant="primary" onclick={saveEditRoll}>Save</Button>
+							<Button variant="primary" disabled={hasEditDateError} onclick={saveEditRoll}>Save</Button>
 						</div>
 					</div>
 				{:else}

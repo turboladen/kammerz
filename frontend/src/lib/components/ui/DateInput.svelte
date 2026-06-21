@@ -14,12 +14,18 @@
 	const typingPattern = /^(\d{0,4}|\d{4}-\d{0,2}|\d{4}-\d{2}-\d{0,2})$/;
 
 	const validationError = $derived.by(() => {
-		if (!value) return '';
+		// Trim first so the live-error display matches dateFieldError (the documented
+		// source of truth, which trims) and the Save/Confirm gates — otherwise a
+		// surrounding space shows an error here while the gate stays satisfied.
+		// `?? ''` keeps the prior undefined-tolerance: the bindable default only
+		// applies to an absent prop, not a parent explicitly binding `undefined`.
+		const v = (value ?? '').trim();
+		if (!v) return '';
 		// Complete pattern → defer to the shared validator (same rule the
 		// Save/Confirm gates and the backend enforce).
-		if (/^(\d{4})(-\d{2}(-\d{2})?)?$/.test(value)) return dateFieldError(value);
+		if (/^(\d{4})(-\d{2}(-\d{2})?)?$/.test(v)) return dateFieldError(v);
 		// If they're still typing, don't nag yet
-		if (typingPattern.test(value)) return '';
+		if (typingPattern.test(v)) return '';
 		return 'Use YYYY, YYYY-MM, or YYYY-MM-DD';
 	});
 
