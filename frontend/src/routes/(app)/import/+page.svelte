@@ -340,6 +340,7 @@
 					shutter_speed: s.shutter_speed || null,
 					date: s.date || null,
 					date_fuzzy: null,
+					time: null,
 					location: s.location || null,
 					notes: s.notes || null,
 					lens_ids: null

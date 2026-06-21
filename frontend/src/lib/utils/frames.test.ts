@@ -11,6 +11,7 @@ function shot(frame_number: string, over: Partial<Shot> = {}): Shot {
 		shutter_speed: null,
 		date: null,
 		date_fuzzy: null,
+		time: null,
 		location: null,
 		gps_lat: null,
 		gps_lon: null,

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Select from '$lib/components/ui/Select.svelte';
 	import DateInput from '$lib/components/ui/DateInput.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import { ChevronDown, ChevronUp } from 'lucide-svelte';
@@ -11,6 +12,7 @@
 		shutterSpeed: string;
 		lensId: string;
 		date: string;
+		time: string;
 		location: string;
 		notes: string;
 	}
@@ -41,6 +43,7 @@
 	let aperture = $state('');
 	let shutterSpeed = $state('');
 	let date = $state('');
+	let time = $state('');
 	let location = $state('');
 	let notes = $state('');
 	let showMore = $state(false);
@@ -60,6 +63,7 @@
 			shutterSpeed,
 			lensId: isFixedLens ? lensIdProp : localLensId,
 			date,
+			time,
 			location,
 			notes
 		});
@@ -67,7 +71,7 @@
 		aperture = '';
 		shutterSpeed = '';
 		notes = '';
-		// Keep: date, location, lens (session defaults)
+		// Keep: date, time, location, lens (session defaults)
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -145,7 +149,7 @@
 		<!-- More / less toggle -->
 		<button
 			onclick={() => (showMore = !showMore)}
-			title={showMore ? 'Hide date, location, and notes' : 'Show date, location, and notes'}
+			title={showMore ? 'Hide date, time, location, and notes' : 'Show date, time, location, and notes'}
 			aria-label={showMore ? 'Hide extra fields' : 'Show extra fields'}
 			aria-expanded={showMore}
 			class="flex h-[38px] items-center gap-1 rounded-lg border border-border px-2.5 text-xs text-text-muted transition-colors hover:bg-surface-overlay hover:text-text"
@@ -159,10 +163,11 @@
 		</button>
 	</div>
 
-	<!-- Expanded fields: date / location / notes -->
+	<!-- Expanded fields: date / time / location / notes -->
 	{#if showMore}
 		<div class="mt-3 grid grid-cols-1 gap-3 border-t border-border-subtle pt-3 sm:grid-cols-3">
 			<DateInput label="Date" bind:value={date} />
+			<Input type="time" label="Time" class="h-[38px]" bind:value={time} />
 			<div class="flex flex-col gap-1">
 				<label for="qab-location" class="text-xs font-medium text-text-muted">Location</label>
 				<input
