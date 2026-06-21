@@ -242,6 +242,68 @@ async fn update_roll_applies_partial_patch() {
     );
 }
 
+// Back-filling historical rolls (kammerz-02q): the roll Edit form sends all five
+// roll-owned lifecycle dates in one PUT and clears any of them with an explicit
+// null. This guards that round-trip + the null-clear, including date_loaded being
+// editable AFTER creation (it's only settable at create-time via the new-roll form).
+#[tokio::test]
+async fn update_roll_sets_and_clears_all_lifecycle_dates() {
+    let app = open_app().await;
+    let id = create_roll(&app, "UPD-DATES").await;
+
+    // Set every roll-owned lifecycle date in one patch (the Edit form's shape).
+    // date_loaded is overwritten from its create-time value to prove it's editable.
+    let payload = json!({
+        "date_loaded": "2021-09-03",
+        "date_finished": "2021-09-20",
+        "date_scanned": "2021-12-20",
+        "date_post_processed": "2021-12-22",
+        "date_archived": "2022-01-05"
+    });
+    let res = app
+        .clone()
+        .oneshot(put_json(&format!("/api/rolls/{id}"), &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/rolls/{id}")))
+        .await
+        .unwrap();
+    let roll: Value = json_body(res).await;
+    assert_eq!(
+        roll["date_loaded"], "2021-09-03",
+        "date_loaded editable post-create"
+    );
+    assert_eq!(roll["date_finished"], "2021-09-20");
+    assert_eq!(roll["date_scanned"], "2021-12-20");
+    assert_eq!(roll["date_post_processed"], "2021-12-22");
+    assert_eq!(roll["date_archived"], "2022-01-05");
+
+    // Clearing one date with an explicit null persists as null and leaves siblings intact.
+    let clear = json!({ "date_scanned": null });
+    let res = app
+        .clone()
+        .oneshot(put_json(&format!("/api/rolls/{id}"), &clear))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    let res = app.oneshot(get(&format!("/api/rolls/{id}"))).await.unwrap();
+    let roll: Value = json_body(res).await;
+    assert!(
+        roll["date_scanned"].is_null(),
+        "explicit null clears the date"
+    );
+    assert_eq!(
+        roll["date_post_processed"], "2021-12-22",
+        "sibling dates untouched by the null-clear"
+    );
+    assert_eq!(roll["date_archived"], "2022-01-05");
+}
+
 #[tokio::test]
 async fn update_missing_roll_is_404() {
     let app = open_app().await;
