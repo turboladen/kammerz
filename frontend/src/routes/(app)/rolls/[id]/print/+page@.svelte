@@ -194,12 +194,6 @@
 						<dd class="font-mono">{roll.date_archived}</dd>
 					</div>
 				{/if}
-				{#if roll.date_fuzzy}
-					<div>
-						<dt class="text-text-faint">Approx. date</dt>
-						<dd>{roll.date_fuzzy}</dd>
-					</div>
-				{/if}
 				{#if totalCost != null}
 					<div>
 						<dt class="text-text-faint">Cost</dt>

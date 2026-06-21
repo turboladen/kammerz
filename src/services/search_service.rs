@@ -190,7 +190,6 @@ impl SearchService {
                 CASE
                     WHEN r.roll_id LIKE $1 THEN 'roll ID'
                     WHEN r.status LIKE $1 THEN 'status'
-                    WHEN r.date_fuzzy LIKE $1 THEN 'date note'
                     WHEN r.push_pull LIKE $1 THEN 'push/pull'
                     WHEN r.notes LIKE $1 THEN 'notes'
                     ELSE 'unknown'
@@ -198,7 +197,6 @@ impl SearchService {
                 CASE
                     WHEN r.roll_id LIKE $1 THEN r.roll_id
                     WHEN r.status LIKE $1 THEN r.status
-                    WHEN r.date_fuzzy LIKE $1 THEN COALESCE(r.date_fuzzy, '')
                     WHEN r.push_pull LIKE $1 THEN COALESCE(r.push_pull, '')
                     WHEN r.notes LIKE $1 THEN COALESCE(r.notes, '')
                     ELSE ''
@@ -206,7 +204,7 @@ impl SearchService {
             FROM rolls r
             LEFT JOIN cameras c ON r.camera_id = c.id
             LEFT JOIN film_stocks fs ON r.film_stock_id = fs.id
-            WHERE r.roll_id LIKE $1 OR r.status LIKE $1 OR r.date_fuzzy LIKE $1
+            WHERE r.roll_id LIKE $1 OR r.status LIKE $1
                 OR r.push_pull LIKE $1 OR r.notes LIKE $1
             LIMIT 20"#,
             [pattern.clone().into()],

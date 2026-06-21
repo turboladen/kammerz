@@ -34,7 +34,6 @@ pub struct RollWithDetails {
     pub date_scanned: Option<String>,
     pub date_post_processed: Option<String>,
     pub date_archived: Option<String>,
-    pub date_fuzzy: Option<String>,
     pub push_pull: Option<PushPull>,
     pub notes: Option<String>,
     pub created_at: String,
@@ -56,7 +55,7 @@ pub struct RollWithDetails {
 const ROLLS_WITH_DETAILS_SQL: &str = "\
     SELECT r.id, r.roll_id, r.camera_id, r.film_stock_id, r.lens_id, r.status, \
            r.frame_count, r.date_loaded, r.date_finished, \
-           r.date_scanned, r.date_post_processed, r.date_archived, r.date_fuzzy, \
+           r.date_scanned, r.date_post_processed, r.date_archived, \
            r.push_pull, r.notes, r.created_at, r.updated_at, \
            c.brand AS camera_brand, c.model AS camera_model, \
            fs.brand AS film_stock_brand, fs.name AS film_stock_name, \
@@ -75,7 +74,6 @@ pub struct ImportShotEntry {
     pub aperture: Option<String>,
     pub shutter_speed: Option<String>,
     pub date: Option<String>,
-    pub date_fuzzy: Option<String>,
     pub time: Option<String>,
     pub location: Option<String>,
     pub notes: Option<String>,
@@ -211,7 +209,6 @@ impl RollService {
                             aperture: Set(entry.aperture),
                             shutter_speed: Set(entry.shutter_speed),
                             date: Set(entry.date),
-                            date_fuzzy: Set(entry.date_fuzzy),
                             time: Set(entry.time),
                             location: Set(entry.location),
                             notes: Set(entry.notes),

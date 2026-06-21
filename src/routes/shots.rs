@@ -32,7 +32,6 @@ pub struct CreateShotDto {
     pub aperture: Option<String>,
     pub shutter_speed: Option<String>,
     pub date: Option<String>,
-    pub date_fuzzy: Option<String>,
     pub time: Option<String>,
     pub location: Option<String>,
     pub gps_lat: Option<f64>,
@@ -51,8 +50,6 @@ pub struct UpdateShotDto {
     pub shutter_speed: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
     pub date: Option<Option<String>>,
-    #[serde(deserialize_with = "double_option")]
-    pub date_fuzzy: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
     pub time: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
@@ -121,7 +118,6 @@ async fn create(
                     aperture: trim_opt(data.aperture),
                     shutter_speed: trim_opt(data.shutter_speed),
                     date: trim_opt(data.date),
-                    date_fuzzy: trim_opt(data.date_fuzzy),
                     time: trim_opt(data.time),
                     location: trim_opt(data.location),
                     gps_lat: Set(data.gps_lat),
@@ -213,9 +209,6 @@ async fn update(
             }
             if let Some(v) = data.date {
                 model.date = trim_opt(v);
-            }
-            if let Some(v) = data.date_fuzzy {
-                model.date_fuzzy = trim_opt(v);
             }
             if let Some(v) = data.time {
                 model.time = trim_opt(v);
