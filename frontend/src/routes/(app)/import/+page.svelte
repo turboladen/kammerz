@@ -331,7 +331,6 @@
 				frame_count: frameCount ? parseInt(frameCount) : null,
 				date_loaded: dateLoaded || null,
 				date_finished: dateFinished || null,
-				date_fuzzy: null,
 				push_pull: null,
 				notes: rollNotes || null,
 				shots: shots.map((s) => ({
@@ -339,7 +338,6 @@
 					aperture: s.aperture || null,
 					shutter_speed: s.shutter_speed || null,
 					date: s.date || null,
-					date_fuzzy: null,
 					time: null,
 					location: s.location || null,
 					notes: s.notes || null,

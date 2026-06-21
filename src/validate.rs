@@ -5,8 +5,7 @@
 //!
 //! Date validation (`validate_date_opt`) accepts the same shape as the frontend:
 //! empty (dates are optional) or a *complete* `YYYY`, `YYYY-MM`, or `YYYY-MM-DD`
-//! with year 1800–2100 and — for full dates — a real calendar day. Free-form
-//! `*_fuzzy` columns are deliberately NOT validated; handlers skip them.
+//! with year 1800–2100 and — for full dates — a real calendar day.
 //!
 //! The remaining helpers cover required strings, non-negative numbers (costs,
 //! counts, dimensions — negatives are nonsensical and skew `/api/stats`), and

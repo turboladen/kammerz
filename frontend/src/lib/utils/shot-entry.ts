@@ -28,7 +28,6 @@ export async function logShot(input: QuickShotInput): Promise<string> {
 		shutter_speed: input.shutterSpeed?.trim() || null,
 		date: input.date?.trim() || null,
 		time: input.time?.trim() || null,
-		date_fuzzy: null,
 		location: input.location?.trim() || null,
 		gps_lat: null,
 		gps_lon: null,

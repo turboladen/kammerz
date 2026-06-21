@@ -30,7 +30,6 @@
 	let frameCount = $state('');
 	let frameCountAutoFilledFrom = $state<string | null>(null); // tracks which stock auto-filled the frame count
 	let dateLoaded = $state(todayLocal());
-	let dateFuzzy = $state('');
 	const dateLoadedError = $derived(dateFieldError(dateLoaded));
 	let pushPull = $state('');
 	let notes = $state('');
@@ -169,7 +168,6 @@
 				date_scanned: null,
 				date_post_processed: null,
 				date_archived: null,
-				date_fuzzy: dateFuzzy || null,
 				push_pull: (pushPull || null) as PushPull | null,
 				notes: notes || null
 			};
@@ -250,13 +248,6 @@
 					<DateInput label="Date Loaded" bind:value={dateLoaded} />
 					<Select label="Push/Pull" bind:value={pushPull} options={pushPullOptions} />
 				</div>
-
-				<Input
-					label="Fuzzy Date"
-					bind:value={dateFuzzy}
-					placeholder="e.g. 'early October 2025'"
-					hint="For when you don't know the exact date"
-				/>
 
 				<Textarea label="Notes" bind:value={notes} placeholder="Any notes about this roll..." />
 

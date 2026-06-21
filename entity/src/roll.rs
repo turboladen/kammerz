@@ -72,7 +72,6 @@ pub struct Model {
     pub date_scanned: Option<String>,
     pub date_post_processed: Option<String>,
     pub date_archived: Option<String>,
-    pub date_fuzzy: Option<String>,
     pub push_pull: Option<PushPull>,
     pub notes: Option<String>,
     pub created_at: String,

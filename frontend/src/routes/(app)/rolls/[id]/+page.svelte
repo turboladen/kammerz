@@ -92,7 +92,6 @@
 	let editFilmStockId = $state('');
 	let editLensId = $state('');
 	let editFrameCount = $state('');
-	let editDateFuzzy = $state('');
 	let editPushPull = $state('');
 	let editNotes = $state('');
 	let editDateLoaded = $state('');
@@ -533,7 +532,6 @@
 					shutter_speed: shotShutterSpeed || null,
 					date: shotDate || null,
 					time: shotTime || null,
-					date_fuzzy: null,
 					location: shotLocation || null,
 					gps_lat: null,
 					gps_lon: null,
@@ -565,7 +563,6 @@
 				shutter_speed: shotShutterSpeed || null,
 				date: shotDate || null,
 				time: shotTime || null,
-				date_fuzzy: null,
 				location: shotLocation || null,
 				gps_lat: null,
 				gps_lon: null,
@@ -762,7 +759,6 @@
 		editFilmStockId = roll.film_stock_id?.toString() ?? '';
 		editLensId = roll.lens_id?.toString() ?? '';
 		editFrameCount = roll.frame_count?.toString() ?? '';
-		editDateFuzzy = roll.date_fuzzy ?? '';
 		editPushPull = roll.push_pull ?? '';
 		editNotes = roll.notes ?? '';
 		editDateLoaded = roll.date_loaded ?? '';
@@ -806,7 +802,6 @@
 				film_stock_id: editFilmStockId ? Number(editFilmStockId) : null,
 				lens_id: lensId,
 				frame_count: editFrameCount ? parseInt(editFrameCount) : null,
-				date_fuzzy: editDateFuzzy || null,
 				push_pull: (editPushPull || null) as PushPull | null,
 				notes: editNotes || null,
 				date_loaded: editDateLoaded.trim() || null,
@@ -955,10 +950,7 @@
 						{:else}
 							<Select label="Default Lens" bind:value={editLensId} options={editLensOptions} />
 						{/if}
-						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-							<Select label="Push/Pull" bind:value={editPushPull} options={pushPullOptions} />
-							<Input label="Fuzzy Date" bind:value={editDateFuzzy} placeholder="e.g. 'early October 2025'" />
-						</div>
+						<Select label="Push/Pull" bind:value={editPushPull} options={pushPullOptions} />
 						<div class="space-y-2">
 							<div class="flex items-center gap-3">
 								<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Lifecycle dates</span>
@@ -1022,9 +1014,6 @@
 									<span>Finished shooting {roll.date_finished}</span>
 								{/if}
 							</div>
-							{#if roll.date_fuzzy}
-								<p class="mt-1 text-xs italic text-text-faint">{roll.date_fuzzy}</p>
-							{/if}
 							{#if roll.notes}
 								<p class="mt-2 text-sm text-text-muted whitespace-pre-wrap">{roll.notes}</p>
 							{/if}

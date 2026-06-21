@@ -149,7 +149,6 @@ export interface Roll {
 	date_scanned: string | null;
 	date_post_processed: string | null;
 	date_archived: string | null;
-	date_fuzzy: string | null;
 	push_pull: PushPull | null;
 	notes: string | null;
 	created_at: string;
@@ -218,7 +217,6 @@ export interface Shot {
 	aperture: string | null;
 	shutter_speed: string | null;
 	date: string | null;
-	date_fuzzy: string | null;
 	// Time-of-day (canonical 24h HH:MM) or null.
 	time: string | null;
 	location: string | null;
@@ -470,7 +468,6 @@ export interface ImportRollDto {
 	frame_count: number | null;
 	date_loaded: string | null;
 	date_finished: string | null;
-	date_fuzzy: string | null;
 	push_pull: PushPull | null;
 	notes: string | null;
 	shots: ImportShotDto[];
@@ -481,7 +478,6 @@ export interface ImportShotDto {
 	aperture: string | null;
 	shutter_speed: string | null;
 	date: string | null;
-	date_fuzzy: string | null;
 	time: string | null;
 	location: string | null;
 	notes: string | null;

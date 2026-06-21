@@ -34,7 +34,6 @@ pub struct ImportRollDto {
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
     pub date_finished: Option<String>,
-    pub date_fuzzy: Option<String>,
     pub push_pull: Option<PushPull>,
     pub notes: Option<String>,
     pub shots: Vec<ImportShotDto>,
@@ -46,7 +45,6 @@ pub struct ImportShotDto {
     pub aperture: Option<String>,
     pub shutter_speed: Option<String>,
     pub date: Option<String>,
-    pub date_fuzzy: Option<String>,
     pub time: Option<String>,
     pub location: Option<String>,
     pub notes: Option<String>,
@@ -167,7 +165,6 @@ async fn import_parsed_roll(
         frame_count: Set(data.frame_count),
         date_loaded: trim_opt(data.date_loaded),
         date_finished: trim_opt(data.date_finished),
-        date_fuzzy: trim_opt(data.date_fuzzy),
         push_pull: Set(data.push_pull),
         notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
@@ -183,7 +180,6 @@ async fn import_parsed_roll(
             aperture: s.aperture.map(|v| v.trim().to_string()),
             shutter_speed: s.shutter_speed.map(|v| v.trim().to_string()),
             date: s.date.map(|v| v.trim().to_string()),
-            date_fuzzy: s.date_fuzzy.map(|v| v.trim().to_string()),
             // `time` carries a stricter contract than its free-text siblings —
             // canonical HH:MM or NULL (see validate_time) — so collapse a
             // whitespace-only value to None, matching the create/update paths'
