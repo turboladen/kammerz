@@ -140,6 +140,7 @@
 		shutterSpeed: string;
 		lensId: string;
 		date: string;
+		time: string;
 		location: string;
 		notes: string;
 	}) {

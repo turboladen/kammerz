@@ -7,6 +7,7 @@ export interface QuickShotInput {
 	shutterSpeed?: string;
 	lensId?: string; // '' = none
 	date?: string; // '' = none
+	time?: string; // '' = none
 	location?: string;
 	notes?: string;
 }
@@ -26,6 +27,7 @@ export async function logShot(input: QuickShotInput): Promise<string> {
 		aperture: input.aperture?.trim() || null,
 		shutter_speed: input.shutterSpeed?.trim() || null,
 		date: input.date?.trim() || null,
+		time: input.time?.trim() || null,
 		date_fuzzy: null,
 		location: input.location?.trim() || null,
 		gps_lat: null,

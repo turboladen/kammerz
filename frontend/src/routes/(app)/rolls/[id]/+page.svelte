@@ -115,6 +115,7 @@
 	let shotAperture = $state('');
 	let shotShutterSpeed = $state('');
 	let shotDate = $state('');
+	let shotTime = $state('');
 	let shotLocation = $state('');
 	let shotNotes = $state('');
 	let shotLensId = $state('');
@@ -438,6 +439,7 @@
 		shotAperture = '';
 		shotShutterSpeed = '';
 		shotDate = '';
+		shotTime = '';
 		shotLocation = '';
 		shotNotes = '';
 		shotLensId = '';
@@ -495,6 +497,7 @@
 		shotAperture = shot.aperture ?? '';
 		shotShutterSpeed = shot.shutter_speed ?? '';
 		shotDate = shot.date ?? '';
+		shotTime = shot.time ?? '';
 		shotLocation = shot.location ?? '';
 		shotNotes = shot.notes ?? '';
 		const ids = shotLensMap[shot.id] ?? [];
@@ -517,6 +520,7 @@
 					aperture: shotAperture || null,
 					shutter_speed: shotShutterSpeed || null,
 					date: shotDate || null,
+					time: shotTime || null,
 					location: shotLocation || null,
 					notes: shotNotes || null,
 					lens_ids: lensIds
@@ -528,6 +532,7 @@
 					aperture: shotAperture || null,
 					shutter_speed: shotShutterSpeed || null,
 					date: shotDate || null,
+					time: shotTime || null,
 					date_fuzzy: null,
 					location: shotLocation || null,
 					gps_lat: null,
@@ -559,6 +564,7 @@
 				aperture: shotAperture || null,
 				shutter_speed: shotShutterSpeed || null,
 				date: shotDate || null,
+				time: shotTime || null,
 				date_fuzzy: null,
 				location: shotLocation || null,
 				gps_lat: null,
@@ -567,7 +573,7 @@
 				lens_ids: lensIds
 			});
 			await loadRollData('shot-add');
-			// Reset per-shot fields but keep session defaults (date, location, lens)
+			// Reset per-shot fields but keep session defaults (date, time, location, lens)
 			try {
 				shotFrameNumber = await suggestNextFrame(id);
 			} catch {
@@ -846,6 +852,7 @@
 		shutterSpeed: string;
 		lensId: string;
 		date: string;
+		time: string;
 		location: string;
 		notes: string;
 	}) {
@@ -1177,8 +1184,9 @@
 				<Input label="Aperture (f/)" bind:value={shotAperture} placeholder="5.6" />
 				<Input label="Shutter Speed" bind:value={shotShutterSpeed} placeholder="1/125" />
 			</div>
-			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
 				<DateInput label="Date" bind:value={shotDate} />
+				<Input type="time" label="Time" class="h-[38px]" bind:value={shotTime} />
 				<Input label="Location" bind:value={shotLocation} placeholder="Central Park" />
 			</div>
 

@@ -332,6 +332,7 @@
 							<th class="py-1.5 pr-3 font-medium">Lens</th>
 							<th class="py-1.5 pr-3 font-medium">f/</th>
 							<th class="py-1.5 pr-3 font-medium">Shutter</th>
+							<th class="py-1.5 pr-3 font-medium">Time</th>
 							<th class="py-1.5 pr-3 font-medium">Location</th>
 							<th class="py-1.5 font-medium">Notes</th>
 						</tr>
@@ -343,6 +344,7 @@
 								<td class="py-1.5 pr-3">{shotLensDisplay(shot.id)}</td>
 								<td class="py-1.5 pr-3">{shot.aperture ? `f/${shot.aperture}` : ''}</td>
 								<td class="py-1.5 pr-3">{shot.shutter_speed ?? ''}</td>
+								<td class="py-1.5 pr-3">{shot.time ?? ''}</td>
 								<td class="py-1.5 pr-3">{shot.location ?? ''}</td>
 								<td class="py-1.5">{shot.notes ?? ''}</td>
 							</tr>
