@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
@@ -16,12 +18,24 @@
 	let rolls: RollWithDetails[] = $state([]);
 	let loading = $state(true);
 	let error = $state('');
-	let filterStatus = $state('all');
+	let filterStatus = $state(page.url.searchParams.get('status') ?? 'all');
 
-	// Toolbar state
-	let searchQuery = $state('');
-	let groupBy = $state('none');
-	let sortBy = $state('date-loaded-desc');
+	// Toolbar state — seeded from the URL so Back from a roll restores the view (kammerz-pq8)
+	let searchQuery = $state(page.url.searchParams.get('q') ?? '');
+	let groupBy = $state(page.url.searchParams.get('group') ?? 'none');
+	let sortBy = $state(page.url.searchParams.get('sort') ?? 'date-loaded-desc');
+
+	// Reflect toolbar state in the URL (kammerz-pq8). Reads only the state vars, so
+	// goto() — which changes the URL but not these vars — can't cause an effect loop.
+	$effect(() => {
+		const params = new URLSearchParams();
+		if (searchQuery) params.set('q', searchQuery);
+		if (filterStatus !== 'all') params.set('status', filterStatus);
+		if (groupBy !== 'none') params.set('group', groupBy);
+		if (sortBy !== 'date-loaded-desc') params.set('sort', sortBy);
+		const qs = params.toString();
+		goto(qs ? `?${qs}` : '/rolls', { replaceState: true, keepFocus: true, noScroll: true });
+	});
 
 	const statuses: { value: string; label: string }[] = [
 		{ value: 'all', label: 'All' },
