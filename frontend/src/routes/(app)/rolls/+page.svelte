@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
@@ -16,13 +18,8 @@
 	let rolls: RollWithDetails[] = $state([]);
 	let loading = $state(true);
 	let error = $state('');
-	let filterStatus = $state('all');
-
-	// Toolbar state
-	let searchQuery = $state('');
-	let groupBy = $state('none');
-	let sortBy = $state('date-loaded-desc');
-
+	// Toolbar option sets — defined before the URL seeds so a seed can reject a value
+	// that isn't an allowed option (a stale/hand-edited URL falls back to the default).
 	const statuses: { value: string; label: string }[] = [
 		{ value: 'all', label: 'All' },
 		{ value: 'loaded', label: 'Loaded' },
@@ -36,6 +33,53 @@
 		{ value: 'post-processed', label: 'Post-processed' },
 		{ value: 'archived', label: 'Archived' }
 	];
+
+	const groupByOptions = [
+		{ value: 'none', label: 'None' },
+		{ value: 'status', label: 'Status' },
+		{ value: 'camera', label: 'Camera' },
+		{ value: 'film-stock', label: 'Film Stock' }
+	];
+
+	const sortOptions = [
+		{ value: 'date-loaded-desc', label: 'Newest Loaded' },
+		{ value: 'date-loaded-asc', label: 'Oldest Loaded' },
+		{ value: 'date-finished-desc', label: 'Newest Finished' },
+		{ value: 'date-finished-asc', label: 'Oldest Finished' },
+		{ value: 'roll-id-asc', label: 'Roll ID A–Z' },
+		{ value: 'roll-id-desc', label: 'Roll ID Z–A' },
+		{ value: 'date-added-desc', label: 'Recently Added' }
+	];
+
+	// Seed a toolbar value from the URL, ignoring a value that isn't an allowed option.
+	function paramOr(key: string, options: { value: string }[], fallback: string): string {
+		const v = page.url.searchParams.get(key);
+		return v !== null && options.some((o) => o.value === v) ? v : fallback;
+	}
+
+	let filterStatus = $state(paramOr('status', statuses, 'all'));
+
+	// Toolbar state — seeded from the URL so Back from a roll restores the view (kammerz-pq8)
+	let searchQuery = $state(page.url.searchParams.get('q') ?? '');
+	let groupBy = $state(paramOr('group', groupByOptions, 'none'));
+	let sortBy = $state(paramOr('sort', sortOptions, 'date-loaded-desc'));
+
+	// Reflect toolbar state in the URL (kammerz-pq8). Builds an absolute target and skips
+	// the navigation when it already matches the current URL — so there's no redundant
+	// history write, and goto() (which changes page.url and re-runs this effect) settles
+	// on the next pass instead of looping.
+	$effect(() => {
+		const params = new URLSearchParams();
+		if (searchQuery) params.set('q', searchQuery);
+		if (filterStatus !== 'all') params.set('status', filterStatus);
+		if (groupBy !== 'none') params.set('group', groupBy);
+		if (sortBy !== 'date-loaded-desc') params.set('sort', sortBy);
+		const qs = params.toString();
+		const target = qs ? `${page.url.pathname}?${qs}` : page.url.pathname;
+		if (target !== page.url.pathname + page.url.search) {
+			void goto(target, { replaceState: true, keepFocus: true, noScroll: true });
+		}
+	});
 
 	// Pipeline: status filter → search → sort → group
 	const afterStatusFilter = $derived(filterStatus === 'all' ? rolls : rolls.filter((r) => r.status === filterStatus));
@@ -86,23 +130,6 @@
 	});
 
 	const resultCount = $derived(afterSearch.length);
-
-	const groupByOptions = [
-		{ value: 'none', label: 'None' },
-		{ value: 'status', label: 'Status' },
-		{ value: 'camera', label: 'Camera' },
-		{ value: 'film-stock', label: 'Film Stock' }
-	];
-
-	const sortOptions = [
-		{ value: 'date-loaded-desc', label: 'Newest Loaded' },
-		{ value: 'date-loaded-asc', label: 'Oldest Loaded' },
-		{ value: 'date-finished-desc', label: 'Newest Finished' },
-		{ value: 'date-finished-asc', label: 'Oldest Finished' },
-		{ value: 'roll-id-asc', label: 'Roll ID A\u2013Z' },
-		{ value: 'roll-id-desc', label: 'Roll ID Z\u2013A' },
-		{ value: 'date-added-desc', label: 'Recently Added' }
-	];
 
 	async function load() {
 		try {
