@@ -223,20 +223,26 @@
 			<div class="space-y-4">
 				<Input label="Roll ID" bind:value={rollId} hint="Auto-suggested as YYMMDD-N. You can type any ID you want." />
 
-				<Select label="Camera" bind:value={cameraId} options={cameraOptions} />
-				<Select label="Film Stock" bind:value={filmStockId} options={filmStockOptions} />
-				{#if isFixedLens && fixedLens}
-					<div>
-						<span class="mb-1.5 block text-xs font-medium text-text-muted">Default Lens</span>
-						<div class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted">
-							{lensDisplayName(fixedLens)} <span class="text-text-faint">(fixed)</span>
+				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+					<Select label="Camera" bind:value={cameraId} options={cameraOptions} />
+					{#if isFixedLens && fixedLens}
+						<div>
+							<span class="mb-1.5 block text-xs font-medium text-text-muted">Default Lens</span>
+							<div class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted">
+								{lensDisplayName(fixedLens)} <span class="text-text-faint">(fixed)</span>
+							</div>
 						</div>
-					</div>
-				{:else}
-					<Select label="Default Lens" bind:value={lensId} options={lensOptions} />
-				{/if}
+					{:else}
+						<Select label="Default Lens" bind:value={lensId} options={lensOptions} />
+					{/if}
+				</div>
 
-				<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+					<Select label="Film Stock" bind:value={filmStockId} options={filmStockOptions} />
+					<Select label="Push/Pull" bind:value={pushPull} options={pushPullOptions} />
+				</div>
+
+				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 					<Input
 						label="Frame Count"
 						bind:value={frameCount}
@@ -246,7 +252,6 @@
 						oninput={() => (frameCountAutoFilledFrom = null)}
 					/>
 					<DateInput label="Date Loaded" bind:value={dateLoaded} />
-					<Select label="Push/Pull" bind:value={pushPull} options={pushPullOptions} />
 				</div>
 
 				<Textarea label="Notes" bind:value={notes} placeholder="Any notes about this roll..." />

@@ -933,24 +933,28 @@
 								hint={editFrameCountHint}
 							/>
 						</div>
-						<Select
-							label="Camera"
-							bind:value={editCameraId}
-							options={cameraOptions}
-							onchange={handleEditCameraChange}
-						/>
-						<Select label="Film Stock" bind:value={editFilmStockId} options={editFilmStockOptions} />
-						{#if editIsFixedLens && editFixedLens}
-							<div>
-								<span class="mb-1.5 block text-xs font-medium text-text-muted">Default Lens</span>
-								<div class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted">
-									{lensDisplayName(editFixedLens)} <span class="text-text-faint">(fixed)</span>
+						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+							<Select
+								label="Camera"
+								bind:value={editCameraId}
+								options={cameraOptions}
+								onchange={handleEditCameraChange}
+							/>
+							{#if editIsFixedLens && editFixedLens}
+								<div>
+									<span class="mb-1.5 block text-xs font-medium text-text-muted">Default Lens</span>
+									<div class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted">
+										{lensDisplayName(editFixedLens)} <span class="text-text-faint">(fixed)</span>
+									</div>
 								</div>
-							</div>
-						{:else}
-							<Select label="Default Lens" bind:value={editLensId} options={editLensOptions} />
-						{/if}
-						<Select label="Push/Pull" bind:value={editPushPull} options={pushPullOptions} />
+							{:else}
+								<Select label="Default Lens" bind:value={editLensId} options={editLensOptions} />
+							{/if}
+						</div>
+						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+							<Select label="Film Stock" bind:value={editFilmStockId} options={editFilmStockOptions} />
+							<Select label="Push/Pull" bind:value={editPushPull} options={pushPullOptions} />
+						</div>
 						<div class="space-y-2">
 							<div class="flex items-center gap-3">
 								<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Lifecycle dates</span>
