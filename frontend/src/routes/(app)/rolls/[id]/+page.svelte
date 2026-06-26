@@ -63,7 +63,7 @@
 		LensMount,
 		RollEvent
 	} from '$lib/types';
-	import { Trash2, Printer } from 'lucide-svelte';
+	import { Trash2, Printer, ChevronLeft, ChevronRight } from 'lucide-svelte';
 
 	const id = $derived(Number(page.params.id));
 
@@ -293,6 +293,12 @@
 	const frameCells = $derived(buildFrameCells(shots, roll?.frame_count ?? null));
 	const nextFrameNumber = $derived(frameCells.find((c) => c.isNext)?.frameNumber ?? '');
 
+	// Shots in FrameStrip order (skips empty slots) — for in-dialog prev/next nav.
+	const orderedShots = $derived(frameCells.filter((c) => c.shot).map((c) => c.shot!));
+	const currentShotIdx = $derived(editingShotId == null ? -1 : orderedShots.findIndex((s) => s.id === editingShotId));
+	const hasPrevShot = $derived(currentShotIdx > 0);
+	const hasNextShot = $derived(currentShotIdx >= 0 && currentShotIdx < orderedShots.length - 1);
+
 	// QuickAddBar save state
 	let quickSaving = $state(false);
 	let quickError = $state('');
@@ -503,6 +509,27 @@
 		shotLensId = ids.length > 0 ? String(ids[0]) : '';
 		shotError = '';
 		showShotDialog = true;
+	}
+
+	function goPrevShot() {
+		if (hasPrevShot) openEditShotDialog(orderedShots[currentShotIdx - 1]);
+	}
+	function goNextShot() {
+		if (hasNextShot) openEditShotDialog(orderedShots[currentShotIdx + 1]);
+	}
+
+	function handleShotDialogKeydown(e: KeyboardEvent) {
+		if (!showShotDialog || !editingShotId) return;
+		const target = e.target as HTMLElement;
+		const tag = target?.tagName?.toLowerCase();
+		if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+		if (e.key === 'ArrowLeft') {
+			e.preventDefault();
+			goPrevShot();
+		} else if (e.key === 'ArrowRight') {
+			e.preventDefault();
+			goNextShot();
+		}
 	}
 
 	async function handleSaveShot() {
@@ -1161,6 +1188,8 @@
 	</div>
 {/if}
 
+<svelte:window onkeydown={handleShotDialogKeydown} />
+
 <!-- Add/Edit Shot Dialog -->
 {#if showShotDialog}
 	<Dialog
@@ -1172,6 +1201,31 @@
 		}}
 	>
 		<div class="space-y-4">
+			{#if editingShotId}
+				<div class="flex items-center justify-between">
+					<button
+						class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:bg-surface-overlay hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+						disabled={!hasPrevShot}
+						onclick={goPrevShot}
+						aria-label="Previous shot"
+						title="Previous shot"
+					>
+						<ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
+					</button>
+					{#if currentShotIdx >= 0}
+						<span class="text-xs text-text-faint">Shot {currentShotIdx + 1} of {orderedShots.length}</span>
+					{/if}
+					<button
+						class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:bg-surface-overlay hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+						disabled={!hasNextShot}
+						onclick={goNextShot}
+						aria-label="Next shot"
+						title="Next shot"
+					>
+						<ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
+					</button>
+				</div>
+			{/if}
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
 				<Input label="Frame #" bind:value={shotFrameNumber} placeholder="1" required />
 				<Input label="Aperture (f/)" bind:value={shotAperture} placeholder="5.6" />
