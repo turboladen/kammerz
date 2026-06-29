@@ -1109,14 +1109,14 @@
 					<div class="flex items-center gap-2">
 						<Button
 							size="sm"
-							variant="ghost"
+							variant="secondary"
 							aria-expanded={quickAddVisible}
 							aria-label={quickAddVisible ? 'Hide the quick entry form' : 'Show the quick entry form'}
 							onclick={() => (quickAddOverride = !quickAddVisible)}
 						>
 							{quickAddVisible ? 'Hide entry' : 'Show entry'}
 						</Button>
-						<Button size="sm" variant="ghost" href="/quick-entry?roll={roll?.id}">Quick Entry</Button>
+						<Button size="sm" variant="secondary" href="/quick-entry?roll={roll?.id}">Quick Entry</Button>
 					</div>
 				</div>
 
