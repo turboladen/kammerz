@@ -29,12 +29,12 @@
 					<button
 						onclick={() => onselect(cell.frameNumber, cell.shot)}
 						title={cell.shot
-							? `Frame ${cell.frameNumber}${cell.shot.aperture ? ' · f/' + cell.shot.aperture : ''}${cell.shot.shutter_speed ? ' · ' + cell.shot.shutter_speed + 's' : ''}${cell.shot.time ? ' · ' + cell.shot.time : ''}`
+							? `Frame ${cell.frameNumber}${cell.shot.date ? ' · ' + cell.shot.date : ''}${cell.shot.aperture ? ' · f/' + cell.shot.aperture : ''}${cell.shot.shutter_speed ? ' · ' + cell.shot.shutter_speed + 's' : ''}${cell.shot.time ? ' · ' + cell.shot.time : ''}`
 							: cell.isNext
 								? `Frame ${cell.frameNumber} — next open frame`
 								: `Frame ${cell.frameNumber} — open`}
 						aria-label={cell.shot
-							? `Frame ${cell.frameNumber}${cell.shot.aperture ? ', f/' + cell.shot.aperture : ''}${cell.shot.shutter_speed ? ', ' + cell.shot.shutter_speed + 's' : ''}${cell.shot.time ? ', ' + cell.shot.time : ''} — click to edit`
+							? `Frame ${cell.frameNumber}${cell.shot.date ? ', ' + cell.shot.date : ''}${cell.shot.aperture ? ', f/' + cell.shot.aperture : ''}${cell.shot.shutter_speed ? ', ' + cell.shot.shutter_speed + 's' : ''}${cell.shot.time ? ', ' + cell.shot.time : ''} — click to edit`
 							: cell.isNext
 								? `Frame ${cell.frameNumber}, next open frame — click to add`
 								: `Frame ${cell.frameNumber}, open — click to add`}
