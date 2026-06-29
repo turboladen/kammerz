@@ -303,6 +303,11 @@
 	let quickSaving = $state(false);
 	let quickError = $state('');
 
+	// QuickAddBar visibility: hidden by default on archived rolls, shown otherwise.
+	// null = follow the default; true/false = user override.
+	let quickAddOverride = $state<boolean | null>(null);
+	const quickAddVisible = $derived(quickAddOverride ?? roll?.status !== 'archived');
+
 	// Default lens id for the QuickAddBar (mirrors the shot dialog's smart cascade,
 	// minus the last-used-on-roll part which is session state — use roll/camera default)
 	const quickDefaultLensId = $derived.by(() => {
@@ -915,6 +920,9 @@
 	$effect(() => {
 		void id;
 		untrack(() => {
+			// Re-apply the per-roll QuickAddBar default (hidden iff archived) on every
+			// roll change, so a manual show/hide on one roll doesn't leak to the next.
+			quickAddOverride = null;
 			loading = true;
 			Promise.all([loadRefData(), loadRollData()]).finally(() => {
 				loading = false;
@@ -1098,7 +1106,18 @@
 							<div class="flex-1 border-b border-border-subtle"></div>
 						{/if}
 					</h2>
-					<Button size="sm" variant="ghost" href="/quick-entry?roll={roll?.id}">Quick Entry</Button>
+					<div class="flex items-center gap-2">
+						<Button
+							size="sm"
+							variant="ghost"
+							aria-expanded={quickAddVisible}
+							aria-label={quickAddVisible ? 'Hide the quick entry form' : 'Show the quick entry form'}
+							onclick={() => (quickAddOverride = !quickAddVisible)}
+						>
+							{quickAddVisible ? 'Hide entry' : 'Show entry'}
+						</Button>
+						<Button size="sm" variant="ghost" href="/quick-entry?roll={roll?.id}">Quick Entry</Button>
+					</div>
 				</div>
 
 				{#if showRollFullNudge}
@@ -1140,16 +1159,18 @@
 				{/if}
 
 				<div class="space-y-2">
-					<QuickAddBar
-						frameNumber={nextFrameNumber}
-						lensOptions={shotLensOptions}
-						lensId={quickDefaultLensId}
-						isFixedLens={isFixedLensCamera}
-						fixedLensLabel={fixedLens ? lensDisplayName(fixedLens) : ''}
-						saving={quickSaving}
-						error={quickError}
-						onsave={handleQuickAdd}
-					/>
+					{#if quickAddVisible}
+						<QuickAddBar
+							frameNumber={nextFrameNumber}
+							lensOptions={shotLensOptions}
+							lensId={quickDefaultLensId}
+							isFixedLens={isFixedLensCamera}
+							fixedLensLabel={fixedLens ? lensDisplayName(fixedLens) : ''}
+							saving={quickSaving}
+							error={quickError}
+							onsave={handleQuickAdd}
+						/>
+					{/if}
 					<FrameStrip frames={frameCells} onselect={handleFrameSelect} onaddextra={() => openAddShotDialog()} />
 				</div>
 			</section>
