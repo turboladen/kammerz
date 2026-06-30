@@ -255,6 +255,11 @@ fn prune_old_snapshots(db_path: &str) {
     }
 }
 
+/// Default DB path. In dev: ./kammerz.db. Override with DATABASE_URL.
+pub fn default_db_url() -> String {
+    "sqlite:./kammerz.db?mode=rwc".to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -357,9 +362,4 @@ mod tests {
 
         std::fs::remove_dir_all(&dir).unwrap();
     }
-}
-
-/// Default DB path. In dev: ./kammerz.db. Override with DATABASE_URL.
-pub fn default_db_url() -> String {
-    "sqlite:./kammerz.db?mode=rwc".to_string()
 }

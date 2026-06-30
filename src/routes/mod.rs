@@ -167,7 +167,11 @@ fn friendly_err_op(context: &str, op: Op, e: impl std::fmt::Display) -> String {
         let rest = &raw[pos + "UNIQUE constraint failed: ".len()..];
         // Strip any trailing quote/paren that SeaORM's wrapping may add
         let rest = rest.trim_end_matches(|c: char| c == '"' || c == ')' || c.is_whitespace());
-        let col = rest.split('.').last().unwrap_or("value").replace('_', " ");
+        let col = rest
+            .split('.')
+            .next_back()
+            .unwrap_or("value")
+            .replace('_', " ");
         return format!("A {context} with that {col} already exists.");
     }
     if raw.contains("UNIQUE constraint failed") {
@@ -189,7 +193,11 @@ fn friendly_err_op(context: &str, op: Op, e: impl std::fmt::Display) -> String {
     if let Some(pos) = raw.find("NOT NULL constraint failed: ") {
         let rest = &raw[pos + "NOT NULL constraint failed: ".len()..];
         let rest = rest.trim_end_matches(|c: char| c == '"' || c == ')' || c.is_whitespace());
-        let col = rest.split('.').last().unwrap_or("field").replace('_', " ");
+        let col = rest
+            .split('.')
+            .next_back()
+            .unwrap_or("field")
+            .replace('_', " ");
         return format!("The {col} field is required.");
     }
 
