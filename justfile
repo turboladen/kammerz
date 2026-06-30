@@ -130,7 +130,7 @@ fmt-check:
 check: fmt-check ci-backend ci-frontend
 
 # Full local mirror of the GitHub Actions pipeline (.github/workflows/ci.yml):
-# backend (cargo build+test --locked), frontend (frozen install + svelte-check
+# backend (cargo build+clippy+test --locked), frontend (frozen install + svelte-check
 # + build), e2e (Playwright smoke against the release binary on :3002). Use
 # this as the PR gate when Actions isn't available — every job a PR needs runs
 # here, in the same order, with the same flags.
@@ -151,9 +151,11 @@ ci-preflight:
         echo "⚠️  local bun $actual ≠ CI-pinned $pinned (.github/workflows/ci.yml)" >&2
     fi
 
-# Mirrors the `backend` CI job.
+# Mirrors the `backend` CI job. clippy runs before test so lint failures
+# surface fast (-D warnings = every lint is a hard gate, like CI).
 ci-backend:
     cargo build --workspace --locked
+    cargo clippy --workspace --all-targets --locked -- -D warnings
     cargo test --workspace --locked
 
 # Mirrors the `frontend` CI job (frozen install, like CI since PR #37).
