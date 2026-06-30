@@ -13,7 +13,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Least privilege: every job only reads the repo (build/test/e2e) — none push,
-# comment, or publish, so the GITHUB_TOKEN needs no write scopes.
+# comment, or publish, so the GITHUB_TOKEN needs no write scopes. The `changes`
+# job widens this to `pull-requests: read` at the job level (dorny/paths-filter
+# reads the PR file list via the API); nothing else needs more than this.
 permissions:
   contents: read
 
@@ -27,6 +29,58 @@ env:
 # matching recipe. `just ci` chains the same recipes locally; keep them in sync
 # by editing the justfile, not by re-describing the commands here.
 jobs:
+  # Path filter → gates the (slow) e2e job. The dorny step runs ONLY on
+  # pull_request, where it reads the PR's changed-file list via the API and
+  # sets `code = true` when the diff touches code/build inputs; a .beads/**- or
+  # docs-only PR leaves it `false` so e2e is skipped (the skip-aware all-checks
+  # aggregator below keeps such a PR mergeable). On push the dorny step is
+  # skipped entirely — no git-diff against github.event.before, which avoids
+  # dorny's force-push / first-push / shallow-checkout failure modes that would
+  # otherwise fail this job and redden main — and e2e instead runs
+  # unconditionally via its `always()` guard. The job itself still runs on every
+  # event so e2e's `needs: changes` never resolves to a skipped dependency. Only
+  # e2e is conditional; format, backend, and frontend stay unconditional —
+  # they're fast and catch the most.
+  changes:
+    name: detect code changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read # checkout (unused on PR; harmless on push)
+      pull-requests: read # dorny reads the PR's changed-file list via the API
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        # PR-only: on push the output is ignored (e2e's always() forces a run),
+        # so skip the git-diff entirely rather than risk a push-diff failure.
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          # `code = true` when ANY changed file matches — i.e. real source,
+          # build inputs, or the CI definition itself. Everything NOT listed
+          # here (notably .beads/** export noise and **/*.md docs) is treated
+          # as non-triggering for e2e.
+          filters: |
+            code:
+              - 'src/**'
+              - 'entity/**'
+              - 'migration/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'build.rs'
+              - 'frontend/src/**'
+              - 'frontend/static/**'
+              - 'frontend/package.json'
+              - 'frontend/bun.lock'
+              - 'frontend/vite.config.ts'
+              - 'frontend/svelte.config.js'
+              - 'frontend/playwright.config.ts'
+              - 'frontend/tests/**'
+              - 'justfile'
+              - '.github/workflows/ci.yml'
+
   # Format gate → `just fmt-check`: dprint (Markdown/JSON/TOML/YAML per
   # dprint.jsonc), Prettier (frontend Svelte/TS/CSS), rustfmt (Rust). Fix
   # locally with `just fmt`.
@@ -98,8 +152,17 @@ jobs:
   # with a runtime-minted argon2 hash, and drives the Playwright suite against
   # :3002. On failure it dumps the server log to the job output; the trace.zip +
   # screenshots are uploaded below for local replay (playwright show-trace).
+  #
+  # Conditional via `always() && (...)`: the always() drops GitHub's implicit
+  # needs-success gate so this boolean is the ONLY thing gating e2e. It always
+  # runs on push-to-main (full post-merge gate — even if the `changes` job
+  # errored), and on a PR runs only when the `changes` filter flagged code
+  # paths. Without always(), a failed `changes` job would silently skip e2e on
+  # push (the implicit success() on `needs` would gate it).
   e2e:
     name: e2e (playwright smoke)
+    needs: changes
+    if: ${{ always() && (github.event_name == 'push' || needs.changes.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -112,6 +175,20 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: just
+
+      # Restore the Chromium binary so `just e2e`'s `bunx playwright install`
+      # is a no-op on a hit instead of re-downloading. Keyed on the resolved
+      # @playwright/test version, which is pinned in frontend/bun.lock. NOTE:
+      # only the browser binary under ~/.cache/ms-playwright is cached — the
+      # `--with-deps` apt system libraries are NOT (re-installed every run).
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - run: just e2e
 
       # Client-side complement to the recipe's server-log dump: upload the
@@ -125,3 +202,35 @@ jobs:
           path: frontend/test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  # Single required status for branch protection. `if: always()` so it runs even
+  # when e2e was deliberately skipped (docs/beads-only PR). It FAILS if any
+  # dependency ended in `failure` or `cancelled`, and TREATS `skipped` AS
+  # ACCEPTABLE — so a skipped e2e doesn't wedge the merge, but a real failure
+  # (including a broken `changes` filter job) still blocks it. Make THIS the only
+  # required check in branch protection; the per-job names then become free to
+  # rename/condition without touching the protection rule.
+  all-checks:
+    name: all-checks
+    needs: [changes, format, backend, frontend, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Verify required jobs (skipped is OK)
+        # RESULTS holds only trusted status enums (success/failure/skipped/
+        # cancelled), but pass it via env rather than inlining the expression
+        # into the shell to keep to the no-interpolation-in-run convention.
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Dependency results: $RESULTS"
+          for r in $RESULTS; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "::error::A required job ended with result '$r'."
+              exit 1
+            fi
+          done
+          echo "All required jobs passed (or were acceptably skipped)."
