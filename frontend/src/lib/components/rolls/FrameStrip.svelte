@@ -62,7 +62,7 @@
 							{/if}
 							<span class="max-w-[3rem] truncate font-mono text-[9px] leading-tight text-text-muted">
 								{#if cell.shot.aperture && cell.shot.shutter_speed}
-									{cell.shot.aperture}/{cell.shot.shutter_speed}
+									f/{cell.shot.aperture}/{cell.shot.shutter_speed}
 								{:else if cell.shot.aperture}
 									f/{cell.shot.aperture}
 								{:else if cell.shot.shutter_speed}
