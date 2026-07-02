@@ -4,11 +4,24 @@ linux_target := "aarch64-unknown-linux-gnu"
 default:
     @just --list
 
+# Waits for the backend's /api/health before starting vite, so the SPA's first
+# /api/auth/me doesn't race the backend boot (the ECONNREFUSED proxy noise).
 # Run backend (axum, :3002) and frontend (vite, :5273) together for dev.
 dev:
     #!/usr/bin/env bash
     trap 'kill 0' EXIT
     cargo run &
+    backend=$!
+    printf 'waiting for backend on :3002 '
+    for _ in $(seq 1 240); do
+        if curl -sf -o /dev/null --max-time 1 http://127.0.0.1:3002/api/health; then
+            echo '- up; starting vite'; break
+        fi
+        if ! kill -0 "$backend" 2>/dev/null; then
+            echo '- backend exited before healthy; starting vite anyway'; break
+        fi
+        printf '.'; sleep 0.5
+    done
     (cd frontend && bun run dev) &
     wait
 

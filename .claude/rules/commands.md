@@ -1,6 +1,6 @@
 # Commands
 
-- `just dev` — Run backend (axum on :3002) + frontend (Vite on :5273, proxies `/api` → :3002) together for development
+- `just dev` — Run backend (axum on :3002) + frontend (Vite on :5273, proxies `/api` → :3002) together for development. Polls the backend's `/api/health` before starting Vite so the SPA's first `/api/auth/me` doesn't race the (slower) axum boot and log `ECONNREFUSED` proxy errors; it falls through to starting Vite anyway if the backend exits early or after a ~120s cap (kammerz-u07)
 - `just dev-backend` / `just dev-frontend` — Run either half alone
 - `just build` — Production build: `frontend/build` (Vite) then `cargo build --release` (embeds it). Binary at `target/release/kammerz`
 - `just fmt` — Format everything: `dprint fmt` (Markdown/JSON/TOML/YAML, config in `dprint.jsonc`) + Prettier via `bun run format` in `frontend/` (Svelte/TS/CSS, `prettier-plugin-svelte`, config in `frontend/.prettierrc`) + `cargo fmt --all`. **Run before committing.** `just fmt-check` is the read-only variant.
