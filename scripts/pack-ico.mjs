@@ -8,9 +8,14 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 function pngSize(buf) {
-  // PNG signature is 0x89 'P' 'N' 'G'; IHDR width/height are big-endian u32s
-  // at byte offsets 16 and 20 (8-byte sig + 4 len + 4 "IHDR").
-  if (buf.readUInt32BE(0) !== 0x89504e47) {
+  // Full 8-byte PNG signature is 89 50 4E 47 0D 0A 1A 0A; IHDR width/height are
+  // big-endian u32s at byte offsets 16 and 20 (8-byte sig + 4 len + 4 "IHDR").
+  // Require >= 24 bytes so the IHDR dimensions are actually present to read.
+  if (
+    buf.length < 24 ||
+    buf.readUInt32BE(0) !== 0x89504e47 ||
+    buf.readUInt32BE(4) !== 0x0d0a1a0a
+  ) {
     throw new Error("not a PNG file");
   }
   return [buf.readUInt32BE(16), buf.readUInt32BE(20)];

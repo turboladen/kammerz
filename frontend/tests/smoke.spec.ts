@@ -214,6 +214,7 @@ test('favicon assets are served and linked (kammerz-1by)', async ({ page }) => {
 	// Match hrefs with an ends-with selector: SvelteKit's hydration reconciles
 	// <head> and resolves these hrefs to absolute URLs, so a literal "/favicon.svg"
 	// attribute match is racy (0 after hydration, 1 before).
+	await expect(page.locator('link[rel="icon"][href$="/favicon.ico"]')).toHaveCount(1);
 	await expect(page.locator('link[rel="icon"][href$="/favicon.svg"]')).toHaveCount(1);
 	await expect(page.locator('link[rel="apple-touch-icon"][href$="/apple-touch-icon.png"]')).toHaveCount(1);
 });
