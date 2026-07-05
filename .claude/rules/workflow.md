@@ -8,6 +8,8 @@
 - When several PRs in a train append tests to the **same** test file (e.g. `tests/rolls.rs`), expect a both-added textual conflict at gate time even though each test is independent — resolve by keeping both, no rebase drama.
 - Mechanical/formatting PRs conflict with everything: merge them **last** in a train, regenerating the `just fmt` commit against final `main` right before merge.
 - `gh pr view --json mergeable` returns `UNKNOWN` while GitHub recomputes after a push/merge — poll until it settles before trusting it.
+- `gh pr merge --squash --delete-branch` **can't delete a branch that's checked out in a worktree** (it errors, and then skips the remote delete too) — `git worktree remove` first, then delete the local + remote branches manually.
+- **Background `general-purpose` subagents may run in their own git worktree** — they commit to an auto-created `.claude/worktrees/agent-<hash>` (branch `worktree-agent-<hash>`), NOT the worktree you set up for them. If your feature branch is empty after the agent finishes, `git worktree list` to find the commit and cherry-pick it over, then remove the stray worktree.
 
 ## Reference
 

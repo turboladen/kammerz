@@ -33,6 +33,7 @@
 - Lens dropdowns: Always use `buildLensOptions()` from `$lib/utils/lens.ts` — handles mount-compatibility sorting with dividers and automatic disambiguation of duplicate lenses. Also see `buildMountOptions()` for mount dropdowns grouped by format family (it carries the inline `+ New mount…` sentinel — kammerz-snh).
 - Camera dropdowns: Use `buildCameraLabels()` from `$lib/utils/disambiguate.ts` to get a `Map<id, label>` that auto-disambiguates duplicate cameras. When two cameras share the same `brand + model`, the label appends `(S/N xxxxx)` if serial exists or `(Copy N)` by creation order. Single instances stay clean.
 - Dialog component uses flex column layout with `max-h-[85vh]` and `overflow-y-auto` on content. When adding fields to dialogs (e.g., inline lens creation), scrolling is already handled.
+- Shot **aperture and shutter_speed are stored BARE** — aperture `2.8` (never `f/2.8`), shutter `1/125` or `4` (no trailing `s`). Every display site prepends `f/` / appends `s` (FrameStrip, `rolls/[id]/print`, etc.) and inputs supply the `f/` label. Migration `m…025_normalize_aperture_bare` normalized legacy `f/`-prefixed rows — writing an `f/`-prefixed value double-prefixes to `f/f/2.8` (kammerz-jd1).
 
 ## Error Handling
 
