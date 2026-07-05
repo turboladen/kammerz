@@ -39,6 +39,12 @@ build:
     # clean checkout still has the dir rust-embed's #[folder] points at.
     touch frontend/build/.gitkeep
 
+# Regenerate favicon.ico + apple-touch-icon.png from frontend/static/favicon.svg.
+# The generated assets are committed, so this is only needed when the SVG changes.
+# No permanent deps (bunx sharp-cli rasterizer + bun ICO packer).
+favicons:
+    ./scripts/gen-favicon.sh
+
 # Cross-compile a release binary for the Linux server (DietPi, ARM64).
 # One-time toolchain setup (see README "Deployment"): rustup target add +
 # brew install messense/macos-cross-toolchains/aarch64-unknown-linux-gnu.

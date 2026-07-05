@@ -192,3 +192,20 @@ test('unmatched route renders the themed error boundary (kammerz-b21)', async ({
 	// The themed boundary offers a way back; the bare fallback does not.
 	await expect(page.getByRole('link', { name: /back to dashboard/i })).toBeVisible();
 });
+
+/**
+ * Regression guard for kammerz-1by: the app ships a real favicon set. The browser's
+ * automatic /favicon.ico request used to 404 (no favicon existed at all). Assert the
+ * three icon assets serve and that app.html advertises them via <link rel="icon">.
+ */
+test('favicon assets are served and linked (kammerz-1by)', async ({ page }) => {
+	for (const asset of ['/favicon.ico', '/favicon.svg', '/apple-touch-icon.png']) {
+		const res = await page.request.get(`${BASE}${asset}`);
+		expect(res.ok(), `${asset} should serve 2xx, got ${res.status()}`).toBeTruthy();
+	}
+
+	await page.goto(`${BASE}/`);
+	// app.html advertises the icon set (SVG preferred, .ico legacy/root fallback).
+	await expect(page.locator('link[rel="icon"][href="/favicon.svg"]')).toHaveCount(1);
+	await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1);
+});
