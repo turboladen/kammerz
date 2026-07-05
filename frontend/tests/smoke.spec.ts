@@ -202,10 +202,18 @@ test('favicon assets are served and linked (kammerz-1by)', async ({ page }) => {
 	for (const asset of ['/favicon.ico', '/favicon.svg', '/apple-touch-icon.png']) {
 		const res = await page.request.get(`${BASE}${asset}`);
 		expect(res.ok(), `${asset} should serve 2xx, got ${res.status()}`).toBeTruthy();
+		// Not just 2xx: guard the subtler regression where serve_spa's route-like
+		// fallback (src/spa.rs) returns 200 + index.html for an asset path. Only the
+		// '.' in the filename keeps it out of that fallback — assert a real image.
+		const ctype = res.headers()['content-type'] ?? '';
+		expect(ctype, `${asset} should be an image, got '${ctype}'`).toContain('image');
 	}
 
 	await page.goto(`${BASE}/`);
 	// app.html advertises the icon set (SVG preferred, .ico legacy/root fallback).
-	await expect(page.locator('link[rel="icon"][href="/favicon.svg"]')).toHaveCount(1);
-	await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1);
+	// Match hrefs with an ends-with selector: SvelteKit's hydration reconciles
+	// <head> and resolves these hrefs to absolute URLs, so a literal "/favicon.svg"
+	// attribute match is racy (0 after hydration, 1 before).
+	await expect(page.locator('link[rel="icon"][href$="/favicon.svg"]')).toHaveCount(1);
+	await expect(page.locator('link[rel="apple-touch-icon"][href$="/apple-touch-icon.png"]')).toHaveCount(1);
 });
