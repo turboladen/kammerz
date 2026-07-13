@@ -258,3 +258,90 @@ async fn invalid_picked_up_date_is_rejected() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+#[tokio::test]
+async fn roll_list_computes_negatives_deadline_from_retention() {
+    let app = open_app().await;
+
+    // Lab with a 10-day retention.
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/labs",
+            &json!({ "name": "Lab R", "negative_retention_days": 10 }),
+        ))
+        .await
+        .unwrap();
+    let lab_id: i32 = json_body(res).await;
+
+    let res = app.clone().oneshot(get("/api/cameras")).await.unwrap();
+    let cams: Vec<Value> = json_body(res).await;
+    let camera_id = cams[0]["id"].as_i64().unwrap() as i32;
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/rolls",
+            &json!({ "roll_id": "R-DL", "camera_id": camera_id, "status": "shot" }),
+        ))
+        .await
+        .unwrap();
+    let roll_pk: i32 = json_body(res).await;
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/lab",
+            &json!({ "roll_id": roll_pk, "lab_id": lab_id, "date_received": "2026-07-01" }),
+        ))
+        .await
+        .unwrap();
+    let _lab_dev_id: i32 = json_body(res).await;
+
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
+        .await
+        .unwrap();
+    let roll: Value = json_body(res).await;
+    assert_eq!(roll["lab_name"], "Lab R");
+    assert_eq!(roll["negatives_date_received"], "2026-07-01");
+    assert_eq!(roll["negatives_deadline"], "2026-07-11"); // +10 days
+    assert_eq!(roll["negatives_not_collecting"], false);
+}
+
+#[tokio::test]
+async fn roll_without_lab_dev_has_null_negatives() {
+    let app = open_app().await;
+    let res = app.clone().oneshot(get("/api/cameras")).await.unwrap();
+    let cams: Vec<Value> = json_body(res).await;
+    let camera_id = cams[0]["id"].as_i64().unwrap() as i32;
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/rolls",
+            &json!({ "roll_id": "R-NONE", "camera_id": camera_id, "status": "loaded" }),
+        ))
+        .await
+        .unwrap();
+    let roll_pk: i32 = json_body(res).await;
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
+        .await
+        .unwrap();
+    let roll: Value = json_body(res).await;
+    assert!(roll["negatives_deadline"].is_null());
+    assert!(roll["lab_dev_id"].is_null());
+}
+
+#[tokio::test]
+async fn roll_deadline_uses_default_30_when_lab_retention_null() {
+    let app = open_app().await;
+    let (roll_pk, _lab_dev_id) = lab_developed_roll(&app).await; // no lab_id → retention NULL → 30
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
+        .await
+        .unwrap();
+    let roll: Value = json_body(res).await;
+    assert_eq!(roll["negatives_deadline"], "2026-07-31"); // 2026-07-01 + 30
+}
