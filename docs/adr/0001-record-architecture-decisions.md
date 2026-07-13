@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-13
-- **Related:** `docs/superpowers/` (specs + plans)
+- **Related:** `docs/adr/README.md`, `.claude/rules/workflow.md`
 
 ## Context
 
@@ -26,8 +26,10 @@ lightweight Nygard style (a status block + Context / Decision / Consequences). A
 ADR is **immutable once Accepted**; a decision changes by adding a new ADR that
 `Supersedes` the old one, flipping the old one's `Status` to `Superseded by`.
 
-ADRs complement, not replace, the `docs/superpowers/` design docs: feature design
-still goes in a spec; the durable _decision_ within it is promoted to an ADR. See
+ADRs complement the brainstorming / writing-plans workflow: feature design still
+starts as a `docs/superpowers/` spec, but that spec is a **transient** working
+artifact — its durable _decision_ is promoted to an ADR and the spec is retired once
+the feature ships (it stays in git history). See
 `docs/adr/README.md` for when to write one and the conventions.
 
 ## Consequences
@@ -35,9 +37,10 @@ still goes in a spec; the durable _decision_ within it is promoted to an ADR. Se
 - **Positive:** every decision's status is explicit; reversals read as a chain
   (`0003` → `0004`) with no revisionism; grepping a topic lands on a doc that says
   whether it's current. The barrier to recording a decision is low (~1 page).
-- **Positive:** the existing `docs/superpowers/` archive gets a one-line `Status`
-  header (Implemented / Superseded-by), so those dated docs also self-declare
-  without being rewritten.
+- **Positive:** the previously-committed `docs/superpowers/specs`/`plans` archive is
+  retired — its durable decisions distilled into ADRs 0002–0009 — rather than kept as
+  a parallel, drift-prone doc set. Going forward those design docs are transient
+  working artifacts (see this directory's README), not a permanent archive.
 - **Negative / cost:** a second doc type to keep in mind, and the discipline to
   supersede rather than edit. Mitigated by the "only for cross-cutting or
   reversible decisions" rule — ADRs stay few and high-signal.

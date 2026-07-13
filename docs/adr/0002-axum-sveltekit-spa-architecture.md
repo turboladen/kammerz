@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-05-29
-- **Related:** `docs/superpowers/specs/2026-05-29-port-kammerz-to-web-design.md`
+- **Related:** `.claude/rules/tech-stack.md`, `.claude/rules/architecture.md`, `src/main.rs` (rust-embed SPA fallback), `src/db.rs` (single-connection pool + pragma sequence)
 
 ## Context
 

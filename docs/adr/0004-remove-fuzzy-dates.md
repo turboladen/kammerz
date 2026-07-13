@@ -35,6 +35,6 @@ into concrete date + notes _before_ the drop.
   route carries no fuzzy field, so `kammerz-31c` / `kammerz-btv` were resolved by
   events (verified: zero `date_fuzzy` in code, schema, or data). Epic `kammerz-qdk`
   closed.
-- **Note:** historical `docs/superpowers/` docs and the schema migrations still
-  mention `date_fuzzy` — those are immutable records of past state, not current
-  behavior. This ADR is the source of truth for how approximate dates work now.
+- **Note:** the schema migrations still mention `date_fuzzy` (they add it, then
+  migration `m20260621_000024` drops it) — that's immutable schema history, not
+  current behavior. This ADR is the source of truth for how approximate dates work now.
