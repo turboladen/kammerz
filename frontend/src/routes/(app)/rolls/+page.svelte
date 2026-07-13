@@ -9,15 +9,20 @@
 	import ListToolbar from '$lib/components/ui/ListToolbar.svelte';
 	import GroupHeader from '$lib/components/ui/GroupHeader.svelte';
 	import RollRow from '$lib/components/rolls/RollRow.svelte';
+	import NegativesBadge from '$lib/components/ui/NegativesBadge.svelte';
 	import { Film } from 'lucide-svelte';
 	import { listRolls } from '$lib/api/rolls';
 	import { filterBySearch, groupItems, sortByString, sortByDate } from '$lib/utils/list';
 	import { statusConfig } from '$lib/utils/status';
+	import { negativesState, isNegativesPending } from '$lib/utils/negatives';
 	import type { RollWithDetails, RollStatus } from '$lib/types';
 
 	let rolls: RollWithDetails[] = $state([]);
 	let loading = $state(true);
 	let error = $state('');
+	// One `now` for the whole list render — shared by every row's negatives badge so
+	// rows can't disagree across a midnight boundary, and to avoid a Date per row.
+	const now = new Date();
 	// Toolbar option sets — defined before the URL seeds so a seed can reject a value
 	// that isn't an allowed option (a stale/hand-edited URL falls back to the default).
 	const statuses: { value: string; label: string }[] = [
@@ -209,6 +214,10 @@
 					<FadeIn delay={Math.min(i, 10) * 30}>
 						<RollRow {roll} href="/rolls/{roll.id}">
 							{#snippet trailing()}
+								{@const negView = negativesState(roll, now)}
+								{#if isNegativesPending(negView)}
+									<NegativesBadge view={negView} />
+								{/if}
 								<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
 							{/snippet}
 						</RollRow>

@@ -25,6 +25,7 @@ mod m20260614_000022_create_roll_events;
 mod m20260618_000023_add_shot_time;
 mod m20260621_000024_drop_date_fuzzy;
 mod m20260701_000025_normalize_aperture_bare;
+mod m20260711_000026_add_negatives_pickup;
 
 pub struct Migrator;
 
@@ -57,6 +58,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260618_000023_add_shot_time::Migration),
             Box::new(m20260621_000024_drop_date_fuzzy::Migration),
             Box::new(m20260701_000025_normalize_aperture_bare::Migration),
+            Box::new(m20260711_000026_add_negatives_pickup::Migration),
         ]
     }
 }

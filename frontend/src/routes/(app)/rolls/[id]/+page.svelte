@@ -1189,6 +1189,7 @@
 				bind:autoPrompt={devAutoPrompt}
 				currentStatus={roll?.status ?? null}
 				defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
+				negativesDeadline={roll?.negatives_deadline ?? null}
 				onchange={() => loadRollData('dev')}
 				onpromptcancel={() => {
 					statusNotice = 'Status unchanged — no development record was saved.';

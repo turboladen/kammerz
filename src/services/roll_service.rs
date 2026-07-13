@@ -50,6 +50,19 @@ pub struct RollWithDetails {
     pub lens_name: Option<String>,
     // Aggregate: number of shots logged on this roll (for the frame counter)
     pub shot_count: i64,
+    // Negatives-pickup ingredients (LEFT JOINed from the roll's lab dev + its lab).
+    // All Option because a roll may have no lab dev. `negatives_deadline` is
+    // date_received + retention (default 30), computed in SQL; the frontend
+    // derives the live countdown/state from it. It is NULL unless date_received
+    // is a full `YYYY-MM-DD` (validate_date_opt also accepts bare `YYYY`/`YYYY-MM`,
+    // for which SQLite's date() yields garbage/NULL — the `length >= 10` guard in
+    // the query excludes those so a partial date shows no countdown, not a bogus one).
+    pub lab_dev_id: Option<i32>,
+    pub lab_name: Option<String>,
+    pub negatives_date_received: Option<String>,
+    pub negatives_deadline: Option<String>,
+    pub date_negatives_picked_up: Option<String>,
+    pub negatives_not_collecting: Option<bool>,
 }
 
 const ROLLS_WITH_DETAILS_SQL: &str = "\
@@ -62,11 +75,21 @@ const ROLLS_WITH_DETAILS_SQL: &str = "\
            fs.iso AS film_stock_iso, \
            l.brand AS lens_brand, \
            COALESCE(l.model, l.focal_length) AS lens_name, \
-           (SELECT COUNT(*) FROM shots s WHERE s.roll_id = r.id) AS shot_count \
+           (SELECT COUNT(*) FROM shots s WHERE s.roll_id = r.id) AS shot_count, \
+           dl.id AS lab_dev_id, \
+           lab.name AS lab_name, \
+           dl.date_received AS negatives_date_received, \
+           CASE WHEN dl.date_received IS NOT NULL AND length(dl.date_received) >= 10 \
+                THEN date(dl.date_received, '+' || COALESCE(lab.negative_retention_days, 30) || ' days') \
+                ELSE NULL END AS negatives_deadline, \
+           dl.date_negatives_picked_up AS date_negatives_picked_up, \
+           dl.negatives_not_collecting AS negatives_not_collecting \
     FROM rolls r \
     LEFT JOIN cameras c ON r.camera_id = c.id \
     LEFT JOIN film_stocks fs ON r.film_stock_id = fs.id \
-    LEFT JOIN lenses l ON r.lens_id = l.id";
+    LEFT JOIN lenses l ON r.lens_id = l.id \
+    LEFT JOIN development_labs dl ON dl.roll_id = r.id \
+    LEFT JOIN labs lab ON dl.lab_id = lab.id";
 
 /// Data for a single shot during roll import.
 pub struct ImportShotEntry {

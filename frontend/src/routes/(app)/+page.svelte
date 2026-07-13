@@ -6,13 +6,17 @@
 	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
 	import FilmLeader from '$lib/components/ui/FilmLeader.svelte';
 	import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
+	import NegativesBadge from '$lib/components/ui/NegativesBadge.svelte';
 	import { AlertTriangle } from 'lucide-svelte';
 	import { listRolls } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import { listLenses } from '$lib/api/lenses';
 	import { listFilmStocks } from '$lib/api/film-stocks';
+	import { updateLabDev } from '$lib/api/development';
 	import type { RollWithDetails, Camera as CameraType, Lens, FilmStock, RollStatus } from '$lib/types';
 	import { allStatusOrder, statusConfig } from '$lib/utils/status';
+	import { negativesState, isNegativesPending } from '$lib/utils/negatives';
+	import { todayLocal } from '$lib/utils/date';
 
 	let rolls: RollWithDetails[] = $state([]);
 	let cameras: CameraType[] = $state([]);
@@ -56,6 +60,30 @@
 
 	const needsAttention = $derived(rolls.filter((r) => !r.camera_id && r.status !== 'archived'));
 
+	// Rolls whose negatives are still at the lab (awaiting or overdue), each with
+	// its live view. Sorted ascending by daysLeft → most-overdue first, then
+	// soonest deadline (overdue has negative daysLeft).
+	const negativesPending = $derived.by(() => {
+		// One `now` for the whole pass so every roll's awaiting/overdue split is
+		// evaluated against the same instant (and to avoid an allocation per roll).
+		const now = new Date();
+		return rolls
+			.map((roll) => ({ roll, view: negativesState(roll, now) }))
+			.filter((x) => isNegativesPending(x.view))
+			.sort((a, b) => (a.view.daysLeft ?? 0) - (b.view.daysLeft ?? 0));
+	});
+	const negativesOverdueCount = $derived(negativesPending.filter((x) => x.view.status === 'overdue').length);
+
+	async function pickUpFromDashboard(rollLabDevId: number | null) {
+		if (rollLabDevId == null) return;
+		try {
+			await updateLabDev(rollLabDevId, { date_negatives_picked_up: todayLocal() });
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
 	// Status distribution for the progress bar (uses shared allStatusOrder + statusConfig)
 	const statusSegments = $derived(
 		allStatusOrder
@@ -96,6 +124,21 @@
 <div class="flex-1 p-6">
 	{#if error}
 		<div class="mb-4 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+	{/if}
+
+	{#if negativesPending.length > 0}
+		<div
+			class="mb-4 rounded-lg border px-4 py-3 {negativesOverdueCount > 0
+				? 'border-danger/50 bg-danger/10 text-danger-fg'
+				: 'border-accent/40 bg-accent/10 text-accent'}"
+		>
+			<a href="#negatives-to-collect" class="font-medium">
+				{negativesPending.length}
+				{negativesPending.length === 1 ? 'roll' : 'rolls'} of negatives to collect{negativesOverdueCount > 0
+					? ` — ${negativesOverdueCount} overdue`
+					: ''}.
+			</a>
+		</div>
 	{/if}
 
 	{#if loading}
@@ -281,6 +324,36 @@
 					</div>
 				</div>
 			</FadeIn>
+		{/if}
+
+		<!-- Negatives to Collect -->
+		{#if negativesPending.length > 0}
+			<section id="negatives-to-collect" class="mt-8">
+				<FadeIn delay={250}>
+					<h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-text-faint">Negatives to Collect</h2>
+					<div class="divide-y divide-border-subtle">
+						{#each negativesPending as { roll, view } (roll.id)}
+							<div class="flex flex-wrap items-center gap-3 px-4 py-2.5">
+								<a href="/rolls/{roll.id}?from=dashboard" class="font-mono text-sm text-text hover:text-accent"
+									>{roll.roll_id}</a
+								>
+								{#if roll.film_stock_brand}
+									<span class="text-sm text-text-muted">{roll.film_stock_brand} {roll.film_stock_name ?? ''}</span>
+								{/if}
+								{#if roll.lab_name}
+									<span class="text-sm text-text-faint">{roll.lab_name}</span>
+								{/if}
+								<NegativesBadge {view} />
+								<div class="ml-auto">
+									<Button size="sm" variant="ghost" onclick={() => pickUpFromDashboard(roll.lab_dev_id)}
+										>Picked up</Button
+									>
+								</div>
+							</div>
+						{/each}
+					</div>
+				</FadeIn>
+			</section>
 		{/if}
 	{/if}
 </div>

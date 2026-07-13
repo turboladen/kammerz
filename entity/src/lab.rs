@@ -10,6 +10,7 @@ pub struct Model {
     pub location: Option<String>,
     pub website: Option<String>,
     pub notes: Option<String>,
+    pub negative_retention_days: Option<i32>,
     pub created_at: String,
     pub updated_at: String,
 }

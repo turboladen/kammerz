@@ -6,6 +6,8 @@
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
+	import NegativesBadge from '$lib/components/ui/NegativesBadge.svelte';
+	import { negativesState } from '$lib/utils/negatives';
 	import { ChevronUp, ChevronDown, X } from 'lucide-svelte';
 	import {
 		createLabDev,
@@ -30,6 +32,7 @@
 		autoPrompt = $bindable(null),
 		currentStatus = null,
 		defaultDate = '',
+		negativesDeadline = null,
 		onchange,
 		onpromptcancel
 	}: {
@@ -44,6 +47,8 @@
 		 * recording dev info on a scanned roll). */
 		currentStatus?: RollStatus | null;
 		defaultDate?: string;
+		/** roll.negatives_deadline (date_received + retention), for the pickup countdown. */
+		negativesDeadline?: string | null;
 		onchange: () => Promise<void>;
 		/** Fired when a dialog opened via autoPrompt is dismissed without saving. */
 		onpromptcancel?: () => void;
@@ -55,6 +60,47 @@
 	let showDevDeleteConfirm = $state(false);
 	let devDeleteType: 'lab' | 'self' = $state('lab');
 	let devDeleteError = $state('');
+	let showWaiveConfirm = $state(false);
+
+	const negView = $derived(
+		labDev
+			? negativesState(
+					{
+						negatives_date_received: labDev.date_received,
+						negatives_deadline: negativesDeadline,
+						date_negatives_picked_up: labDev.date_negatives_picked_up,
+						negatives_not_collecting: labDev.negatives_not_collecting
+					},
+					new Date()
+				)
+			: null
+	);
+
+	async function markPickedUp() {
+		if (!labDev) return;
+		devDeleteError = '';
+		try {
+			await updateLabDev(labDev.id, { date_negatives_picked_up: todayLocal() });
+			await onchange();
+		} catch (err) {
+			devDeleteError = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	async function markNotCollecting() {
+		if (!labDev) return;
+		devDeleteError = '';
+		try {
+			await updateLabDev(labDev.id, { negatives_not_collecting: true });
+			await onchange();
+		} catch (err) {
+			devDeleteError = err instanceof Error ? err.message : String(err);
+		} finally {
+			// Always close the confirm dialog — ConfirmDialog doesn't self-close, so
+			// on an error path the parent must reset the bound `open` or it sticks.
+			showWaiveConfirm = false;
+		}
+	}
 
 	// Auto-prompt bookkeeping: which status chevron opened the current dialog (null when
 	// opened via Edit or with no specific target), and whether the dialog was opened by a
@@ -403,6 +449,20 @@
 			{#if labDev.notes}
 				<p class="mt-1 text-xs text-text-faint">{labDev.notes}</p>
 			{/if}
+			{#if negView && negView.status !== 'na'}
+				<div class="mt-2 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-2">
+					<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Negatives</span>
+					{#if negView.status === 'picked-up'}
+						<span class="text-text-muted">Collected · {labDev.date_negatives_picked_up}</span>
+					{:else if negView.status === 'waived'}
+						<span class="text-text-muted">Not collecting</span>
+					{:else}
+						<NegativesBadge view={negView} />
+						<Button size="sm" variant="ghost" onclick={markPickedUp}>Mark picked up</Button>
+						<Button size="sm" variant="ghost" onclick={() => (showWaiveConfirm = true)}>Not collecting</Button>
+					{/if}
+				</div>
+			{/if}
 		</div>
 	{:else if selfDev}
 		<div class="group rounded-lg border border-border bg-surface-raised p-4">
@@ -614,3 +674,13 @@
 		}}
 	/>
 {/if}
+
+<!-- Waive Negatives Pickup Confirmation -->
+<ConfirmDialog
+	bind:open={showWaiveConfirm}
+	title="Not collecting negatives?"
+	message="This silences the pickup reminder for this roll. You can still see the lab dev record."
+	confirmLabel="Not collecting"
+	onconfirm={markNotCollecting}
+	oncancel={() => (showWaiveConfirm = false)}
+/>
