@@ -21,6 +21,7 @@
 	let location = $state('');
 	let website = $state('');
 	let notes = $state('');
+	let retentionDays = $state('');
 
 	async function load() {
 		try {
@@ -37,6 +38,7 @@
 		location = '';
 		website = '';
 		notes = '';
+		retentionDays = '';
 	}
 
 	function openAddDialog() {
@@ -56,7 +58,8 @@
 				name: name.trim(),
 				location: location || null,
 				website: website || null,
-				notes: notes || null
+				notes: notes || null,
+				negative_retention_days: retentionDays ? parseInt(retentionDays, 10) : null
 			};
 			await createLab(lab);
 			showAddDialog = false;
@@ -74,6 +77,7 @@
 		location = lab.location ?? '';
 		website = lab.website ?? '';
 		notes = lab.notes ?? '';
+		retentionDays = lab.negative_retention_days?.toString() ?? '';
 	}
 
 	async function handleEdit() {
@@ -88,7 +92,8 @@
 				name: name.trim(),
 				location: location || null,
 				website: website || null,
-				notes: notes || null
+				notes: notes || null,
+				negative_retention_days: retentionDays ? parseInt(retentionDays, 10) : null
 			});
 			editingLab = null;
 			resetForm();
@@ -176,6 +181,7 @@
 		<Input label="Location" bind:value={location} placeholder="San Clemente, CA" />
 		<Input label="Website" bind:value={website} placeholder="thedarkroom.com" />
 		<Textarea label="Notes" bind:value={notes} />
+		<Input label="Negative retention (days)" type="number" bind:value={retentionDays} placeholder="30" />
 		{#if error}
 			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 		{/if}
@@ -206,6 +212,7 @@
 			<Input label="Location" bind:value={location} />
 			<Input label="Website" bind:value={website} />
 			<Textarea label="Notes" bind:value={notes} />
+			<Input label="Negative retention (days)" type="number" bind:value={retentionDays} placeholder="30" />
 			{#if error}
 				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 			{/if}
