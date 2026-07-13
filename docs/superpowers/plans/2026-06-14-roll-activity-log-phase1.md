@@ -1,5 +1,7 @@
 # Roll Activity Log (Phase 1 — Backend) Implementation Plan
 
+> **Status:** Implemented — dated design record, kept as history. Current architecture decisions live in the [ADR index](../../adr/README.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add an append-only `roll_events` activity log to the backend, emit events on every roll/shot/development mutation, and expose them on the roll detail endpoint — the data foundation for the redesigned roll page (Phase 2).

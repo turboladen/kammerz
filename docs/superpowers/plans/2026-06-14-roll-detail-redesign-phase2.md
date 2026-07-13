@@ -1,5 +1,7 @@
 # Roll Detail Redesign — Phase 2 (Two-Pane Page) Implementation Plan
 
+> **Status:** Implemented — dated design record, kept as history. Current architecture decisions live in the [ADR index](../../adr/README.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. **Visual treatment is governed by the `design-system` skill — invoke it before writing component markup; this plan specifies structure, props, logic, and data flow, not pixel-final CSS.**
 
 **Goal:** Replace the roll-detail page's stacked Status + Timeline + Development + Shots sections with a two-pane layout — film-strip metadata card → restored chevron status control → **Frames pane** (always-on quick-add bar + horizontal scrolling frame strip) + **Activity pane** (a journal rendering the Phase 1 `roll_events` log) — with development details edited from their journal events.

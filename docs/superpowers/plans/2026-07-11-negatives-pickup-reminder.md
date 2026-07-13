@@ -1,5 +1,7 @@
 # Negatives Pickup Reminder Implementation Plan
 
+> **Status:** Implemented — dated design record, kept as history. Current architecture decisions live in the [ADR index](../../adr/README.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Remind the user to collect lab-developed negatives before the lab's retention window (default 30 days) expires, via a dashboard banner, a dedicated section, per-roll badges, and roll-detail controls.

@@ -1,5 +1,7 @@
 # Port Kammerz to Axum + SvelteKit Web App — Implementation Plan
 
+> **Status:** Implemented — dated design record, kept as history. Current architecture decisions live in the [ADR index](../../adr/README.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Convert the Tauri 2 desktop app into a self-hosted axum + SvelteKit web app (single-password auth, LAN + UniFi-VPN access) while reusing the existing SeaORM/SQLite core unchanged.

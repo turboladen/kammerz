@@ -15,4 +15,5 @@
 
 - Another SeaORM + SQLite project by the same author: `~/Development/projects/financier` (same SeaORM patterns). The axum + tower-sessions + rust-embed server structure mirrors `~/Development/projects/chorez`.
 - `UI_DESIGN.md` documents the visual design system (colors, typography, components, layout).
+- **Architecture Decision Records** live in `docs/adr/` (see `docs/adr/README.md`). Write an ADR when a decision is cross-cutting/architectural or likely to be reversed — feature design still lives in a `docs/superpowers/` spec; promote the durable decision to an ADR. ADRs are immutable once Accepted: supersede with a new ADR, don't edit. The dated `docs/superpowers/specs`/`plans` archives each carry a one-line `Status:` header pointing at current ADRs.
 - Project rules live in `.claude/rules/*.md`, imported from the root `CLAUDE.md`. The Beads issue-tracker block in `CLAUDE.md` is managed by `bd` (between its `BEGIN/END BEADS INTEGRATION` markers) — don't hand-edit it or move it into a rule file.

@@ -1,5 +1,7 @@
 # Quick Entry UX Refinement Implementation Plan
 
+> **Status:** Implemented — dated design record, kept as history. Current architecture decisions live in the [ADR index](../../adr/README.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the standalone `/quick-entry` page's bare dropdown + bespoke form with a visual roll picker and the same `QuickAddBar` + `FrameStrip` logging UI the roll-detail page already uses.

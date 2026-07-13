@@ -1,5 +1,7 @@
 # Quick Entry UX Refinement — Design (kammerz-ife)
 
+> **Status:** Implemented — dated design record, kept as history. Current architecture decisions live in the [ADR index](../../adr/README.md).
+
 ## Problem
 
 The standalone `/quick-entry` page (`frontend/src/routes/(app)/quick-entry/+page.svelte`)

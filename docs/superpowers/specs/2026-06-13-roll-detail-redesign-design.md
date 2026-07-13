@@ -1,5 +1,7 @@
 # Roll Detail Page — UX Redesign
 
+> **Status:** Implemented — dated design record, kept as history. Current architecture decisions live in the [ADR index](../../adr/README.md).
+
 **Date:** 2026-06-13
 **Status:** Design approved in brainstorming; pending spec review
 **Supersedes:** PR #91 (lifecycle stepper) and the original framing of kammerz-06i

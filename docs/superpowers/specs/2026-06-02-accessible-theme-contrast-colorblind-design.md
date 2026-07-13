@@ -1,5 +1,7 @@
 # Accessible theme: contrast + red/green-safe palette
 
+> **Status:** Implemented — dated design record, kept as history. Current architecture decisions live in the [ADR index](../../adr/README.md).
+
 **Date:** 2026-06-02
 **Status:** Implemented (see revision below)
 

@@ -1,5 +1,7 @@
 # Accessible Theme (Contrast + Red/Green-Safe Palette) Implementation Plan
 
+> **Status:** Implemented — dated design record, kept as history. Current architecture decisions live in the [ADR index](../../adr/README.md).
+
 > **Superseded 2026-06-03 — read as history.** This plan was written for the
 > original approach that _kept the warm-brown surfaces_. Real-app review showed
 > that warmth was the problem, so the implemented theme pivoted to a **neutral

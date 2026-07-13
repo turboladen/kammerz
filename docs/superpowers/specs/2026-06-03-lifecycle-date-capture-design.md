@@ -1,5 +1,7 @@
 # Lifecycle date capture & editing — design spec
 
+> **Status:** Implemented — dated design record. Its fuzzy-date portion is **superseded by [ADR-0004](../../adr/0004-remove-fuzzy-dates.md)** (`date_fuzzy` was removed). See the [ADR index](../../adr/README.md).
+
 **Bead:** kammerz-b08 · **Related:** kammerz-a7e (state-machine review) · **Date:** 2026-06-03
 
 ## Context / problem

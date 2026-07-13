@@ -1,5 +1,7 @@
 # Negatives Pickup Reminder — Design
 
+> **Status:** Implemented — dated design record, kept as history. Current architecture decisions live in the [ADR index](../../adr/README.md).
+
 **Date:** 2026-07-10
 **Status:** Approved (brainstorm), pending implementation plan
 

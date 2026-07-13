@@ -1,5 +1,7 @@
 # Lifecycle Date Capture & Editing — Implementation Plan
 
+> **Status:** Implemented — dated design record. Its fuzzy-date portion is **superseded by [ADR-0004](../../adr/0004-remove-fuzzy-dates.md)** (`date_fuzzy` was removed). See the [ADR index](../../adr/README.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let the user record the _real_ date of every roll lifecycle milestone (including the missing Lab Done → "received back" date) via a confirm-on-transition prompt, and edit any date directly from an inline-editable Timeline.
