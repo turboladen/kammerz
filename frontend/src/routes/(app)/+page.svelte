@@ -220,7 +220,7 @@
 						{#each negativesPending as { roll, view } (roll.id)}
 							<div class="flex flex-wrap items-center gap-3 px-4 py-2.5">
 								<Button size="sm" variant="secondary" onclick={() => pickUpFromDashboard(roll.lab_dev_id)}>
-									<Check size={14} strokeWidth={2} aria-hidden="true" /> Pick up
+									<Check size={14} strokeWidth={2} aria-hidden="true" /> Picked up
 								</Button>
 								<a href="/rolls/{roll.id}?from=dashboard" class="font-mono text-sm text-text hover:text-accent"
 									>{roll.roll_id}</a
