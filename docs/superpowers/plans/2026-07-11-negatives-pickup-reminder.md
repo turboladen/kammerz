@@ -4,7 +4,7 @@
 
 **Goal:** Remind the user to collect lab-developed negatives before the lab's retention window (default 30 days) expires, via a dashboard banner, a dedicated section, per-roll badges, and roll-detail controls.
 
-**Architecture:** Additive-only. Three new columns (`labs.negative_retention_days`, `development_labs.date_negatives_picked_up`, `development_labs.negatives_not_collecting`) carry the raw facts; the pickup **state** (na / awaiting / overdue / picked-up / waived) is *derived*, never stored. The existing joined roll-list query (`RollWithDetails`) is extended to carry the ingredients + a SQL-computed deadline, so the dashboard's existing `listRolls()` feeds every read surface with no new endpoint. Pickup/waive ride the existing `PUT /api/development/lab/:id`. Nothing in the roll status machine changes.
+**Architecture:** Additive-only. Three new columns (`labs.negative_retention_days`, `development_labs.date_negatives_picked_up`, `development_labs.negatives_not_collecting`) carry the raw facts; the pickup **state** (na / awaiting / overdue / picked-up / waived) is _derived_, never stored. The existing joined roll-list query (`RollWithDetails`) is extended to carry the ingredients + a SQL-computed deadline, so the dashboard's existing `listRolls()` feeds every read surface with no new endpoint. Pickup/waive ride the existing `PUT /api/development/lab/:id`. Nothing in the roll status machine changes.
 
 **Tech Stack:** axum 0.8 + SeaORM 1.1 + SQLite (backend), SvelteKit + Svelte 5 runes + Tailwind 4 (frontend), vitest (frontend unit) + `cargo test` in-memory SQLite (backend integration).
 
@@ -14,7 +14,7 @@
 
 - Rust edition 2024, workspace MSRV 1.85.0; clippy is a hard gate (`-D warnings`).
 - Use the wrapper extractors `crate::extract::{Json, Path}` on handlers, never `axum::extract::*`.
-- `date_received` means *"the lab notified me the order is ready"* (call/text for develop-only, email/Dropbox for develop+scan) — the countdown start — **not** physical possession. Physical possession is `date_negatives_picked_up`.
+- `date_received` means _"the lab notified me the order is ready"_ (call/text for develop-only, email/Dropbox for develop+scan) — the countdown start — **not** physical possession. Physical possession is `date_negatives_picked_up`.
 - Retention default is **30**, encoded once as `COALESCE(..., 30)` in SQL — do not backfill the column.
 - Pickup/waive edits must **not** touch `date_received`, so the existing lab-dev status auto-sync stays dormant (negatives are orthogonal to the status machine).
 - Frontend: never inline status pills — use a component. Svelte 5 runes only (`$state`/`$derived`/`$props`/`$bindable`). `onclick={}` on buttons.
@@ -24,10 +24,12 @@
 ## File Structure
 
 **Backend (create):**
+
 - `migration/src/m20260711_000026_add_negatives_pickup.rs` — the three columns.
 - `tests/negatives.rs` — integration tests for the API + SQL surface.
 
 **Backend (modify):**
+
 - `migration/src/lib.rs` — register migration 026.
 - `entity/src/lab.rs` — add `negative_retention_days`.
 - `entity/src/development_lab.rs` — add `date_negatives_picked_up`, `negatives_not_collecting`.
@@ -37,11 +39,13 @@
 - `src/services/roll_service.rs` — extend `RollWithDetails` struct + `ROLLS_WITH_DETAILS_SQL`.
 
 **Frontend (create):**
+
 - `frontend/src/lib/utils/negatives.ts` — pure derivation (`negativesState`, `isNegativesPending`).
 - `frontend/src/lib/utils/negatives.test.ts` — vitest.
 - `frontend/src/lib/components/ui/NegativesBadge.svelte` — the countdown pill.
 
 **Frontend (modify):**
+
 - `frontend/src/lib/types/index.ts` — extend `RollWithDetails`, `DevelopmentLab`, `Lab`, `RollEventType`.
 - `frontend/src/lib/components/rolls/DevelopmentSection.svelte` — pickup/waive controls + state display on the lab card.
 - `frontend/src/routes/(app)/rolls/[id]/+page.svelte` — pass `negativesDeadline` down.
@@ -54,11 +58,13 @@
 ### Task 1: Schema — migration + entity fields
 
 **Files:**
+
 - Create: `migration/src/m20260711_000026_add_negatives_pickup.rs`
 - Modify: `migration/src/lib.rs`, `entity/src/lab.rs:6-14`, `entity/src/development_lab.rs:6-16`
 - Test: `tests/negatives.rs`
 
 **Interfaces:**
+
 - Produces: `lab::Model.negative_retention_days: Option<i32>`; `development_lab::Model.date_negatives_picked_up: Option<String>`, `development_lab::Model.negatives_not_collecting: bool`.
 
 - [ ] **Step 1: Write the failing test**
@@ -146,14 +152,14 @@ Expected: FAIL — compile error, `negative_retention_days` / `date_negatives_pi
 In `entity/src/lab.rs`, inside `Model`, after `pub notes: Option<String>,`:
 
 ```rust
-    pub negative_retention_days: Option<i32>,
+pub negative_retention_days: Option<i32>,
 ```
 
 In `entity/src/development_lab.rs`, inside `Model`, after `pub notes: Option<String>,`:
 
 ```rust
-    pub date_negatives_picked_up: Option<String>,
-    pub negatives_not_collecting: bool,
+pub date_negatives_picked_up: Option<String>,
+pub negatives_not_collecting: bool,
 ```
 
 - [ ] **Step 4: Write the migration**
@@ -267,7 +273,7 @@ mod m20260711_000026_add_negatives_pickup;
 and add to the `vec![...]` after the `m20260701_000025_normalize_aperture_bare::Migration` entry:
 
 ```rust
-            Box::new(m20260711_000026_add_negatives_pickup::Migration),
+Box::new(m20260711_000026_add_negatives_pickup::Migration),
 ```
 
 - [ ] **Step 6: Run the test to verify it passes**
@@ -298,10 +304,12 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 2: Labs API — retention field
 
 **Files:**
+
 - Modify: `src/routes/labs.rs`
 - Test: `tests/negatives.rs`
 
 **Interfaces:**
+
 - Consumes: `lab::Model.negative_retention_days` (Task 1).
 - Produces: `POST /api/labs` accepts `negative_retention_days: number|null`; `PUT /api/labs/:id` accepts it as a nullable patch; both validate non-negative.
 
@@ -365,35 +373,35 @@ Add `use crate::validate::validate_non_negative_i32;` alongside the existing `us
 In `CreateLabDto`, after `pub notes: Option<String>,`:
 
 ```rust
-    pub negative_retention_days: Option<i32>,
+pub negative_retention_days: Option<i32>,
 ```
 
 In `UpdateLabDto`, after the `notes` field:
 
 ```rust
-    #[serde(deserialize_with = "double_option")]
-    pub negative_retention_days: Option<Option<i32>>,
+#[serde(deserialize_with = "double_option")]
+pub negative_retention_days: Option<Option<i32>>,
 ```
 
 In `create`, after `let name = require_nonempty("name", &data.name)?;`:
 
 ```rust
-    validate_non_negative_i32("negative_retention_days", data.negative_retention_days)?;
+validate_non_negative_i32("negative_retention_days", data.negative_retention_days)?;
 ```
 
 and in the `lab::ActiveModel { ... }` literal, after `notes: trim_opt(data.notes),`:
 
 ```rust
-        negative_retention_days: Set(data.negative_retention_days),
+negative_retention_days: Set(data.negative_retention_days),
 ```
 
 In `update`, after the `if let Some(v) = data.notes { ... }` block:
 
 ```rust
-    if let Some(v) = data.negative_retention_days {
-        validate_non_negative_i32("negative_retention_days", v)?;
-        model.negative_retention_days = Set(v);
-    }
+if let Some(v) = data.negative_retention_days {
+    validate_non_negative_i32("negative_retention_days", v)?;
+    model.negative_retention_days = Set(v);
+}
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -416,10 +424,12 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 3: Lab dev API — pickup / waive + journal events
 
 **Files:**
+
 - Modify: `entity/src/roll_event.rs`, `src/routes/development.rs`
 - Test: `tests/negatives.rs`
 
 **Interfaces:**
+
 - Consumes: `development_lab::Model.date_negatives_picked_up`, `.negatives_not_collecting` (Task 1); `RollEventService::record` (unchanged).
 - Produces: `PUT /api/development/lab/:id` accepts `date_negatives_picked_up: string|null` and `negatives_not_collecting: bool`; logs `negatives_picked_up` / `negatives_waived` roll events; does NOT alter roll status.
 
@@ -525,12 +535,12 @@ Expected: FAIL — DTO ignores the field, so `date_negatives_picked_up` stays nu
 In `entity/src/roll_event.rs`, inside `RollEventType`, after the `SelfDevRemoved` variant:
 
 ```rust
-    #[sea_orm(string_value = "negatives_picked_up")]
-    #[serde(rename = "negatives_picked_up")]
-    NegativesPickedUp,
-    #[sea_orm(string_value = "negatives_waived")]
-    #[serde(rename = "negatives_waived")]
-    NegativesWaived,
+#[sea_orm(string_value = "negatives_picked_up")]
+#[serde(rename = "negatives_picked_up")]
+NegativesPickedUp,
+#[sea_orm(string_value = "negatives_waived")]
+#[serde(rename = "negatives_waived")]
+NegativesWaived,
 ```
 
 - [ ] **Step 4: Extend `UpdateLabDevDto` and the handler**
@@ -538,71 +548,71 @@ In `entity/src/roll_event.rs`, inside `RollEventType`, after the `SelfDevRemoved
 In `src/routes/development.rs`, in `UpdateLabDevDto`, after the `notes` field:
 
 ```rust
-    #[serde(deserialize_with = "double_option")]
-    pub date_negatives_picked_up: Option<Option<String>>,
-    pub negatives_not_collecting: Option<bool>,
+#[serde(deserialize_with = "double_option")]
+pub date_negatives_picked_up: Option<Option<String>>,
+pub negatives_not_collecting: Option<bool>,
 ```
 
 In `update_lab_dev`, after the existing `if let Some(v) = data.date_received { validate_date_opt(...) }` block, add validation:
 
 ```rust
-    if let Some(v) = &data.date_negatives_picked_up {
-        validate_date_opt("date_negatives_picked_up", v)?;
-    }
+if let Some(v) = &data.date_negatives_picked_up {
+    validate_date_opt("date_negatives_picked_up", v)?;
+}
 ```
 
 Immediately after `let old_received_present = existing.date_received.is_some();`, capture the pre-edit negatives state (needed to pick the right journal event and read before `existing` is moved):
 
 ```rust
-    // Which specialized negatives action (if any) this edit performs — captured
-    // before `existing` is consumed. Pickup takes priority over waive over a
-    // plain edit for the journal entry.
-    let picking_up = matches!(&data.date_negatives_picked_up, Some(Some(s)) if !s.trim().is_empty())
-        && existing.date_negatives_picked_up.is_none();
-    let waiving = data.negatives_not_collecting == Some(true) && !existing.negatives_not_collecting;
+// Which specialized negatives action (if any) this edit performs — captured
+// before `existing` is consumed. Pickup takes priority over waive over a
+// plain edit for the journal entry.
+let picking_up = matches!(&data.date_negatives_picked_up, Some(Some(s)) if !s.trim().is_empty())
+    && existing.date_negatives_picked_up.is_none();
+let waiving = data.negatives_not_collecting == Some(true) && !existing.negatives_not_collecting;
 ```
 
 Inside the transaction closure, after the `if let Some(v) = data.notes { ... }` block, apply the new fields:
 
 ```rust
-            if let Some(v) = data.date_negatives_picked_up {
-                model.date_negatives_picked_up = trim_opt(v);
-            }
-            if let Some(v) = data.negatives_not_collecting {
-                model.negatives_not_collecting = Set(v);
-            }
+if let Some(v) = data.date_negatives_picked_up {
+    model.date_negatives_picked_up = trim_opt(v);
+}
+if let Some(v) = data.negatives_not_collecting {
+    model.negatives_not_collecting = Set(v);
+}
 ```
 
 Replace the existing unconditional `RollEventService::record(... LabDevEdited ...)` call with a branch that logs the salient event (pickup/waive) instead of a generic edit:
 
 ```rust
-            let (event_type, summary) = if picking_up {
-                (
-                    entity::roll_event::RollEventType::NegativesPickedUp,
-                    "Negatives picked up".to_string(),
-                )
-            } else if waiving {
-                (
-                    entity::roll_event::RollEventType::NegativesWaived,
-                    "Negatives marked not for collection".to_string(),
-                )
-            } else {
-                (
-                    entity::roll_event::RollEventType::LabDevEdited,
-                    "Lab development edited".to_string(),
-                )
-            };
-            RollEventService::record(
-                txn,
-                result.roll_id,
-                event_type,
-                None,
-                None,
-                Some(entity::roll_event::RefKind::LabDev),
-                Some(id),
-                summary,
-            )
-            .await?;
+let (event_type, summary) = if picking_up {
+    (
+        entity::roll_event::RollEventType::NegativesPickedUp,
+        "Negatives picked up".to_string(),
+    )
+} else if waiving {
+    (
+        entity::roll_event::RollEventType::NegativesWaived,
+        "Negatives marked not for collection".to_string(),
+    )
+} else {
+    (
+        entity::roll_event::RollEventType::LabDevEdited,
+        "Lab development edited".to_string(),
+    )
+};
+RollEventService::record(
+    txn,
+    result.roll_id,
+    event_type,
+    None,
+    None,
+    Some(entity::roll_event::RefKind::LabDev),
+    Some(id),
+    summary,
+)
+.await?;
 ```
 
 (The existing `resync_lab_dev_status` block above this is unchanged — it fires only on `date_received` presence change, which pickup/waive never touches.)
@@ -632,10 +642,12 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 4: Roll list query carries the pickup ingredients
 
 **Files:**
+
 - Modify: `src/services/roll_service.rs:20-70` (`RollWithDetails` struct + `ROLLS_WITH_DETAILS_SQL`)
 - Test: `tests/negatives.rs`
 
 **Interfaces:**
+
 - Consumes: the schema from Task 1, the create flow from Task 3's `lab_developed_roll` helper.
 - Produces: every `RollWithDetails` row (used by `GET /api/rolls`, `/for-camera`, `/{id}`, `/{id}/detail`) now carries `lab_dev_id: Option<i32>`, `lab_name: Option<String>`, `negatives_date_received: Option<String>`, `negatives_deadline: Option<String>`, `date_negatives_picked_up: Option<String>`, `negatives_not_collecting: Option<bool>`.
 
@@ -716,16 +728,16 @@ Expected: FAIL — the fields don't exist in the JSON (deserialization of `Value
 In `src/services/roll_service.rs`, in `RollWithDetails`, after `pub shot_count: i64,`:
 
 ```rust
-    // Negatives-pickup ingredients (LEFT JOINed from the roll's lab dev + its lab).
-    // All Option because a roll may have no lab dev. `negatives_deadline` is
-    // date_received + retention (default 30), computed in SQL; the frontend
-    // derives the live countdown/state from it.
-    pub lab_dev_id: Option<i32>,
-    pub lab_name: Option<String>,
-    pub negatives_date_received: Option<String>,
-    pub negatives_deadline: Option<String>,
-    pub date_negatives_picked_up: Option<String>,
-    pub negatives_not_collecting: Option<bool>,
+// Negatives-pickup ingredients (LEFT JOINed from the roll's lab dev + its lab).
+// All Option because a roll may have no lab dev. `negatives_deadline` is
+// date_received + retention (default 30), computed in SQL; the frontend
+// derives the live countdown/state from it.
+pub lab_dev_id: Option<i32>,
+pub lab_name: Option<String>,
+pub negatives_date_received: Option<String>,
+pub negatives_deadline: Option<String>,
+pub date_negatives_picked_up: Option<String>,
+pub negatives_not_collecting: Option<bool>,
 ```
 
 - [ ] **Step 4: Extend the SQL**
@@ -733,31 +745,31 @@ In `src/services/roll_service.rs`, in `RollWithDetails`, after `pub shot_count: 
 In `ROLLS_WITH_DETAILS_SQL`, change the final `shot_count` select line to add the new columns after it, and add the two joins. Replace:
 
 ```rust
-           (SELECT COUNT(*) FROM shots s WHERE s.roll_id = r.id) AS shot_count \
-    FROM rolls r \
-    LEFT JOIN cameras c ON r.camera_id = c.id \
-    LEFT JOIN film_stocks fs ON r.film_stock_id = fs.id \
-    LEFT JOIN lenses l ON r.lens_id = l.id";
+       (SELECT COUNT(*) FROM shots s WHERE s.roll_id = r.id) AS shot_count \
+FROM rolls r \
+LEFT JOIN cameras c ON r.camera_id = c.id \
+LEFT JOIN film_stocks fs ON r.film_stock_id = fs.id \
+LEFT JOIN lenses l ON r.lens_id = l.id";
 ```
 
 with:
 
 ```rust
-           (SELECT COUNT(*) FROM shots s WHERE s.roll_id = r.id) AS shot_count, \
-           dl.id AS lab_dev_id, \
-           lab.name AS lab_name, \
-           dl.date_received AS negatives_date_received, \
-           CASE WHEN dl.date_received IS NOT NULL \
-                THEN date(dl.date_received, '+' || COALESCE(lab.negative_retention_days, 30) || ' days') \
-                ELSE NULL END AS negatives_deadline, \
-           dl.date_negatives_picked_up AS date_negatives_picked_up, \
-           dl.negatives_not_collecting AS negatives_not_collecting \
-    FROM rolls r \
-    LEFT JOIN cameras c ON r.camera_id = c.id \
-    LEFT JOIN film_stocks fs ON r.film_stock_id = fs.id \
-    LEFT JOIN lenses l ON r.lens_id = l.id \
-    LEFT JOIN development_labs dl ON dl.roll_id = r.id \
-    LEFT JOIN labs lab ON dl.lab_id = lab.id";
+       (SELECT COUNT(*) FROM shots s WHERE s.roll_id = r.id) AS shot_count, \
+       dl.id AS lab_dev_id, \
+       lab.name AS lab_name, \
+       dl.date_received AS negatives_date_received, \
+       CASE WHEN dl.date_received IS NOT NULL \
+            THEN date(dl.date_received, '+' || COALESCE(lab.negative_retention_days, 30) || ' days') \
+            ELSE NULL END AS negatives_deadline, \
+       dl.date_negatives_picked_up AS date_negatives_picked_up, \
+       dl.negatives_not_collecting AS negatives_not_collecting \
+FROM rolls r \
+LEFT JOIN cameras c ON r.camera_id = c.id \
+LEFT JOIN film_stocks fs ON r.film_stock_id = fs.id \
+LEFT JOIN lenses l ON r.lens_id = l.id \
+LEFT JOIN development_labs dl ON dl.roll_id = r.id \
+LEFT JOIN labs lab ON dl.lab_id = lab.id";
 ```
 
 - [ ] **Step 5: Run the tests to verify they pass**
@@ -785,10 +797,12 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 5: Frontend types + shared derivation util
 
 **Files:**
+
 - Create: `frontend/src/lib/utils/negatives.ts`, `frontend/src/lib/utils/negatives.test.ts`
 - Modify: `frontend/src/lib/types/index.ts`
 
 **Interfaces:**
+
 - Consumes: the backend field names from Task 4 (`negatives_date_received`, `negatives_deadline`, `date_negatives_picked_up`, `negatives_not_collecting`).
 - Produces: `negativesState(input: NegativesInput, today: Date): NegativesView`; `isNegativesPending(v: NegativesView): boolean`; types `NegativesStatus`, `NegativesTier`, `NegativesView`, `NegativesInput`.
 
@@ -799,32 +813,32 @@ In `frontend/src/lib/types/index.ts`:
 In `interface RollWithDetails`, after `shot_count: number;`:
 
 ```ts
-	lab_dev_id: number | null;
-	lab_name: string | null;
-	negatives_date_received: string | null;
-	negatives_deadline: string | null;
-	date_negatives_picked_up: string | null;
-	negatives_not_collecting: boolean | null;
+lab_dev_id: number | null;
+lab_name: string | null;
+negatives_date_received: string | null;
+negatives_deadline: string | null;
+date_negatives_picked_up: string | null;
+negatives_not_collecting: boolean | null;
 ```
 
 In `interface DevelopmentLab`, after `notes: string | null;`:
 
 ```ts
-	date_negatives_picked_up: string | null;
-	negatives_not_collecting: boolean;
+date_negatives_picked_up: string | null;
+negatives_not_collecting: boolean;
 ```
 
 In `interface Lab`, after `notes: string | null;`:
 
 ```ts
-	negative_retention_days: number | null;
+negative_retention_days: number | null;
 ```
 
 In the `RollEventType` union (starts at line 172), add two members:
 
 ```ts
-	| 'negatives_picked_up'
-	| 'negatives_waived'
+| 'negatives_picked_up'
+| 'negatives_waived'
 ```
 
 - [ ] **Step 2: Write the failing test**
@@ -1012,10 +1026,12 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 6: NegativesBadge component + roll-list badge + roll-detail controls
 
 **Files:**
+
 - Create: `frontend/src/lib/components/ui/NegativesBadge.svelte`
 - Modify: `frontend/src/lib/components/rolls/DevelopmentSection.svelte`, `frontend/src/routes/(app)/rolls/[id]/+page.svelte`, `frontend/src/routes/(app)/rolls/+page.svelte`
 
 **Interfaces:**
+
 - Consumes: `negativesState`, `isNegativesPending`, `NegativesView` (Task 5); `updateLabDev` (existing); `todayLocal()` (existing in DevelopmentSection).
 - Produces: `<NegativesBadge view={NegativesView} />`; a `negativesDeadline` prop on `DevelopmentSection`.
 
@@ -1061,16 +1077,16 @@ In `frontend/src/lib/components/rolls/DevelopmentSection.svelte`:
 Add imports at the top of the `<script>` (near the other UI imports):
 
 ```ts
-	import NegativesBadge from '$lib/components/ui/NegativesBadge.svelte';
-	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
-	import { negativesState } from '$lib/utils/negatives';
+import NegativesBadge from '$lib/components/ui/NegativesBadge.svelte';
+import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
+import { negativesState } from '$lib/utils/negatives';
 ```
 
 Add a `negativesDeadline` prop. In the `let { ... } = $props()` destructure add `negativesDeadline = null,` and in its `Props` type add:
 
 ```ts
-		/** roll.negatives_deadline (date_received + retention), for the pickup countdown. */
-		negativesDeadline?: string | null;
+/** roll.negatives_deadline (date_received + retention), for the pickup countdown. */
+negativesDeadline?: string | null;
 ```
 
 Add derived state + a waive-confirm flag after the existing `$state`/`$derived` declarations:
@@ -1109,20 +1125,20 @@ Add derived state + a waive-confirm flag after the existing `$state`/`$derived` 
 In the lab-card markup (the `{#if labDev}` block, after the `{#if labDev.date_received}...{/if}` line ~396), add the negatives row:
 
 ```svelte
-				{#if negView && negView.status !== 'na'}
-					<div class="mt-2 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-2">
-						<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Negatives</span>
-						{#if negView.status === 'picked-up'}
-							<span class="text-text-muted">Collected · {labDev.date_negatives_picked_up}</span>
-						{:else if negView.status === 'waived'}
-							<span class="text-text-muted">Not collecting</span>
-						{:else}
-							<NegativesBadge view={negView} />
-							<Button size="sm" variant="ghost" onclick={markPickedUp}>Mark picked up</Button>
-							<Button size="sm" variant="ghost" onclick={() => (showWaiveConfirm = true)}>Not collecting</Button>
-						{/if}
-					</div>
-				{/if}
+{#if negView && negView.status !== 'na'}
+	<div class="mt-2 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-2">
+		<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Negatives</span>
+		{#if negView.status === 'picked-up'}
+			<span class="text-text-muted">Collected · {labDev.date_negatives_picked_up}</span>
+		{:else if negView.status === 'waived'}
+			<span class="text-text-muted">Not collecting</span>
+		{:else}
+			<NegativesBadge view={negView} />
+			<Button size="sm" variant="ghost" onclick={markPickedUp}>Mark picked up</Button>
+			<Button size="sm" variant="ghost" onclick={() => (showWaiveConfirm = true)}>Not collecting</Button>
+		{/if}
+	</div>
+{/if}
 ```
 
 At the end of the component markup (after the existing dialogs), add the confirm dialog:
@@ -1144,7 +1160,7 @@ At the end of the component markup (after the existing dialogs), add the confirm
 In `frontend/src/routes/(app)/rolls/[id]/+page.svelte`, in the `<DevelopmentSection ... />` usage (~line 1186), add the prop:
 
 ```svelte
-				negativesDeadline={roll?.negatives_deadline ?? null}
+negativesDeadline={roll?.negatives_deadline ?? null}
 ```
 
 - [ ] **Step 5: Add the badge to the roll list**
@@ -1152,16 +1168,16 @@ In `frontend/src/routes/(app)/rolls/[id]/+page.svelte`, in the `<DevelopmentSect
 In `frontend/src/routes/(app)/rolls/+page.svelte`, add the imports:
 
 ```ts
-	import NegativesBadge from '$lib/components/ui/NegativesBadge.svelte';
-	import { negativesState, isNegativesPending } from '$lib/utils/negatives';
+import NegativesBadge from '$lib/components/ui/NegativesBadge.svelte';
+import { negativesState, isNegativesPending } from '$lib/utils/negatives';
 ```
 
 In the roll-row markup, next to the roll's status `<Badge>`, render the countdown when pending:
 
 ```svelte
-					{#if isNegativesPending(negativesState(roll, new Date()))}
-						<NegativesBadge view={negativesState(roll, new Date())} />
-					{/if}
+{#if isNegativesPending(negativesState(roll, new Date()))}
+	<NegativesBadge view={negativesState(roll, new Date())} />
+{/if}
 ```
 
 (`roll` is a `RollWithDetails`, which now satisfies `NegativesInput` structurally — no adapter needed.)
@@ -1189,9 +1205,11 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 7: Dashboard banner + "Negatives to Collect" section
 
 **Files:**
+
 - Modify: `frontend/src/routes/(app)/+page.svelte`
 
 **Interfaces:**
+
 - Consumes: `negativesState`, `isNegativesPending` (Task 5); `NegativesBadge` (Task 6); `updateLabDev` (existing); `rolls: RollWithDetails[]` + `load()` (existing in this file).
 - Produces: no exports (page component).
 
@@ -1200,9 +1218,9 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 In `frontend/src/routes/(app)/+page.svelte` `<script>`:
 
 ```ts
-	import NegativesBadge from '$lib/components/ui/NegativesBadge.svelte';
-	import { negativesState, isNegativesPending } from '$lib/utils/negatives';
-	import { updateLabDev } from '$lib/api/development';
+import NegativesBadge from '$lib/components/ui/NegativesBadge.svelte';
+import { negativesState, isNegativesPending } from '$lib/utils/negatives';
+import { updateLabDev } from '$lib/api/development';
 ```
 
 Add derived lists (near the other `$derived` roll groupings):
@@ -1229,49 +1247,49 @@ Add derived lists (near the other `$derived` roll groupings):
 - [ ] **Step 2: Add the banner** (top of the dashboard markup, inside the outer container, before the first `<FadeIn>`):
 
 ```svelte
-	{#if negativesPending.length > 0}
-		<div
-			class="mb-4 rounded-lg border px-4 py-3 {negativesOverdueCount > 0
-				? 'border-danger/50 bg-danger/10 text-danger-fg'
-				: 'border-accent/40 bg-accent/10 text-accent'}"
-		>
-			<a href="#negatives-to-collect" class="font-medium">
-				{negativesPending.length}
-				{negativesPending.length === 1 ? 'roll' : 'rolls'} of negatives to collect{negativesOverdueCount > 0
-					? ` — ${negativesOverdueCount} overdue`
-					: ''}.
-			</a>
-		</div>
-	{/if}
+{#if negativesPending.length > 0}
+	<div
+		class="mb-4 rounded-lg border px-4 py-3 {negativesOverdueCount > 0
+			? 'border-danger/50 bg-danger/10 text-danger-fg'
+			: 'border-accent/40 bg-accent/10 text-accent'}"
+	>
+		<a href="#negatives-to-collect" class="font-medium">
+			{negativesPending.length}
+			{negativesPending.length === 1 ? 'roll' : 'rolls'} of negatives to collect{negativesOverdueCount > 0
+				? ` — ${negativesOverdueCount} overdue`
+				: ''}.
+		</a>
+	</div>
+{/if}
 ```
 
 - [ ] **Step 3: Add the section** (as a peer of the other sections, e.g. after "Needs Attention"):
 
 ```svelte
-	{#if negativesPending.length > 0}
-		<section id="negatives-to-collect">
-			<FadeIn delay={250}>
-				<h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-text-faint">Negatives to Collect</h2>
-				<div class="divide-y divide-border-subtle">
-					{#each negativesPending as { roll, view } (roll.id)}
-						<div class="flex flex-wrap items-center gap-3 px-4 py-2.5">
-							<a href="/rolls/{roll.id}?from=dashboard" class="font-mono text-sm text-text hover:text-accent">{roll.roll_id}</a>
-							{#if roll.film_stock_brand}
-								<span class="text-sm text-text-muted">{roll.film_stock_brand} {roll.film_stock_name ?? ''}</span>
-							{/if}
-							{#if roll.lab_name}
-								<span class="text-sm text-text-faint">{roll.lab_name}</span>
-							{/if}
-							<NegativesBadge {view} />
-							<div class="ml-auto">
-								<Button size="sm" variant="ghost" onclick={() => pickUpFromDashboard(roll.lab_dev_id)}>Picked up</Button>
-							</div>
+{#if negativesPending.length > 0}
+	<section id="negatives-to-collect">
+		<FadeIn delay={250}>
+			<h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-text-faint">Negatives to Collect</h2>
+			<div class="divide-y divide-border-subtle">
+				{#each negativesPending as { roll, view } (roll.id)}
+					<div class="flex flex-wrap items-center gap-3 px-4 py-2.5">
+						<a href="/rolls/{roll.id}?from=dashboard" class="font-mono text-sm text-text hover:text-accent">{roll.roll_id}</a>
+						{#if roll.film_stock_brand}
+							<span class="text-sm text-text-muted">{roll.film_stock_brand} {roll.film_stock_name ?? ''}</span>
+						{/if}
+						{#if roll.lab_name}
+							<span class="text-sm text-text-faint">{roll.lab_name}</span>
+						{/if}
+						<NegativesBadge {view} />
+						<div class="ml-auto">
+							<Button size="sm" variant="ghost" onclick={() => pickUpFromDashboard(roll.lab_dev_id)}>Picked up</Button>
 						</div>
-					{/each}
-				</div>
-			</FadeIn>
-		</section>
-	{/if}
+					</div>
+				{/each}
+			</div>
+		</FadeIn>
+	</section>
+{/if}
 ```
 
 (If `Button` isn't already imported in this file, add `import Button from '$lib/components/ui/Button.svelte';`.)
@@ -1299,9 +1317,11 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 8: Labs page — retention input
 
 **Files:**
+
 - Modify: `frontend/src/routes/(app)/labs/+page.svelte`
 
 **Interfaces:**
+
 - Consumes: `createLab`/`updateLab` (existing) with the `negative_retention_days` field (Task 2 backend, Task 5 type).
 - Produces: no exports (page component).
 
@@ -1310,19 +1330,19 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 In `frontend/src/routes/(app)/labs/+page.svelte` `<script>`, next to the other field `$state`s (`name`, `location`, …):
 
 ```ts
-	let retentionDays = $state('');
+let retentionDays = $state('');
 ```
 
 In `resetForm()`, add:
 
 ```ts
-		retentionDays = '';
+retentionDays = '';
 ```
 
 In `openEditDialog` (where it seeds `name`, `location`, … from `lab`), add:
 
 ```ts
-		retentionDays = lab.negative_retention_days?.toString() ?? '';
+retentionDays = lab.negative_retention_days?.toString() ?? '';
 ```
 
 - [ ] **Step 2: Include it in create + update payloads**
@@ -1330,7 +1350,7 @@ In `openEditDialog` (where it seeds `name`, `location`, … from `lab`), add:
 In the create handler's payload object (where `location: location || null,` etc. are set), add:
 
 ```ts
-				negative_retention_days: retentionDays ? parseInt(retentionDays, 10) : null,
+negative_retention_days: retentionDays ? parseInt(retentionDays, 10) : null,
 ```
 
 In the `updateLab(editingLab.id, { ... })` payload, add the same line.
@@ -1340,7 +1360,7 @@ In the `updateLab(editingLab.id, { ... })` payload, add the same line.
 In the Add dialog (after the `<Textarea label="Notes" ... />`, ~line 178) and again in the Edit dialog (after its Notes textarea, ~line 208):
 
 ```svelte
-		<Input label="Negative retention (days)" type="number" bind:value={retentionDays} placeholder="30" />
+<Input label="Negative retention (days)" type="number" bind:value={retentionDays} placeholder="30" />
 ```
 
 (If `Input` doesn't pass `type` through, it does via `{...rest}` on the native input per the component pattern; a `number`-typed input is fine.)
@@ -1406,6 +1426,7 @@ EOF
 ## Self-Review
 
 **Spec coverage:**
+
 - Schema (labs retention, pickup date, waive flag) → Task 1. ✓
 - Derivation (na/awaiting/overdue/picked-up/waived, clock on `date_received`, deadline = received + retention default 30) → Task 4 (SQL deadline) + Task 5 (state). ✓
 - No new endpoints; roll-list query extended; pickup/waive via lab-dev PUT → Task 3 + Task 4. ✓

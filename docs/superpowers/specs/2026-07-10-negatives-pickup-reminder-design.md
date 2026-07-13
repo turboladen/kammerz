@@ -21,10 +21,10 @@ the lab notifies that the results are ready:
 Either notification is the moment the negatives (and any scans) become
 available — and it is the **start of the ~30-day retention countdown**. This
 maps directly to the lab dev record's existing `date_received` field, which in
-this app means *"the lab told me the order is ready"* (the notification date),
-**not** *"I physically have the negatives in hand."* Physical possession is the
+this app means _"the lab told me the order is ready"_ (the notification date),
+**not** _"I physically have the negatives in hand."_ Physical possession is the
 new, separate `date_negatives_picked_up`. The develop-only vs develop+scan
-distinction changes only *how* you're notified, not the model — both set
+distinction changes only _how_ you're notified, not the model — both set
 `date_received` and start the same clock, so the feature treats them identically.
 
 Once the order is complete, pickup runs **parallel** to the rest of the pipeline:
@@ -45,11 +45,11 @@ derivable from dates + two flags, so it can never drift.
 
 ### Schema additions
 
-| Table               | Column                        | Type                     | Notes |
-|---------------------|-------------------------------|--------------------------|-------|
-| `labs`              | `negative_retention_days`     | `INTEGER NULL`           | Per-lab retention policy. `NULL` → treated as default **30**. Nullable so existing labs need no backfill; the default lives in one place. |
-| `development_labs`  | `date_negatives_picked_up`    | `TEXT NULL`              | Stamped when negatives are collected. |
-| `development_labs`  | `negatives_not_collecting`    | `INTEGER NOT NULL DEFAULT 0` | Boolean "waive" opt-out for rolls whose negatives you don't want back. |
+| Table              | Column                     | Type                         | Notes                                                                                                                                     |
+| ------------------ | -------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `labs`             | `negative_retention_days`  | `INTEGER NULL`               | Per-lab retention policy. `NULL` → treated as default **30**. Nullable so existing labs need no backfill; the default lives in one place. |
+| `development_labs` | `date_negatives_picked_up` | `TEXT NULL`                  | Stamped when negatives are collected.                                                                                                     |
+| `development_labs` | `negatives_not_collecting` | `INTEGER NOT NULL DEFAULT 0` | Boolean "waive" opt-out for rolls whose negatives you don't want back.                                                                    |
 
 Migration follows the idempotent-guard convention (`ADD COLUMN` is inherently
 additive; no table rebuild, so no FK-cascade concern).
@@ -98,7 +98,7 @@ develop + scan). No new "ready" date to remember.
    Pickup and waive are plain PUTs to the existing `PUT /api/development/lab/:id`:
    - "Mark picked up" → set `date_negatives_picked_up = today`
    - "Not collecting" → set `negatives_not_collecting = true`
-   Validate `date_negatives_picked_up` with `validate_date_opt`.
+     Validate `date_negatives_picked_up` with `validate_date_opt`.
 
 3. **Labs create/update DTOs** — add `negative_retention_days`
    (`Option<i32>` on create, `Option<Option<i32>>` on update), validated with
@@ -138,21 +138,21 @@ the new fields.
 
 Exact palette chosen via the design-system skill at implementation time:
 
-| Condition        | Treatment            |
-|------------------|----------------------|
-| `overdue`        | red / alert, loudest |
-| `daysLeft ≤ 3`   | strong amber         |
-| `daysLeft ≤ 7`   | amber                |
-| `daysLeft > 7`   | neutral / muted      |
+| Condition      | Treatment            |
+| -------------- | -------------------- |
+| `overdue`      | red / alert, loudest |
+| `daysLeft ≤ 3` | strong amber         |
+| `daysLeft ≤ 7` | amber                |
+| `daysLeft > 7` | neutral / muted      |
 
 ### Surfaces
 
 1. **Dashboard banner** — new component above the sections, rendered only when
-   any roll is `awaiting`/`overdue`, e.g. *"3 rolls of negatives to collect — 1
-   overdue."* Red accent if any overdue. Click scrolls to the section.
+   any roll is `awaiting`/`overdue`, e.g. _"3 rolls of negatives to collect — 1
+   overdue."_ Red accent if any overdue. Click scrolls to the section.
 
-2. **Dashboard section "Negatives to Collect"** — peer of *In the Field* /
-   *Needs Attention*. List rows sorted **overdue-first (most overdue first),
+2. **Dashboard section "Negatives to Collect"** — peer of _In the Field_ /
+   _Needs Attention_. List rows sorted **overdue-first (most overdue first),
    then soonest deadline**. Each row: roll id + film, lab name, countdown
    `<Badge>`, one-click **"Picked up"** action (stamps today). Uses the existing
    list-row + ledger/`GroupHeader` conventions.
@@ -162,10 +162,10 @@ Exact palette chosen via the design-system skill at implementation time:
 
 4. **Roll detail — lab dev card** — countdown badge + controls:
    - **"Mark picked up"** → PUT date = today (non-destructive, no confirm).
-     Resolved card shows *"Negatives collected · <date>"*.
+     Resolved card shows _"Negatives collected · <date>"_.
    - **"Not collecting"** → flips the waive bool behind a light `ConfirmDialog`
-     (it silences a real deadline). Resolved card shows *"Not collecting
-     negatives."*
+     (it silences a real deadline). Resolved card shows _"Not collecting
+     negatives."_
    - Both surface the transient `InlineNotice` on reload, consistent with the
      existing auto-sync feedback.
 
