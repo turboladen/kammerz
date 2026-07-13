@@ -184,7 +184,7 @@
 
 #### View & Edit
 
-- [ ] All roll info displayed: roll_id, status, camera, film, lens, ISO, push/pull, frame count, dates, fuzzy date, notes
+- [ ] All roll info displayed: roll_id, status, camera, film, lens, ISO, push/pull, frame count, dates, notes
 - [ ] Frame progress: FrameCounter + "X/Y" bar (turns red when shots exceed frame count)
 - [ ] Edit mode toggles a form with current values
 - [ ] Film stock dropdown re-filters when camera changes; default lens re-seeds on camera change
