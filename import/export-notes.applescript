@@ -15,9 +15,12 @@ on run
 	set outPath to (POSIX path of (path to home folder)) & "kammerz-import/corpus/notes-export.txt"
 	set outFile to POSIX file outPath
 	set fileRef to open for access outFile with write permission
-	set eof of fileRef to 0
-	set noteCount to 0
-	tell application "Notes"
+	-- Guarantee the file handle is released even if a Notes call throws mid-export;
+	-- otherwise a leaked handle makes the next run fail with "file is busy".
+	try
+		set eof of fileRef to 0
+		set noteCount to 0
+		tell application "Notes"
 		set theNotes to my collectNotes()
 		repeat with n in theNotes
 			set noteCount to noteCount + 1
@@ -35,9 +38,13 @@ on run
 			set rec to rec & "@@@ENDNOTE@@@" & linefeed
 			my appendText(fileRef, rec)
 		end repeat
-	end tell
-	close access fileRef
-	return "Exported " & noteCount & " notes to " & outPath
+		end tell
+		close access fileRef
+		return "Exported " & noteCount & " notes to " & outPath
+	on error errMsg number errNum
+		close access fileRef
+		error errMsg number errNum
+	end try
 end run
 
 -- Resolve the target notes, robust to nested folders.

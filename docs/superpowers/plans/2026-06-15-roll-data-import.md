@@ -17,7 +17,7 @@
 
 **Tech Stack:** macOS AppleScript (`osascript`) for Notes export; Numbers CSV export; `curl` against axum dev server on `:3002` (open auth in dev); Kammerz REST API; `bd` (beads) for cross-session progress; SQLite (`sqlite3`) for verification.
 
-**Source spec:** `docs/superpowers/specs/2026-06-15-roll-data-import-design.md` (this branch).
+**Source spec:** `docs/superpowers/specs/2026-06-15-roll-data-import-design.md`.
 
 ---
 
@@ -288,7 +288,7 @@ Expected: health 200 with a JSON body; `/api/auth/me` shows `auth_required: fals
 
 ```bash
 # DATABASE_URL dev default is sqlite:./kammerz.db?mode=rwc (in the MAIN checkout, not this worktree)
-cp ../../kammerz.db ~/kammerz-import/kammerz.db.pre-import.bak 2>/dev/null \
+cp -f ../../kammerz.db ~/kammerz-import/kammerz.db.pre-import.bak 2>/dev/null \
   && echo "backed up" || echo "NOTE: confirm the dev DB path with the user"
 ```
 
