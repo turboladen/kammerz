@@ -1158,18 +1158,35 @@
 					</div>
 				{/if}
 
-				<div class="space-y-2">
+				<!-- Activity journal — rendered beside Quick Entry when the entry form is
+				     open, full-width above the strip when it's hidden (kammerz-n7b). -->
+				{#snippet activityPane()}
+					<div>
+						<h3 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+							Activity
+							<div class="flex-1 border-b border-border-subtle"></div>
+						</h3>
+						<RollActivity {events} onopendev={openDevFromEvent} />
+					</div>
+				{/snippet}
+
+				<div class="space-y-4">
 					{#if quickAddVisible}
-						<QuickAddBar
-							frameNumber={nextFrameNumber}
-							lensOptions={shotLensOptions}
-							lensId={quickDefaultLensId}
-							isFixedLens={isFixedLensCamera}
-							fixedLensLabel={fixedLens ? lensDisplayName(fixedLens) : ''}
-							saving={quickSaving}
-							error={quickError}
-							onsave={handleQuickAdd}
-						/>
+						<div class="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+							<QuickAddBar
+								frameNumber={nextFrameNumber}
+								lensOptions={shotLensOptions}
+								lensId={quickDefaultLensId}
+								isFixedLens={isFixedLensCamera}
+								fixedLensLabel={fixedLens ? lensDisplayName(fixedLens) : ''}
+								saving={quickSaving}
+								error={quickError}
+								onsave={handleQuickAdd}
+							/>
+							{@render activityPane()}
+						</div>
+					{:else}
+						{@render activityPane()}
 					{/if}
 					<FrameStrip frames={frameCells} onselect={handleFrameSelect} onaddextra={() => openAddShotDialog()} />
 				</div>
@@ -1196,17 +1213,6 @@
 				}}
 			/>
 		</div>
-
-		<!-- Activity -->
-		<FadeIn delay={150}>
-			<section>
-				<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
-					Activity
-					<div class="flex-1 border-b border-border-subtle"></div>
-				</h2>
-				<RollActivity {events} onopendev={openDevFromEvent} />
-			</section>
-		</FadeIn>
 	</div>
 {/if}
 
