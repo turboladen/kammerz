@@ -114,11 +114,15 @@ export interface Lab {
 	location: string | null;
 	website: string | null;
 	notes: string | null;
+	negative_retention_days: number | null;
 	created_at: string;
 	updated_at: string;
 }
 
-export type LabInsert = Omit<Lab, 'id' | 'created_at' | 'updated_at'>;
+export type LabInsert = Omit<Lab, 'id' | 'created_at' | 'updated_at' | 'negative_retention_days'> & {
+	// Optional at create — CreateLabDto defaults it; NULL → 30-day retention.
+	negative_retention_days?: number | null;
+};
 
 // --- Rolls ---
 
@@ -167,6 +171,12 @@ export interface RollWithDetails extends Roll {
 	lens_brand: string | null;
 	lens_name: string | null;
 	shot_count: number;
+	lab_dev_id: number | null;
+	lab_name: string | null;
+	negatives_date_received: string | null;
+	negatives_deadline: string | null;
+	date_negatives_picked_up: string | null;
+	negatives_not_collecting: boolean | null;
 }
 
 export type RollEventType =
@@ -180,7 +190,9 @@ export type RollEventType =
 	| 'lab_dev_removed'
 	| 'self_dev_added'
 	| 'self_dev_edited'
-	| 'self_dev_removed';
+	| 'self_dev_removed'
+	| 'negatives_picked_up'
+	| 'negatives_waived';
 
 export type RollEventRefKind = 'lab_dev' | 'self_dev' | 'shot';
 
@@ -244,11 +256,20 @@ export interface DevelopmentLab {
 	date_received: string | null;
 	cost: number | null;
 	notes: string | null;
+	date_negatives_picked_up: string | null;
+	negatives_not_collecting: boolean;
 	created_at: string;
 	updated_at: string;
 }
 
-export type DevelopmentLabInsert = Omit<DevelopmentLab, 'id' | 'created_at' | 'updated_at'>;
+export type DevelopmentLabInsert = Omit<
+	DevelopmentLab,
+	'id' | 'created_at' | 'updated_at' | 'date_negatives_picked_up' | 'negatives_not_collecting'
+> & {
+	// Update-only (pickup/waive) — never sent on create; set via updateLabDev(Partial<...>).
+	date_negatives_picked_up?: string | null;
+	negatives_not_collecting?: boolean;
+};
 
 export interface DevelopmentSelf {
 	id: number;
