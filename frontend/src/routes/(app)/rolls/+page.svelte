@@ -20,6 +20,9 @@
 	let rolls: RollWithDetails[] = $state([]);
 	let loading = $state(true);
 	let error = $state('');
+	// One `now` for the whole list render — shared by every row's negatives badge so
+	// rows can't disagree across a midnight boundary, and to avoid a Date per row.
+	const now = new Date();
 	// Toolbar option sets — defined before the URL seeds so a seed can reject a value
 	// that isn't an allowed option (a stale/hand-edited URL falls back to the default).
 	const statuses: { value: string; label: string }[] = [
@@ -211,7 +214,7 @@
 					<FadeIn delay={Math.min(i, 10) * 30}>
 						<RollRow {roll} href="/rolls/{roll.id}">
 							{#snippet trailing()}
-								{@const negView = negativesState(roll, new Date())}
+								{@const negView = negativesState(roll, now)}
 								{#if isNegativesPending(negView)}
 									<NegativesBadge view={negView} />
 								{/if}

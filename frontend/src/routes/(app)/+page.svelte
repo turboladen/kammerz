@@ -63,18 +63,25 @@
 	// Rolls whose negatives are still at the lab (awaiting or overdue), each with
 	// its live view. Sorted ascending by daysLeft → most-overdue first, then
 	// soonest deadline (overdue has negative daysLeft).
-	const negativesPending = $derived(
-		rolls
-			.map((roll) => ({ roll, view: negativesState(roll, new Date()) }))
+	const negativesPending = $derived.by(() => {
+		// One `now` for the whole pass so every roll's awaiting/overdue split is
+		// evaluated against the same instant (and to avoid an allocation per roll).
+		const now = new Date();
+		return rolls
+			.map((roll) => ({ roll, view: negativesState(roll, now) }))
 			.filter((x) => isNegativesPending(x.view))
-			.sort((a, b) => (a.view.daysLeft ?? 0) - (b.view.daysLeft ?? 0))
-	);
+			.sort((a, b) => (a.view.daysLeft ?? 0) - (b.view.daysLeft ?? 0));
+	});
 	const negativesOverdueCount = $derived(negativesPending.filter((x) => x.view.status === 'overdue').length);
 
 	async function pickUpFromDashboard(rollLabDevId: number | null) {
 		if (rollLabDevId == null) return;
-		await updateLabDev(rollLabDevId, { date_negatives_picked_up: todayLocal() });
-		await load();
+		try {
+			await updateLabDev(rollLabDevId, { date_negatives_picked_up: todayLocal() });
+			await load();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	// Status distribution for the progress bar (uses shared allStatusOrder + statusConfig)

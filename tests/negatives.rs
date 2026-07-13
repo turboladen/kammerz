@@ -345,3 +345,49 @@ async fn roll_deadline_uses_default_30_when_lab_retention_null() {
     let roll: Value = json_body(res).await;
     assert_eq!(roll["negatives_deadline"], "2026-07-31"); // 2026-07-01 + 30
 }
+
+// validate_date_opt accepts bare `YYYY` and `YYYY-MM`, but SQLite's date() can't
+// add days to those (it yields a garbage negative-year date for `YYYY` and NULL
+// for `YYYY-MM`). The query's `length >= 10` guard must NULL the deadline for a
+// partial received date so the roll shows no countdown instead of a bogus one.
+#[tokio::test]
+async fn partial_date_received_yields_null_deadline() {
+    let app = open_app().await;
+    let res = app.clone().oneshot(get("/api/cameras")).await.unwrap();
+    let cams: Vec<Value> = json_body(res).await;
+    let camera_id = cams[0]["id"].as_i64().unwrap() as i32;
+
+    for (roll_id, partial) in [("R-YR", "2026"), ("R-YM", "2026-07")] {
+        let res = app
+            .clone()
+            .oneshot(post_json(
+                "/api/rolls",
+                &json!({ "roll_id": roll_id, "camera_id": camera_id, "status": "shot" }),
+            ))
+            .await
+            .unwrap();
+        let roll_pk: i32 = json_body(res).await;
+        let res = app
+            .clone()
+            .oneshot(post_json(
+                "/api/development/lab",
+                &json!({ "roll_id": roll_pk, "date_received": partial }),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+
+        let res = app
+            .clone()
+            .oneshot(get(&format!("/api/rolls/{roll_pk}")))
+            .await
+            .unwrap();
+        let roll: Value = json_body(res).await;
+        assert_eq!(roll["negatives_date_received"], partial);
+        assert!(
+            roll["negatives_deadline"].is_null(),
+            "partial received date {partial:?} must yield a null deadline, got {:?}",
+            roll["negatives_deadline"]
+        );
+    }
+}

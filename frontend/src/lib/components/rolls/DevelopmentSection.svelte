@@ -78,15 +78,28 @@
 
 	async function markPickedUp() {
 		if (!labDev) return;
-		await updateLabDev(labDev.id, { date_negatives_picked_up: todayLocal() });
-		onchange();
+		devDeleteError = '';
+		try {
+			await updateLabDev(labDev.id, { date_negatives_picked_up: todayLocal() });
+			await onchange();
+		} catch (err) {
+			devDeleteError = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	async function markNotCollecting() {
 		if (!labDev) return;
-		await updateLabDev(labDev.id, { negatives_not_collecting: true });
-		showWaiveConfirm = false;
-		onchange();
+		devDeleteError = '';
+		try {
+			await updateLabDev(labDev.id, { negatives_not_collecting: true });
+			await onchange();
+		} catch (err) {
+			devDeleteError = err instanceof Error ? err.message : String(err);
+		} finally {
+			// Always close the confirm dialog — ConfirmDialog doesn't self-close, so
+			// on an error path the parent must reset the bound `open` or it sticks.
+			showWaiveConfirm = false;
+		}
 	}
 
 	// Auto-prompt bookkeeping: which status chevron opened the current dialog (null when

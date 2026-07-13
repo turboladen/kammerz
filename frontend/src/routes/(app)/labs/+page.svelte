@@ -22,6 +22,12 @@
 	let website = $state('');
 	let notes = $state('');
 	let retentionDays = $state('');
+	// Parse once for both the add and edit payloads: empty or non-numeric → null
+	// (backend then applies the 30-day default); a fractional entry truncates.
+	const parsedRetention = $derived.by(() => {
+		const n = parseInt(retentionDays, 10);
+		return Number.isNaN(n) ? null : n;
+	});
 
 	async function load() {
 		try {
@@ -59,7 +65,7 @@
 				location: location || null,
 				website: website || null,
 				notes: notes || null,
-				negative_retention_days: retentionDays ? parseInt(retentionDays, 10) : null
+				negative_retention_days: parsedRetention
 			};
 			await createLab(lab);
 			showAddDialog = false;
@@ -93,7 +99,7 @@
 				location: location || null,
 				website: website || null,
 				notes: notes || null,
-				negative_retention_days: retentionDays ? parseInt(retentionDays, 10) : null
+				negative_retention_days: parsedRetention
 			});
 			editingLab = null;
 			resetForm();
@@ -181,7 +187,14 @@
 		<Input label="Location" bind:value={location} placeholder="San Clemente, CA" />
 		<Input label="Website" bind:value={website} placeholder="thedarkroom.com" />
 		<Textarea label="Notes" bind:value={notes} />
-		<Input label="Negative retention (days)" type="number" bind:value={retentionDays} placeholder="30" />
+		<Input
+			label="Negative retention (days)"
+			type="number"
+			min="0"
+			step="1"
+			bind:value={retentionDays}
+			placeholder="30"
+		/>
 		{#if error}
 			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 		{/if}
@@ -212,7 +225,14 @@
 			<Input label="Location" bind:value={location} />
 			<Input label="Website" bind:value={website} />
 			<Textarea label="Notes" bind:value={notes} />
-			<Input label="Negative retention (days)" type="number" bind:value={retentionDays} placeholder="30" />
+			<Input
+				label="Negative retention (days)"
+				type="number"
+				min="0"
+				step="1"
+				bind:value={retentionDays}
+				placeholder="30"
+			/>
 			{#if error}
 				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 			{/if}
