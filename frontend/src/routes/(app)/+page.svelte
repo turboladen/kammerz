@@ -73,6 +73,7 @@
 			.sort((a, b) => (a.view.daysLeft ?? 0) - (b.view.daysLeft ?? 0));
 	});
 	const negativesOverdueCount = $derived(negativesPending.filter((x) => x.view.status === 'overdue').length);
+	const hasOverdue = $derived(negativesOverdueCount > 0);
 
 	async function pickUpFromDashboard(rollLabDevId: number | null) {
 		if (rollLabDevId == null) return;
@@ -202,16 +203,15 @@
 		{#if negativesPending.length > 0}
 			<FadeIn>
 				<section
-					id="negatives-to-collect"
-					class="mb-8 rounded-lg border {negativesOverdueCount > 0
+					class="mb-8 rounded-lg border {hasOverdue
 						? 'border-danger/50 bg-danger/10'
 						: 'border-accent/40 bg-accent/10'}"
 				>
 					<header class="flex items-center justify-between gap-3 border-b border-border-subtle px-4 py-3">
 						<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Negatives to Collect</h2>
-						<span class="font-mono text-xs {negativesOverdueCount > 0 ? 'text-danger-fg' : 'text-text-muted'}">
+						<span class="font-mono text-xs {hasOverdue ? 'text-danger-fg' : 'text-text-muted'}">
 							{negativesPending.length}
-							{negativesPending.length === 1 ? 'roll' : 'rolls'}{negativesOverdueCount > 0
+							{negativesPending.length === 1 ? 'roll' : 'rolls'}{hasOverdue
 								? ` · ${negativesOverdueCount} overdue`
 								: ''}
 						</span>
@@ -220,7 +220,7 @@
 						{#each negativesPending as { roll, view } (roll.id)}
 							<div class="flex flex-wrap items-center gap-3 px-4 py-2.5">
 								<Button size="sm" variant="secondary" onclick={() => pickUpFromDashboard(roll.lab_dev_id)}>
-									<Check size={14} strokeWidth={2} /> Pick up
+									<Check size={14} strokeWidth={2} aria-hidden="true" /> Pick up
 								</Button>
 								<a href="/rolls/{roll.id}?from=dashboard" class="font-mono text-sm text-text hover:text-accent"
 									>{roll.roll_id}</a
@@ -241,7 +241,7 @@
 
 		<!-- Currently Shooting -->
 		{#if activeRolls.length > 0}
-			<FadeIn>
+			<FadeIn delay={50}>
 				<div class="mb-8">
 					<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 						In the Field
@@ -258,7 +258,7 @@
 
 		<!-- In the Darkroom -->
 		{#if processingRolls.length > 0}
-			<FadeIn delay={50}>
+			<FadeIn delay={100}>
 				<div class="mb-8">
 					<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 						In the Darkroom
@@ -274,7 +274,7 @@
 		{/if}
 
 		<!-- Quick Stats Row -->
-		<FadeIn delay={100}>
+		<FadeIn delay={150}>
 			<div class="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
 				<div class="rounded-lg border border-border bg-surface-raised p-4">
 					<p class="font-mono text-2xl font-semibold">{rolls.length}</p>
@@ -297,7 +297,7 @@
 
 		<!-- Status Distribution Bar -->
 		{#if statusSegments.length > 0}
-			<FadeIn delay={150}>
+			<FadeIn delay={200}>
 				<div class="mb-8">
 					<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 						Roll Pipeline
@@ -329,7 +329,7 @@
 
 		<!-- Needs Attention -->
 		{#if needsAttention.length > 0}
-			<FadeIn delay={200}>
+			<FadeIn delay={250}>
 				<div>
 					<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 						Needs Attention
