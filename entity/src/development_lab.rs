@@ -12,6 +12,8 @@ pub struct Model {
     pub date_received: Option<String>,
     pub cost: Option<f64>,
     pub notes: Option<String>,
+    pub date_negatives_picked_up: Option<String>,
+    pub negatives_not_collecting: bool,
     pub created_at: String,
     pub updated_at: String,
 }
