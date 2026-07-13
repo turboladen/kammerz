@@ -9,10 +9,12 @@
 	import ListToolbar from '$lib/components/ui/ListToolbar.svelte';
 	import GroupHeader from '$lib/components/ui/GroupHeader.svelte';
 	import RollRow from '$lib/components/rolls/RollRow.svelte';
+	import NegativesBadge from '$lib/components/ui/NegativesBadge.svelte';
 	import { Film } from 'lucide-svelte';
 	import { listRolls } from '$lib/api/rolls';
 	import { filterBySearch, groupItems, sortByString, sortByDate } from '$lib/utils/list';
 	import { statusConfig } from '$lib/utils/status';
+	import { negativesState, isNegativesPending } from '$lib/utils/negatives';
 	import type { RollWithDetails, RollStatus } from '$lib/types';
 
 	let rolls: RollWithDetails[] = $state([]);
@@ -209,6 +211,10 @@
 					<FadeIn delay={Math.min(i, 10) * 30}>
 						<RollRow {roll} href="/rolls/{roll.id}">
 							{#snippet trailing()}
+								{@const negView = negativesState(roll, new Date())}
+								{#if isNegativesPending(negView)}
+									<NegativesBadge view={negView} />
+								{/if}
 								<span class="text-xs text-text-faint opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
 							{/snippet}
 						</RollRow>
