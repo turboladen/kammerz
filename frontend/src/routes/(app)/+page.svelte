@@ -7,7 +7,7 @@
 	import FilmLeader from '$lib/components/ui/FilmLeader.svelte';
 	import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
 	import NegativesBadge from '$lib/components/ui/NegativesBadge.svelte';
-	import { AlertTriangle } from 'lucide-svelte';
+	import { AlertTriangle, Check } from 'lucide-svelte';
 	import { listRolls } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import { listLenses } from '$lib/api/lenses';
@@ -126,21 +126,6 @@
 		<div class="mb-4 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 	{/if}
 
-	{#if negativesPending.length > 0}
-		<div
-			class="mb-4 rounded-lg border px-4 py-3 {negativesOverdueCount > 0
-				? 'border-danger/50 bg-danger/10 text-danger-fg'
-				: 'border-accent/40 bg-accent/10 text-accent'}"
-		>
-			<a href="#negatives-to-collect" class="font-medium">
-				{negativesPending.length}
-				{negativesPending.length === 1 ? 'roll' : 'rolls'} of negatives to collect{negativesOverdueCount > 0
-					? ` — ${negativesOverdueCount} overdue`
-					: ''}.
-			</a>
-		</div>
-	{/if}
-
 	{#if loading}
 		<p class="text-sm text-text-muted">Loading...</p>
 	{:else if rolls.length === 0}
@@ -210,6 +195,49 @@
 				{/if}
 			</a>
 		{/snippet}
+
+		<!-- Negatives to Collect — the app's most time-sensitive list (rolls are
+		     discarded by the lab after its retention window). Pinned to the top and
+		     styled as an urgent alert panel; red when any are overdue, amber otherwise. -->
+		{#if negativesPending.length > 0}
+			<FadeIn>
+				<section
+					id="negatives-to-collect"
+					class="mb-8 rounded-lg border {negativesOverdueCount > 0
+						? 'border-danger/50 bg-danger/10'
+						: 'border-accent/40 bg-accent/10'}"
+				>
+					<header class="flex items-center justify-between gap-3 border-b border-border-subtle px-4 py-3">
+						<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Negatives to Collect</h2>
+						<span class="font-mono text-xs {negativesOverdueCount > 0 ? 'text-danger-fg' : 'text-text-muted'}">
+							{negativesPending.length}
+							{negativesPending.length === 1 ? 'roll' : 'rolls'}{negativesOverdueCount > 0
+								? ` · ${negativesOverdueCount} overdue`
+								: ''}
+						</span>
+					</header>
+					<div class="divide-y divide-border-subtle">
+						{#each negativesPending as { roll, view } (roll.id)}
+							<div class="flex flex-wrap items-center gap-3 px-4 py-2.5">
+								<Button size="sm" variant="secondary" onclick={() => pickUpFromDashboard(roll.lab_dev_id)}>
+									<Check size={14} strokeWidth={2} /> Pick up
+								</Button>
+								<a href="/rolls/{roll.id}?from=dashboard" class="font-mono text-sm text-text hover:text-accent"
+									>{roll.roll_id}</a
+								>
+								{#if roll.film_stock_brand}
+									<span class="text-sm text-text-muted">{roll.film_stock_brand} {roll.film_stock_name ?? ''}</span>
+								{/if}
+								{#if roll.lab_name}
+									<span class="text-sm text-text-faint">{roll.lab_name}</span>
+								{/if}
+								<span class="ml-auto"><NegativesBadge {view} /></span>
+							</div>
+						{/each}
+					</div>
+				</section>
+			</FadeIn>
+		{/if}
 
 		<!-- Currently Shooting -->
 		{#if activeRolls.length > 0}
@@ -324,36 +352,6 @@
 					</div>
 				</div>
 			</FadeIn>
-		{/if}
-
-		<!-- Negatives to Collect -->
-		{#if negativesPending.length > 0}
-			<section id="negatives-to-collect" class="mt-8">
-				<FadeIn delay={250}>
-					<h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-text-faint">Negatives to Collect</h2>
-					<div class="divide-y divide-border-subtle">
-						{#each negativesPending as { roll, view } (roll.id)}
-							<div class="flex flex-wrap items-center gap-3 px-4 py-2.5">
-								<a href="/rolls/{roll.id}?from=dashboard" class="font-mono text-sm text-text hover:text-accent"
-									>{roll.roll_id}</a
-								>
-								{#if roll.film_stock_brand}
-									<span class="text-sm text-text-muted">{roll.film_stock_brand} {roll.film_stock_name ?? ''}</span>
-								{/if}
-								{#if roll.lab_name}
-									<span class="text-sm text-text-faint">{roll.lab_name}</span>
-								{/if}
-								<NegativesBadge {view} />
-								<div class="ml-auto">
-									<Button size="sm" variant="ghost" onclick={() => pickUpFromDashboard(roll.lab_dev_id)}
-										>Picked up</Button
-									>
-								</div>
-							</div>
-						{/each}
-					</div>
-				</FadeIn>
-			</section>
 		{/if}
 	{/if}
 </div>
