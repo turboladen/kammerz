@@ -85,8 +85,8 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="rounded-lg border border-border bg-surface-raised p-3">
-	<!-- Primary entry row -->
-	<div class="flex flex-wrap items-end gap-2">
+	<!-- Row 1: frame chip + aperture + shutter -->
+	<div class="flex items-end gap-2">
 		<!-- Frame label (mono, read-only — parent drives this) -->
 		<div class="flex flex-col gap-1">
 			<span class="text-xs font-medium text-text-muted">Frame</span>
@@ -98,7 +98,7 @@
 		</div>
 
 		<!-- f/ Aperture input -->
-		<div class="flex flex-col gap-1">
+		<div class="flex flex-1 flex-col gap-1">
 			<label for="qab-aperture" class="text-xs font-medium text-text-muted">f/</label>
 			<input
 				id="qab-aperture"
@@ -106,39 +106,42 @@
 				type="text"
 				bind:value={aperture}
 				placeholder="5.6"
-				class="h-[38px] w-20 rounded-lg border border-border bg-surface px-3 font-mono text-sm text-text placeholder-text-faint transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+				class="h-[38px] w-full rounded-lg border border-border bg-surface px-3 font-mono text-sm text-text placeholder-text-faint transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 			/>
 		</div>
 
 		<!-- Shutter speed input -->
-		<div class="flex flex-col gap-1">
+		<div class="flex flex-1 flex-col gap-1">
 			<label for="qab-shutter" class="text-xs font-medium text-text-muted">Shutter</label>
 			<input
 				id="qab-shutter"
 				type="text"
 				bind:value={shutterSpeed}
 				placeholder="1/250"
-				class="h-[38px] w-24 rounded-lg border border-border bg-surface px-3 font-mono text-sm text-text placeholder-text-faint transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+				class="h-[38px] w-full rounded-lg border border-border bg-surface px-3 font-mono text-sm text-text placeholder-text-faint transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 			/>
 		</div>
+	</div>
 
-		<!-- Lens selector (or read-only fixed lens display) -->
+	<!-- Row 2: lens (full width) — or read-only fixed-lens display -->
+	<div class="mt-3">
 		{#if isFixedLens}
 			<div class="flex flex-col gap-1">
 				<span class="text-xs font-medium text-text-muted">Lens</span>
 				<div class="flex h-[38px] items-center rounded-lg border border-border bg-surface px-3 text-sm text-text-muted">
-					<span class="truncate max-w-[10rem]">{fixedLensLabel || 'Fixed lens'}</span>
+					<span class="min-w-0 truncate">{fixedLensLabel || 'Fixed lens'}</span>
 				</div>
 			</div>
 		{:else}
-			<div class="min-w-[10rem] flex-1">
-				<Select label="Lens" options={lensOptions} bind:value={localLensId} />
-			</div>
+			<Select label="Lens" options={lensOptions} bind:value={localLensId} />
 		{/if}
+	</div>
 
-		<!-- Save & Next button -->
+	<!-- Row 3: actions — full-width Save & Next + More toggle -->
+	<div class="mt-3 flex items-center gap-2">
 		<Button
 			variant="primary"
+			class="flex-1"
 			onclick={handleSave}
 			disabled={saving || !frameNumber.trim()}
 			title="Save frame and advance to next (⌘/Ctrl+Enter)"
@@ -154,7 +157,7 @@
 			aria-expanded={showMore}
 			class="flex h-[38px] items-center gap-1 rounded-lg border border-border px-2.5 text-xs text-text-muted transition-colors hover:bg-surface-overlay hover:text-text"
 		>
-			<span class="hidden sm:inline">More</span>
+			<span>More</span>
 			{#if showMore}
 				<ChevronUp size={14} aria-hidden="true" />
 			{:else}
@@ -165,10 +168,10 @@
 
 	<!-- Expanded fields: date / time / location / notes -->
 	{#if showMore}
-		<div class="mt-3 grid grid-cols-1 gap-3 border-t border-border-subtle pt-3 sm:grid-cols-3">
+		<div class="mt-3 grid grid-cols-1 gap-3 border-t border-border-subtle pt-3 sm:grid-cols-2">
 			<DateInput label="Date" bind:value={date} />
 			<Input type="time" label="Time" class="h-[38px]" bind:value={time} />
-			<div class="flex flex-col gap-1">
+			<div class="flex flex-col gap-1 sm:col-span-2">
 				<label for="qab-location" class="text-xs font-medium text-text-muted">Location</label>
 				<input
 					id="qab-location"
@@ -178,7 +181,9 @@
 					class="h-[38px] rounded-lg border border-border bg-surface px-3 text-sm text-text placeholder-text-faint transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 				/>
 			</div>
-			<Textarea label="Notes" bind:value={notes} rows={1} placeholder="Anything notable…" />
+			<div class="sm:col-span-2">
+				<Textarea label="Notes" bind:value={notes} rows={1} placeholder="Anything notable…" />
+			</div>
 		</div>
 	{/if}
 
