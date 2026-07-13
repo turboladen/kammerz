@@ -4,6 +4,10 @@
 > the removal of `date_fuzzy` (epic `kammerz-qdk`); its fuzzy-date handling is superseded by
 > the concrete-date + notes-annotation convention (reconciliation tracked by `kammerz-31c` /
 > `kammerz-btv`). The one-time 300+ roll import it describes is complete. Kept for the record.
+> Of the tooling it plans, only `import/export-notes.applescript` was committed — the
+> `post-roll.sh` helper was never built (the import wrote rolls via inline `curl`), and the
+> API-payload examples below are indicative: confirm field shapes against the live DTOs (the
+> plan's own Task 0.6), since the endpoints have evolved since.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
