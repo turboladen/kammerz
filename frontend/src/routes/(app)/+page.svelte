@@ -7,7 +7,7 @@
 	import FilmLeader from '$lib/components/ui/FilmLeader.svelte';
 	import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
 	import NegativesBadge from '$lib/components/ui/NegativesBadge.svelte';
-	import { AlertTriangle } from 'lucide-svelte';
+	import { AlertTriangle, Check } from 'lucide-svelte';
 	import { listRolls } from '$lib/api/rolls';
 	import { listCameras } from '$lib/api/cameras';
 	import { listLenses } from '$lib/api/lenses';
@@ -73,6 +73,7 @@
 			.sort((a, b) => (a.view.daysLeft ?? 0) - (b.view.daysLeft ?? 0));
 	});
 	const negativesOverdueCount = $derived(negativesPending.filter((x) => x.view.status === 'overdue').length);
+	const hasOverdue = $derived(negativesOverdueCount > 0);
 
 	async function pickUpFromDashboard(rollLabDevId: number | null) {
 		if (rollLabDevId == null) return;
@@ -124,21 +125,6 @@
 <div class="flex-1 p-6">
 	{#if error}
 		<div class="mb-4 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
-	{/if}
-
-	{#if negativesPending.length > 0}
-		<div
-			class="mb-4 rounded-lg border px-4 py-3 {negativesOverdueCount > 0
-				? 'border-danger/50 bg-danger/10 text-danger-fg'
-				: 'border-accent/40 bg-accent/10 text-accent'}"
-		>
-			<a href="#negatives-to-collect" class="font-medium">
-				{negativesPending.length}
-				{negativesPending.length === 1 ? 'roll' : 'rolls'} of negatives to collect{negativesOverdueCount > 0
-					? ` — ${negativesOverdueCount} overdue`
-					: ''}.
-			</a>
-		</div>
 	{/if}
 
 	{#if loading}
@@ -211,9 +197,51 @@
 			</a>
 		{/snippet}
 
+		<!-- Negatives to Collect — the app's most time-sensitive list (rolls are
+		     discarded by the lab after its retention window). Pinned to the top and
+		     styled as an urgent alert panel; red when any are overdue, amber otherwise. -->
+		{#if negativesPending.length > 0}
+			<FadeIn>
+				<section
+					class="mb-8 rounded-lg border {hasOverdue
+						? 'border-danger/50 bg-danger/10'
+						: 'border-accent/40 bg-accent/10'}"
+				>
+					<header class="flex items-center justify-between gap-3 border-b border-border-subtle px-4 py-3">
+						<h2 class="text-xs font-semibold uppercase tracking-wider text-text-faint">Negatives to Collect</h2>
+						<span class="font-mono text-xs {hasOverdue ? 'text-danger-fg' : 'text-text-muted'}">
+							{negativesPending.length}
+							{negativesPending.length === 1 ? 'roll' : 'rolls'}{hasOverdue
+								? ` · ${negativesOverdueCount} overdue`
+								: ''}
+						</span>
+					</header>
+					<div class="divide-y divide-border-subtle">
+						{#each negativesPending as { roll, view } (roll.id)}
+							<div class="flex flex-wrap items-center gap-3 px-4 py-2.5">
+								<Button size="sm" variant="secondary" onclick={() => pickUpFromDashboard(roll.lab_dev_id)}>
+									<Check size={14} strokeWidth={2} aria-hidden="true" /> Pick up
+								</Button>
+								<a href="/rolls/{roll.id}?from=dashboard" class="font-mono text-sm text-text hover:text-accent"
+									>{roll.roll_id}</a
+								>
+								{#if roll.film_stock_brand}
+									<span class="text-sm text-text-muted">{roll.film_stock_brand} {roll.film_stock_name ?? ''}</span>
+								{/if}
+								{#if roll.lab_name}
+									<span class="text-sm text-text-faint">{roll.lab_name}</span>
+								{/if}
+								<span class="ml-auto"><NegativesBadge {view} /></span>
+							</div>
+						{/each}
+					</div>
+				</section>
+			</FadeIn>
+		{/if}
+
 		<!-- Currently Shooting -->
 		{#if activeRolls.length > 0}
-			<FadeIn>
+			<FadeIn delay={50}>
 				<div class="mb-8">
 					<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 						In the Field
@@ -230,7 +258,7 @@
 
 		<!-- In the Darkroom -->
 		{#if processingRolls.length > 0}
-			<FadeIn delay={50}>
+			<FadeIn delay={100}>
 				<div class="mb-8">
 					<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 						In the Darkroom
@@ -246,7 +274,7 @@
 		{/if}
 
 		<!-- Quick Stats Row -->
-		<FadeIn delay={100}>
+		<FadeIn delay={150}>
 			<div class="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
 				<div class="rounded-lg border border-border bg-surface-raised p-4">
 					<p class="font-mono text-2xl font-semibold">{rolls.length}</p>
@@ -269,7 +297,7 @@
 
 		<!-- Status Distribution Bar -->
 		{#if statusSegments.length > 0}
-			<FadeIn delay={150}>
+			<FadeIn delay={200}>
 				<div class="mb-8">
 					<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 						Roll Pipeline
@@ -301,7 +329,7 @@
 
 		<!-- Needs Attention -->
 		{#if needsAttention.length > 0}
-			<FadeIn delay={200}>
+			<FadeIn delay={250}>
 				<div>
 					<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 						Needs Attention
@@ -324,36 +352,6 @@
 					</div>
 				</div>
 			</FadeIn>
-		{/if}
-
-		<!-- Negatives to Collect -->
-		{#if negativesPending.length > 0}
-			<section id="negatives-to-collect" class="mt-8">
-				<FadeIn delay={250}>
-					<h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-text-faint">Negatives to Collect</h2>
-					<div class="divide-y divide-border-subtle">
-						{#each negativesPending as { roll, view } (roll.id)}
-							<div class="flex flex-wrap items-center gap-3 px-4 py-2.5">
-								<a href="/rolls/{roll.id}?from=dashboard" class="font-mono text-sm text-text hover:text-accent"
-									>{roll.roll_id}</a
-								>
-								{#if roll.film_stock_brand}
-									<span class="text-sm text-text-muted">{roll.film_stock_brand} {roll.film_stock_name ?? ''}</span>
-								{/if}
-								{#if roll.lab_name}
-									<span class="text-sm text-text-faint">{roll.lab_name}</span>
-								{/if}
-								<NegativesBadge {view} />
-								<div class="ml-auto">
-									<Button size="sm" variant="ghost" onclick={() => pickUpFromDashboard(roll.lab_dev_id)}
-										>Picked up</Button
-									>
-								</div>
-							</div>
-						{/each}
-					</div>
-				</FadeIn>
-			</section>
 		{/if}
 	{/if}
 </div>
