@@ -1172,7 +1172,7 @@
 
 				<div class="space-y-4">
 					{#if quickAddVisible}
-						<div class="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+						<div class="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
 							<QuickAddBar
 								frameNumber={nextFrameNumber}
 								lensOptions={shotLensOptions}
