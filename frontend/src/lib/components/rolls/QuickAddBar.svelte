@@ -97,8 +97,8 @@
 			</div>
 		</div>
 
-		<!-- f/ Aperture input -->
-		<div class="flex flex-1 flex-col gap-1">
+		<!-- f/ Aperture input — narrow: values like "5.6" / "16" -->
+		<div class="flex flex-col gap-1">
 			<label for="qab-aperture" class="text-xs font-medium text-text-muted">f/</label>
 			<input
 				id="qab-aperture"
@@ -106,19 +106,19 @@
 				type="text"
 				bind:value={aperture}
 				placeholder="5.6"
-				class="h-[38px] w-full rounded-lg border border-border bg-surface px-3 font-mono text-sm text-text placeholder-text-faint transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+				class="h-[38px] w-20 rounded-lg border border-border bg-surface px-3 font-mono text-sm text-text placeholder-text-faint transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 			/>
 		</div>
 
-		<!-- Shutter speed input -->
-		<div class="flex flex-1 flex-col gap-1">
+		<!-- Shutter speed input — narrow: values like "1/250" / "4" -->
+		<div class="flex flex-col gap-1">
 			<label for="qab-shutter" class="text-xs font-medium text-text-muted">Shutter</label>
 			<input
 				id="qab-shutter"
 				type="text"
 				bind:value={shutterSpeed}
 				placeholder="1/250"
-				class="h-[38px] w-full rounded-lg border border-border bg-surface px-3 font-mono text-sm text-text placeholder-text-faint transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+				class="h-[38px] w-24 rounded-lg border border-border bg-surface px-3 font-mono text-sm text-text placeholder-text-faint transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 			/>
 		</div>
 	</div>
@@ -137,11 +137,10 @@
 		{/if}
 	</div>
 
-	<!-- Row 3: actions — full-width Save & Next + More toggle -->
+	<!-- Row 3: actions — Save & Next (content width) + More toggle -->
 	<div class="mt-3 flex items-center gap-2">
 		<Button
 			variant="primary"
-			class="flex-1"
 			onclick={handleSave}
 			disabled={saving || !frameNumber.trim()}
 			title="Save frame and advance to next (⌘/Ctrl+Enter)"
