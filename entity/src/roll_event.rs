@@ -41,6 +41,12 @@ pub enum RollEventType {
     #[sea_orm(string_value = "self_dev_removed")]
     #[serde(rename = "self_dev_removed")]
     SelfDevRemoved,
+    #[sea_orm(string_value = "negatives_picked_up")]
+    #[serde(rename = "negatives_picked_up")]
+    NegativesPickedUp,
+    #[sea_orm(string_value = "negatives_waived")]
+    #[serde(rename = "negatives_waived")]
+    NegativesWaived,
 }
 
 /// What record `ref_id` points to, so the frontend journal can deep-link an

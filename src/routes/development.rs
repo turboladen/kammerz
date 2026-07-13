@@ -52,6 +52,9 @@ pub struct UpdateLabDevDto {
     pub cost: Option<Option<f64>>,
     #[serde(deserialize_with = "double_option")]
     pub notes: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub date_negatives_picked_up: Option<Option<String>>,
+    pub negatives_not_collecting: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -274,6 +277,9 @@ async fn update_lab_dev(
     if let Some(v) = data.cost {
         validate_non_negative_f64("cost", v)?;
     }
+    if let Some(v) = &data.date_negatives_picked_up {
+        validate_date_opt("date_negatives_picked_up", v)?;
+    }
 
     let now = now_string();
 
@@ -283,6 +289,13 @@ async fn update_lab_dev(
     // so an unrelated edit (e.g. notes) never silently undoes a confirmed
     // backward status move.
     let old_received_present = existing.date_received.is_some();
+
+    // Which specialized negatives action (if any) this edit performs — captured
+    // before `existing` is consumed. Pickup takes priority over waive over a
+    // plain edit for the journal entry.
+    let picking_up = matches!(&data.date_negatives_picked_up, Some(Some(s)) if !s.trim().is_empty())
+        && existing.date_negatives_picked_up.is_none();
+    let waiving = data.negatives_not_collecting == Some(true) && !existing.negatives_not_collecting;
 
     db.transaction::<_, (), DbErr>(|txn| {
         Box::pin(async move {
@@ -303,6 +316,12 @@ async fn update_lab_dev(
             if let Some(v) = data.notes {
                 model.notes = trim_opt(v);
             }
+            if let Some(v) = data.date_negatives_picked_up {
+                model.date_negatives_picked_up = trim_opt(v);
+            }
+            if let Some(v) = data.negatives_not_collecting {
+                model.negatives_not_collecting = Set(v);
+            }
             model.updated_at = Set(now);
 
             let result = DevelopmentService::update_lab_dev(txn, model).await?;
@@ -318,15 +337,31 @@ async fn update_lab_dev(
                     .await?;
             }
 
+            let (event_type, summary) = if picking_up {
+                (
+                    entity::roll_event::RollEventType::NegativesPickedUp,
+                    "Negatives picked up".to_string(),
+                )
+            } else if waiving {
+                (
+                    entity::roll_event::RollEventType::NegativesWaived,
+                    "Negatives marked not for collection".to_string(),
+                )
+            } else {
+                (
+                    entity::roll_event::RollEventType::LabDevEdited,
+                    "Lab development edited".to_string(),
+                )
+            };
             RollEventService::record(
                 txn,
                 result.roll_id,
-                entity::roll_event::RollEventType::LabDevEdited,
+                event_type,
                 None,
                 None,
                 Some(entity::roll_event::RefKind::LabDev),
                 Some(id),
-                "Lab development edited".to_string(),
+                summary,
             )
             .await?;
 

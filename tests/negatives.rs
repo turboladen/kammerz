@@ -139,3 +139,122 @@ async fn lab_retention_create_update_and_validation() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+// Helper: create a lab-developed roll at `lab-done` (date_received set), return
+// (roll_pk, lab_dev_id). Mirrors the create flow the UI uses.
+async fn lab_developed_roll(app: &axum::Router) -> (i32, i32) {
+    let res = app.clone().oneshot(get("/api/cameras")).await.unwrap();
+    let cams: Vec<Value> = json_body(res).await;
+    let camera_id = cams[0]["id"].as_i64().unwrap() as i32;
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/rolls",
+            &json!({ "roll_id": "R-NEG-A", "camera_id": camera_id, "status": "shot", "date_loaded": "2026-06-01" }),
+        ))
+        .await
+        .unwrap();
+    let roll_pk: i32 = json_body(res).await;
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/lab",
+            &json!({ "roll_id": roll_pk, "date_received": "2026-07-01" }),
+        ))
+        .await
+        .unwrap();
+    let lab_dev_id: i32 = json_body(res).await;
+    (roll_pk, lab_dev_id)
+}
+
+#[tokio::test]
+async fn mark_picked_up_sets_date_logs_event_and_keeps_status() {
+    let app = open_app().await;
+    let (roll_pk, lab_dev_id) = lab_developed_roll(&app).await;
+
+    let status_before = {
+        let res = app
+            .clone()
+            .oneshot(get(&format!("/api/rolls/{roll_pk}")))
+            .await
+            .unwrap();
+        let r: Value = json_body(res).await;
+        r["status"].as_str().unwrap().to_string()
+    };
+
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/development/lab/{lab_dev_id}"),
+            &json!({ "date_negatives_picked_up": "2026-07-10" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/rolls/{roll_pk}/detail")))
+        .await
+        .unwrap();
+    let detail: Value = json_body(res).await;
+    assert_eq!(detail["lab_dev"]["date_negatives_picked_up"], "2026-07-10");
+    // Status untouched by a pickup edit.
+    assert_eq!(detail["roll"]["status"], status_before);
+    // Journal recorded the specialized event.
+    let types: Vec<&str> = detail["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["event_type"].as_str().unwrap())
+        .collect();
+    assert!(types.contains(&"negatives_picked_up"), "events: {types:?}");
+}
+
+#[tokio::test]
+async fn mark_not_collecting_logs_waived_event() {
+    let app = open_app().await;
+    let (roll_pk, lab_dev_id) = lab_developed_roll(&app).await;
+
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/development/lab/{lab_dev_id}"),
+            &json!({ "negatives_not_collecting": true }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/rolls/{roll_pk}/detail")))
+        .await
+        .unwrap();
+    let detail: Value = json_body(res).await;
+    assert_eq!(detail["lab_dev"]["negatives_not_collecting"], true);
+    let types: Vec<&str> = detail["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["event_type"].as_str().unwrap())
+        .collect();
+    assert!(types.contains(&"negatives_waived"), "events: {types:?}");
+}
+
+#[tokio::test]
+async fn invalid_picked_up_date_is_rejected() {
+    let app = open_app().await;
+    let (_roll_pk, lab_dev_id) = lab_developed_roll(&app).await;
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/development/lab/{lab_dev_id}"),
+            &json!({ "date_negatives_picked_up": "not-a-date" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
