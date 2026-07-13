@@ -129,7 +129,7 @@
 			<div class="flex flex-col gap-1">
 				<span class="text-xs font-medium text-text-muted">Lens</span>
 				<div class="flex h-[38px] items-center rounded-lg border border-border bg-surface px-3 text-sm text-text-muted">
-					<span class="truncate">{fixedLensLabel || 'Fixed lens'}</span>
+					<span class="min-w-0 truncate">{fixedLensLabel || 'Fixed lens'}</span>
 				</div>
 			</div>
 		{:else}
@@ -168,10 +168,10 @@
 
 	<!-- Expanded fields: date / time / location / notes -->
 	{#if showMore}
-		<div class="mt-3 grid grid-cols-2 gap-3 border-t border-border-subtle pt-3">
+		<div class="mt-3 grid grid-cols-1 gap-3 border-t border-border-subtle pt-3 sm:grid-cols-2">
 			<DateInput label="Date" bind:value={date} />
 			<Input type="time" label="Time" class="h-[38px]" bind:value={time} />
-			<div class="col-span-2 flex flex-col gap-1">
+			<div class="flex flex-col gap-1 sm:col-span-2">
 				<label for="qab-location" class="text-xs font-medium text-text-muted">Location</label>
 				<input
 					id="qab-location"
@@ -181,7 +181,7 @@
 					class="h-[38px] rounded-lg border border-border bg-surface px-3 text-sm text-text placeholder-text-faint transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
 				/>
 			</div>
-			<div class="col-span-2">
+			<div class="sm:col-span-2">
 				<Textarea label="Notes" bind:value={notes} rows={1} placeholder="Anything notable…" />
 			</div>
 		</div>
