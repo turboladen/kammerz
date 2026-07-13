@@ -1,7 +1,10 @@
 mod common;
 
-use common::open_app_with_db;
+use axum::http::StatusCode;
+use common::{get, json_body, open_app, open_app_with_db, post_json, put_json};
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+use serde_json::{Value, json};
+use tower::ServiceExt;
 
 // Proves the three new columns exist and round-trip through the entities.
 #[tokio::test]
@@ -81,4 +84,58 @@ async fn new_negatives_columns_round_trip() {
     .await
     .unwrap();
     assert!(!dev2.negatives_not_collecting);
+}
+
+#[tokio::test]
+async fn lab_retention_create_update_and_validation() {
+    let app = open_app().await;
+
+    // Create with retention.
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/labs",
+            &json!({ "name": "Lab A", "negative_retention_days": 45 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let id: i32 = json_body(res).await;
+
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/labs/{id}")))
+        .await
+        .unwrap();
+    let lab: Value = json_body(res).await;
+    assert_eq!(lab["negative_retention_days"], 45);
+
+    // Update to a new value.
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            &format!("/api/labs/{id}"),
+            &json!({ "negative_retention_days": 14 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/labs/{id}")))
+        .await
+        .unwrap();
+    let lab: Value = json_body(res).await;
+    assert_eq!(lab["negative_retention_days"], 14);
+
+    // Negative value rejected.
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/labs",
+            &json!({ "name": "Lab B", "negative_retention_days": -1 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }

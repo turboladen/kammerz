@@ -12,7 +12,7 @@ use crate::extract::{Json, Path};
 use crate::patch::{double_option, now_string, trim_opt};
 use crate::routes::{friendly_delete_err, friendly_err};
 use crate::services::lab_service::LabService;
-use crate::validate::require_nonempty;
+use crate::validate::{require_nonempty, validate_non_negative_i32};
 use entity::lab;
 
 // --- DTOs (moved verbatim from commands/labs.rs) ---
@@ -23,6 +23,7 @@ pub struct CreateLabDto {
     pub location: Option<String>,
     pub website: Option<String>,
     pub notes: Option<String>,
+    pub negative_retention_days: Option<i32>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -35,6 +36,8 @@ pub struct UpdateLabDto {
     pub website: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
     pub notes: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub negative_retention_days: Option<Option<i32>>,
 }
 
 // --- Router ---
@@ -68,6 +71,7 @@ async fn create(
     Json(data): Json<CreateLabDto>,
 ) -> AppResult<(StatusCode, Json<i32>)> {
     let name = require_nonempty("name", &data.name)?;
+    validate_non_negative_i32("negative_retention_days", data.negative_retention_days)?;
 
     let now = now_string();
     let model = lab::ActiveModel {
@@ -75,6 +79,7 @@ async fn create(
         location: trim_opt(data.location),
         website: trim_opt(data.website),
         notes: trim_opt(data.notes),
+        negative_retention_days: Set(data.negative_retention_days),
         created_at: Set(now.clone()),
         updated_at: Set(now),
         ..Default::default()
@@ -105,6 +110,10 @@ async fn update(
     }
     if let Some(v) = data.notes {
         model.notes = trim_opt(v);
+    }
+    if let Some(v) = data.negative_retention_days {
+        validate_non_negative_i32("negative_retention_days", v)?;
+        model.negative_retention_days = Set(v);
     }
     model.updated_at = Set(now);
     LabService::update(&db, model)
