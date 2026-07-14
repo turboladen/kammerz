@@ -13,16 +13,7 @@
 		mono?: boolean;
 	}
 
-	let {
-		label,
-		hint,
-		placeholder,
-		value = $bindable(),
-		options,
-		normalize,
-		warning,
-		mono = false
-	}: Props = $props();
+	let { label, hint, placeholder, value = $bindable(), options, normalize, warning, mono = false }: Props = $props();
 
 	let showDropdown = $state(false);
 	let highlightIndex = $state(-1);

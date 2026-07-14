@@ -44,11 +44,13 @@ Replace the four plain inputs with `ComboInput`, keeping the same bound vars and
 - `rolls/[id]/+page.svelte` Shot add/edit dialog — `shotAperture`, `shotShutterSpeed`
 
 Each consumer passes, e.g. for aperture:
+
 ```
 options={APERTURE_SUGGESTIONS}
 normalize={normalizeAperture}
 warning={aperture && !isRecognizedAperture(aperture) ? 'Non-standard f/ value' : ''}
 ```
+
 Analogous for shutter with the shutter helpers.
 
 **Belt-and-suspenders:** the save handlers (`handleSave` in `QuickAddBar`, the create/update paths in the Shot dialog) run `normalize*` when building the payload, so a keyboard save (⌘/Ctrl+Enter, which fires before blur) still stores clean bare values.

@@ -22,10 +22,12 @@
 ### Task 1: `exposure.ts` util + tests
 
 **Files:**
+
 - Create: `frontend/src/lib/utils/exposure.ts`
 - Test: `frontend/src/lib/utils/exposure.test.ts`
 
 **Interfaces:**
+
 - Produces: `APERTURE_SUGGESTIONS: string[]`, `SHUTTER_SUGGESTIONS: string[]`, `normalizeAperture(v: string): string`, `normalizeShutter(v: string): string`, `isRecognizedAperture(v: string): boolean`, `isRecognizedShutter(v: string): boolean`.
 
 - [ ] **Step 1: Write the failing test**
@@ -205,9 +207,11 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 2: Extend `ComboInput` with `normalize`, `warning`, `mono`
 
 **Files:**
+
 - Modify: `frontend/src/lib/components/ui/ComboInput.svelte`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `ComboInput` accepts three new optional props — `normalize?: (v: string) => string` (applied on blur), `warning?: string` (amber hint shown only when unfocused), `mono?: boolean` (renders the input in the mono data font).
 
@@ -249,14 +253,14 @@ In `frontend/src/lib/components/ui/ComboInput.svelte`, replace the `Props` inter
 Replace `handleBlur` (lines 43–49):
 
 ```svelte
-	function handleBlur() {
-		// Delay to allow click on dropdown option to register
-		setTimeout(() => {
-			showDropdown = false;
-			highlightIndex = -1;
-			if (normalize) value = normalize(value);
-		}, 150);
-	}
+function handleBlur() {
+	// Delay to allow click on dropdown option to register
+	setTimeout(() => {
+		showDropdown = false;
+		highlightIndex = -1;
+		if (normalize) value = normalize(value);
+	}, 150);
+}
 ```
 
 - [ ] **Step 3: Apply mono + amber-border classes to the input**
@@ -264,10 +268,10 @@ Replace `handleBlur` (lines 43–49):
 Replace the input's `class` attribute (lines 112–113) with a conditional version. The border color and mono font become conditional; everything else is unchanged:
 
 ```svelte
-			class="rounded-lg border bg-surface px-3 py-2 text-sm text-text placeholder-text-faint
-				transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50
-				{mono ? 'font-mono' : ''}
-				{warning && !showDropdown ? 'border-amber-500/60 focus:border-amber-500' : 'border-border focus:border-accent'}"
+class="rounded-lg border bg-surface px-3 py-2 text-sm text-text placeholder-text-faint
+	transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50
+	{mono ? 'font-mono' : ''}
+	{warning && !showDropdown ? 'border-amber-500/60 focus:border-amber-500' : 'border-border focus:border-accent'}"
 ```
 
 - [ ] **Step 4: Render the warning line**
@@ -275,12 +279,12 @@ Replace the input's `class` attribute (lines 112–113) with a conditional versi
 Replace the trailing hint block (lines 136–138) with the hint plus the warning:
 
 ```svelte
-	{#if hint}
-		<span class="text-xs text-text-faint">{hint}</span>
-	{/if}
-	{#if warning && !showDropdown}
-		<span class="text-xs text-amber-400">{warning}</span>
-	{/if}
+{#if hint}
+	<span class="text-xs text-text-faint">{hint}</span>
+{/if}
+{#if warning && !showDropdown}
+	<span class="text-xs text-amber-400">{warning}</span>
+{/if}
 ```
 
 - [ ] **Step 5: Verify svelte-check + build**
@@ -302,9 +306,11 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 3: Wire `QuickAddBar` to the guided inputs
 
 **Files:**
+
 - Modify: `frontend/src/lib/components/rolls/QuickAddBar.svelte`
 
 **Interfaces:**
+
 - Consumes: `ComboInput` (Task 2) and `exposure.ts` exports (Task 1).
 
 - [ ] **Step 1: Add imports**
@@ -312,15 +318,15 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 In the `<script>` block (after the existing `$lib/components/ui/*` imports, ~line 6), add:
 
 ```svelte
-	import ComboInput from '$lib/components/ui/ComboInput.svelte';
-	import {
-		APERTURE_SUGGESTIONS,
-		SHUTTER_SUGGESTIONS,
-		isRecognizedAperture,
-		isRecognizedShutter,
-		normalizeAperture,
-		normalizeShutter
-	} from '$lib/utils/exposure';
+import ComboInput from '$lib/components/ui/ComboInput.svelte';
+import {
+	APERTURE_SUGGESTIONS,
+	SHUTTER_SUGGESTIONS,
+	isRecognizedAperture,
+	isRecognizedShutter,
+	normalizeAperture,
+	normalizeShutter
+} from '$lib/utils/exposure';
 ```
 
 - [ ] **Step 2: Normalize on save**
@@ -328,16 +334,16 @@ In the `<script>` block (after the existing `$lib/components/ui/*` imports, ~lin
 In `handleSave` (lines 60–69), replace the `onsave({ ... })` payload's `aperture` and `shutterSpeed` lines so the keyboard-save path also stores bare values:
 
 ```svelte
-		onsave({
-			frameNumber,
-			aperture: normalizeAperture(aperture),
-			shutterSpeed: normalizeShutter(shutterSpeed),
-			lensId: isFixedLens ? lensIdProp : localLensId,
-			date,
-			time,
-			location,
-			notes
-		});
+onsave({
+	frameNumber,
+	aperture: normalizeAperture(aperture),
+	shutterSpeed: normalizeShutter(shutterSpeed),
+	lensId: isFixedLens ? lensIdProp : localLensId,
+	date,
+	time,
+	location,
+	notes
+});
 ```
 
 - [ ] **Step 3: Swap the aperture input**
@@ -345,18 +351,18 @@ In `handleSave` (lines 60–69), replace the `onsave({ ... })` payload's `apertu
 Replace the f/ Aperture block (lines 100–111) with:
 
 ```svelte
-			<!-- f/ Aperture — guided combobox (standard values + free entry) -->
-			<div class="w-20">
-				<ComboInput
-					label="f/"
-					placeholder="5.6"
-					mono
-					options={APERTURE_SUGGESTIONS}
-					normalize={normalizeAperture}
-					warning={aperture && !isRecognizedAperture(aperture) ? 'Non-standard' : ''}
-					bind:value={aperture}
-				/>
-			</div>
+<!-- f/ Aperture — guided combobox (standard values + free entry) -->
+<div class="w-20">
+	<ComboInput
+		label="f/"
+		placeholder="5.6"
+		mono
+		options={APERTURE_SUGGESTIONS}
+		normalize={normalizeAperture}
+		warning={aperture && !isRecognizedAperture(aperture) ? 'Non-standard' : ''}
+		bind:value={aperture}
+	/>
+</div>
 ```
 
 - [ ] **Step 4: Swap the shutter input**
@@ -364,18 +370,18 @@ Replace the f/ Aperture block (lines 100–111) with:
 Replace the Shutter speed block (lines 113–123) with:
 
 ```svelte
-			<!-- Shutter — guided combobox -->
-			<div class="w-24">
-				<ComboInput
-					label="Shutter"
-					placeholder="1/250"
-					mono
-					options={SHUTTER_SUGGESTIONS}
-					normalize={normalizeShutter}
-					warning={shutterSpeed && !isRecognizedShutter(shutterSpeed) ? 'Non-standard' : ''}
-					bind:value={shutterSpeed}
-				/>
-			</div>
+<!-- Shutter — guided combobox -->
+<div class="w-24">
+	<ComboInput
+		label="Shutter"
+		placeholder="1/250"
+		mono
+		options={SHUTTER_SUGGESTIONS}
+		normalize={normalizeShutter}
+		warning={shutterSpeed && !isRecognizedShutter(shutterSpeed) ? 'Non-standard' : ''}
+		bind:value={shutterSpeed}
+	/>
+</div>
 ```
 
 - [ ] **Step 5: Verify svelte-check + build**
@@ -397,9 +403,11 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 4: Wire the Shot add/edit dialog
 
 **Files:**
+
 - Modify: `frontend/src/routes/(app)/rolls/[id]/+page.svelte`
 
 **Interfaces:**
+
 - Consumes: `ComboInput` (Task 2) and `exposure.ts` exports (Task 1).
 
 - [ ] **Step 1: Add imports**
@@ -407,15 +415,15 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 In the page's `<script>` import block, alongside the existing `$lib/components/ui/*` imports (the page already imports `Input` from there), add:
 
 ```svelte
-	import ComboInput from '$lib/components/ui/ComboInput.svelte';
-	import {
-		APERTURE_SUGGESTIONS,
-		SHUTTER_SUGGESTIONS,
-		isRecognizedAperture,
-		isRecognizedShutter,
-		normalizeAperture,
-		normalizeShutter
-	} from '$lib/utils/exposure';
+import ComboInput from '$lib/components/ui/ComboInput.svelte';
+import {
+	APERTURE_SUGGESTIONS,
+	SHUTTER_SUGGESTIONS,
+	isRecognizedAperture,
+	isRecognizedShutter,
+	normalizeAperture,
+	normalizeShutter
+} from '$lib/utils/exposure';
 ```
 
 - [ ] **Step 2: Normalize at all three submit sites**
@@ -423,15 +431,15 @@ In the page's `<script>` import block, alongside the existing `$lib/components/u
 The page builds the shot payload in three places (lines ~551–552, ~563–564, ~594–595), each with the identical pair:
 
 ```svelte
-				aperture: shotAperture || null,
-				shutter_speed: shotShutterSpeed || null,
+aperture: shotAperture || null,
+shutter_speed: shotShutterSpeed || null,
 ```
 
 Replace **every** occurrence of that pair with:
 
 ```svelte
-				aperture: normalizeAperture(shotAperture) || null,
-				shutter_speed: normalizeShutter(shotShutterSpeed) || null,
+aperture: normalizeAperture(shotAperture) || null,
+shutter_speed: normalizeShutter(shotShutterSpeed) || null,
 ```
 
 (There are three; use find-and-replace across the file and confirm three edits.)
@@ -441,31 +449,31 @@ Replace **every** occurrence of that pair with:
 Replace lines 1259–1260:
 
 ```svelte
-				<Input label="Aperture (f/)" bind:value={shotAperture} placeholder="5.6" />
-				<Input label="Shutter Speed" bind:value={shotShutterSpeed} placeholder="1/125" />
+<Input label="Aperture (f/)" bind:value={shotAperture} placeholder="5.6" />
+<Input label="Shutter Speed" bind:value={shotShutterSpeed} placeholder="1/125" />
 ```
 
 with:
 
 ```svelte
-				<ComboInput
-					label="Aperture (f/)"
-					placeholder="5.6"
-					mono
-					options={APERTURE_SUGGESTIONS}
-					normalize={normalizeAperture}
-					warning={shotAperture && !isRecognizedAperture(shotAperture) ? 'Non-standard f/ value' : ''}
-					bind:value={shotAperture}
-				/>
-				<ComboInput
-					label="Shutter Speed"
-					placeholder="1/250"
-					mono
-					options={SHUTTER_SUGGESTIONS}
-					normalize={normalizeShutter}
-					warning={shotShutterSpeed && !isRecognizedShutter(shotShutterSpeed) ? 'Non-standard shutter speed' : ''}
-					bind:value={shotShutterSpeed}
-				/>
+<ComboInput
+	label="Aperture (f/)"
+	placeholder="5.6"
+	mono
+	options={APERTURE_SUGGESTIONS}
+	normalize={normalizeAperture}
+	warning={shotAperture && !isRecognizedAperture(shotAperture) ? 'Non-standard f/ value' : ''}
+	bind:value={shotAperture}
+/>
+<ComboInput
+	label="Shutter Speed"
+	placeholder="1/250"
+	mono
+	options={SHUTTER_SUGGESTIONS}
+	normalize={normalizeShutter}
+	warning={shotShutterSpeed && !isRecognizedShutter(shotShutterSpeed) ? 'Non-standard shutter speed' : ''}
+	bind:value={shotShutterSpeed}
+/>
 ```
 
 - [ ] **Step 4: Verify svelte-check + build**
@@ -500,10 +508,11 @@ Expected: `fmt-check`, `ci-backend`, `ci-frontend` all pass (backend is unchange
 - [ ] **Step 3: Manual / Playwright check** (`just dev` → a roll detail page)
 
 Verify against a throwaway DB copy (never the live catalog):
+
 - **Dropdown:** focus the f/ field → half-stop suggestions appear; typing `5` narrows to `5.6`; picking one fills it.
 - **Normalize:** type `f/5.6` and blur → becomes `5.6`; type `1/250s` in shutter and blur → `1/250`.
 - **Off-list ⚠:** type `1.8` (recognized third-stop) → **no** warning; type `56` → amber "Non-standard" appears after blur, amber border shows, and it still saves.
-- **Both surfaces:** confirm in the `QuickAddBar` card *and* the full Shot add/edit dialog.
+- **Both surfaces:** confirm in the `QuickAddBar` card _and_ the full Shot add/edit dialog.
 - **Round-trip:** save a shot, reopen it → the value shows bare (no `f/`, no `s`), FrameStrip shows `f/5.6`.
 
 - [ ] **Step 4: Commit any formatting**
@@ -514,6 +523,7 @@ git commit -m "chore: formatting for guided exposure inputs (kammerz-dzuy)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
+
 (Skip if the tree is already clean.)
 
 ---
