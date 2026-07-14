@@ -6,6 +6,15 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
+	import ComboInput from '$lib/components/ui/ComboInput.svelte';
+	import {
+		APERTURE_SUGGESTIONS,
+		SHUTTER_SUGGESTIONS,
+		isRecognizedAperture,
+		isRecognizedShutter,
+		normalizeAperture,
+		normalizeShutter
+	} from '$lib/utils/exposure';
 	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
@@ -548,8 +557,8 @@
 			if (editingShotId) {
 				await updateShot(editingShotId, {
 					frame_number: shotFrameNumber.trim(),
-					aperture: shotAperture || null,
-					shutter_speed: shotShutterSpeed || null,
+					aperture: normalizeAperture(shotAperture) || null,
+					shutter_speed: normalizeShutter(shotShutterSpeed) || null,
 					date: shotDate || null,
 					time: shotTime || null,
 					location: shotLocation || null,
@@ -560,8 +569,8 @@
 				await createShot({
 					roll_id: id,
 					frame_number: shotFrameNumber.trim(),
-					aperture: shotAperture || null,
-					shutter_speed: shotShutterSpeed || null,
+					aperture: normalizeAperture(shotAperture) || null,
+					shutter_speed: normalizeShutter(shotShutterSpeed) || null,
 					date: shotDate || null,
 					time: shotTime || null,
 					location: shotLocation || null,
@@ -591,8 +600,8 @@
 			await createShot({
 				roll_id: id,
 				frame_number: shotFrameNumber.trim(),
-				aperture: shotAperture || null,
-				shutter_speed: shotShutterSpeed || null,
+				aperture: normalizeAperture(shotAperture) || null,
+				shutter_speed: normalizeShutter(shotShutterSpeed) || null,
 				date: shotDate || null,
 				time: shotTime || null,
 				location: shotLocation || null,
@@ -1256,8 +1265,24 @@
 			{/if}
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
 				<Input label="Frame #" bind:value={shotFrameNumber} placeholder="1" required />
-				<Input label="Aperture (f/)" bind:value={shotAperture} placeholder="5.6" />
-				<Input label="Shutter Speed" bind:value={shotShutterSpeed} placeholder="1/125" />
+				<ComboInput
+					label="Aperture (f/)"
+					placeholder="5.6"
+					mono
+					options={APERTURE_SUGGESTIONS}
+					normalize={normalizeAperture}
+					warning={shotAperture && !isRecognizedAperture(shotAperture) ? 'Non-standard f/ value' : ''}
+					bind:value={shotAperture}
+				/>
+				<ComboInput
+					label="Shutter Speed"
+					placeholder="1/250"
+					mono
+					options={SHUTTER_SUGGESTIONS}
+					normalize={normalizeShutter}
+					warning={shotShutterSpeed && !isRecognizedShutter(shotShutterSpeed) ? 'Non-standard shutter speed' : ''}
+					bind:value={shotShutterSpeed}
+				/>
 			</div>
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
 				<DateInput label="Date" bind:value={shotDate} />
