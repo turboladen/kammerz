@@ -51,6 +51,9 @@
 						<li>A later step that needs a date asks for one first.</li>
 						<li>An earlier step moves the roll back and asks to confirm.</li>
 						<li>Lab and self steps open a development form when no record exists yet.</li>
+						<li>
+							To fix <em>when</em> a step happened without moving the roll, edit its date in Lifecycle dates below.
+						</li>
 					</ul>
 				</div>
 			{/if}

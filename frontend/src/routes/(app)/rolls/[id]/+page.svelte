@@ -28,11 +28,12 @@
 	import FrameStrip from '$lib/components/rolls/FrameStrip.svelte';
 	import QuickAddBar from '$lib/components/rolls/QuickAddBar.svelte';
 	import RollActivity from '$lib/components/rolls/RollActivity.svelte';
+	import RollTimeline from '$lib/components/rolls/RollTimeline.svelte';
 	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
 	import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
 	import { getRollDetail, updateRoll, deleteRoll } from '$lib/api/rolls';
 	import { updateLabDev, updateSelfDev } from '$lib/api/development';
-	import type { DateTarget } from '$lib/utils/timeline';
+	import type { DateTarget, TimelineMilestone } from '$lib/utils/timeline';
 	import { logShot } from '$lib/utils/shot-entry';
 	import { listCameras } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
@@ -54,7 +55,7 @@
 		selfFlow,
 		type DevAutoPrompt
 	} from '$lib/utils/status';
-	import { readDateTarget, STATUS_DATE_TARGET } from '$lib/utils/timeline';
+	import { buildRollTimeline, readDateTarget, STATUS_DATE_TARGET } from '$lib/utils/timeline';
 	import { todayLocal, dateFieldError } from '$lib/utils/date';
 	import { parseTime } from '$lib/utils/time';
 	import type {
@@ -167,6 +168,12 @@
 	const devPath = $derived(roll ? getDevPath(roll.status as RollStatus, !!labDev, !!selfDev) : ('undecided' as const));
 	const statusFlow = $derived(getFlowForPath(devPath));
 	const pathLabel = $derived(getPathLabel(devPath));
+
+	// Path-aware lifecycle timeline: each reached milestone's date, editable inline
+	// via RollTimeline WITHOUT moving the status (kammerz-2u8). A not-yet-reached
+	// milestone is non-editable — its date is recorded by advancing the status, not
+	// back-filled here (kammerz-fxl).
+	const timeline = $derived(roll ? buildRollTimeline(roll, labDev, selfDev, devPath) : []);
 
 	// Helper: the current value of a status's target date (for the forward+empty check).
 	// STATUS_DATE_TARGET and the read dispatch live in timeline.ts so the status→date
@@ -361,7 +368,7 @@
 	// it did. 'explicit' = a user-driven status move (chevron / nudge): suppress the
 	// notice even when the status changes. The rest name the mutation that ran so the
 	// message can be specific; an undiffed status (no change) shows nothing regardless.
-	type ReloadReason = 'navigate' | 'explicit' | 'shot-add' | 'shot-delete' | 'dev' | 'roll-edit';
+	type ReloadReason = 'navigate' | 'explicit' | 'shot-add' | 'shot-delete' | 'dev' | 'roll-edit' | 'timeline';
 
 	// Direction of an auto-change, judged WITHIN a single dev flow. The canonical full
 	// status order interleaves the lab and self branches (at-lab, lab-done, developing,
@@ -697,6 +704,21 @@
 			await updateLabDev(labDev.id, { [t.field]: date });
 		} else if (t.kind === 'self' && selfDev) {
 			await updateSelfDev(selfDev.id, { [t.field]: date });
+		}
+	}
+
+	// Persist an inline Timeline milestone-date edit, then refresh. Distinct from a
+	// chevron status move: this only writes the date to its owning record and never
+	// changes the status (a roll-owned date is inert; clearing a dev-owned date can
+	// trigger the backend's data-driven revert, which the 'timeline' reload surfaces
+	// via autoStatusNotice — kammerz-2u8/3wg).
+	async function saveTimelineDate(milestone: TimelineMilestone, date: string | null) {
+		error = '';
+		try {
+			await writeDateTarget(milestone.target, date);
+			await loadRollData('timeline');
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
 		}
 	}
 
@@ -1105,6 +1127,26 @@
 				{/if}
 			</div>
 		</FadeIn>
+
+		<!-- Lifecycle dates — inline milestone-date editing, separate from the status
+		     chevron bar above: the chevrons CHANGE status; this CORRECTS the date each
+		     reached step happened, without moving status (kammerz-2u8).
+		     Hidden while the roll Edit form is open — that form has its own "Lifecycle
+		     dates" inputs for the roll-owned dates, so showing both would duplicate the
+		     heading and controls on screen.
+		     Deliberately NOT wrapped in FadeIn — RollTimeline renders its own DateConfirm
+		     dialog, and a FadeIn transform creates a containing block that traps a
+		     fixed-positioned dialog. This matches the DevelopmentSection precedent below;
+		     both Dialog-rendering components stay outside FadeIn (see frontend-patterns.md). -->
+		{#if !editingRoll}
+			<div class="mb-6">
+				<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
+					Lifecycle dates
+					<div class="flex-1 border-b border-border-subtle"></div>
+				</h2>
+				<RollTimeline milestones={timeline} onedit={saveTimelineDate} />
+			</div>
+		{/if}
 
 		<!-- Frames — front-and-center: most info + the Quick Entry control. Placed
 		     above Development and Activity (kammerz-60f). -->
