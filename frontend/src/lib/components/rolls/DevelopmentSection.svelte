@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
+	import ComboInput from '$lib/components/ui/ComboInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
@@ -14,13 +16,15 @@
 		deleteLabDev,
 		createSelfDev,
 		updateSelfDev,
-		deleteSelfDev
+		deleteSelfDev,
+		getChemicals
 	} from '$lib/api/development';
 	import { secondsToMmSs, mmSsToSeconds } from '$lib/utils/duration';
 	import { dateFieldError, todayLocal } from '$lib/utils/date';
+	import { defaultDilutionFor, dilutionPrefill } from '$lib/utils/chemistry';
 	import { labFlow, selfFlow, getStatusLabel } from '$lib/utils/status';
 	import type { DevAutoPrompt } from '$lib/utils/status';
-	import type { Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus } from '$lib/types';
+	import type { Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, GroupedChemicals } from '$lib/types';
 
 	let {
 		rollId,
@@ -131,6 +135,38 @@
 	let devFormStages: { stage_name: string; duration: string; notes: string }[] = $state([]);
 	let devSelfError = $state('');
 	const selfDateError = $derived(dateFieldError(devDateProcessed));
+
+	// Canonical chemistry reference for the self-dev autocomplete (kammerz-9fx).
+	// Self-learning: the backend upserts novel values on save, so we refetch after
+	// a successful save to surface them without a page reload.
+	let chemicals = $state<GroupedChemicals | null>(null);
+	async function loadChemicals() {
+		try {
+			chemicals = await getChemicals();
+		} catch {
+			// Non-fatal: keep the last-good set so a transient refetch failure doesn't
+			// wipe already-loaded suggestions. On the initial load `chemicals` is still
+			// null, so the fields simply degrade to free-text entry.
+		}
+	}
+	onMount(loadChemicals);
+
+	const developerOptions = $derived(chemicals?.developer.map((c) => c.name) ?? []);
+	const fixerOptions = $derived(chemicals?.fixer.map((c) => c.name) ?? []);
+	const stopBathOptions = $derived(chemicals?.stop_bath.map((c) => c.name) ?? []);
+	const wettingAgentOptions = $derived(chemicals?.wetting_agent.map((c) => c.name) ?? []);
+	const clearingAgentOptions = $derived(chemicals?.clearing_agent.map((c) => c.name) ?? []);
+
+	// On selecting a known developer/fixer, pre-fill an empty dilution from its
+	// default (never overwrites a value the user already typed).
+	function handleDeveloperSelect(name: string) {
+		const filled = dilutionPrefill(devDeveloperDilution, defaultDilutionFor(chemicals?.developer ?? [], name));
+		if (filled !== null) devDeveloperDilution = filled;
+	}
+	function handleFixerSelect(name: string) {
+		const filled = dilutionPrefill(devFixerDilution, defaultDilutionFor(chemicals?.fixer ?? [], name));
+		if (filled !== null) devFixerDilution = filled;
+	}
 
 	const labOptions = $derived([
 		{ value: '', label: 'No lab selected' },
@@ -355,6 +391,8 @@
 			showSelfDevDialog = false;
 			resetSelfDevForm();
 			clearPromptState();
+			// Surface any values the backend just learned (self-learning reference).
+			await loadChemicals();
 			await onchange();
 		} catch (err) {
 			devSelfError = err instanceof Error ? err.message : String(err);
@@ -577,15 +615,37 @@
 			<div>
 				<span class="mb-2 block text-xs font-semibold uppercase tracking-wider text-text-faint">Chemistry</span>
 				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-					<Input label="Developer" bind:value={devDeveloper} placeholder="Rodinal" />
+					<ComboInput
+						label="Developer"
+						bind:value={devDeveloper}
+						options={developerOptions}
+						placeholder="Rodinal"
+						onselect={handleDeveloperSelect}
+					/>
 					<Input label="Dilution" bind:value={devDeveloperDilution} placeholder="1+25" />
-					<Input label="Fixer" bind:value={devFixer} placeholder="Ilford Rapid Fix" />
+					<ComboInput
+						label="Fixer"
+						bind:value={devFixer}
+						options={fixerOptions}
+						placeholder="Ilford Rapid Fix"
+						onselect={handleFixerSelect}
+					/>
 					<Input label="Dilution" bind:value={devFixerDilution} placeholder="1+4" />
-					<Input label="Stop Bath" bind:value={devStopBath} placeholder="Optional" />
-					<Input label="Clearing Agent" bind:value={devClearingAgent} placeholder="Optional" />
+					<ComboInput label="Stop Bath" bind:value={devStopBath} options={stopBathOptions} placeholder="Optional" />
+					<ComboInput
+						label="Clearing Agent"
+						bind:value={devClearingAgent}
+						options={clearingAgentOptions}
+						placeholder="Optional"
+					/>
 				</div>
 				<div class="mt-3">
-					<Input label="Wetting Agent" bind:value={devWettingAgent} placeholder="Optional" />
+					<ComboInput
+						label="Wetting Agent"
+						bind:value={devWettingAgent}
+						options={wettingAgentOptions}
+						placeholder="Optional"
+					/>
 				</div>
 			</div>
 

@@ -291,6 +291,26 @@ export interface DevelopmentSelf {
 
 export type DevelopmentSelfInsert = Omit<DevelopmentSelf, 'id' | 'created_at' | 'updated_at'>;
 
+export type ChemicalType = 'developer' | 'fixer' | 'stop_bath' | 'wetting_agent' | 'clearing_agent';
+
+export interface Chemical {
+	id: number;
+	name: string;
+	type: ChemicalType;
+	default_dilution: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+/** Canonical chemistry reference bucketed by type (GET /api/development/chemicals). */
+export interface GroupedChemicals {
+	developer: Chemical[];
+	fixer: Chemical[];
+	stop_bath: Chemical[];
+	wetting_agent: Chemical[];
+	clearing_agent: Chemical[];
+}
+
 export interface DevStage {
 	id: number;
 	development_self_id: number;

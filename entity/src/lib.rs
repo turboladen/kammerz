@@ -1,6 +1,7 @@
 pub mod camera;
 pub mod camera_lens;
 pub mod camera_maintenance;
+pub mod chemical;
 pub mod dev_stage;
 pub mod development_lab;
 pub mod development_self;

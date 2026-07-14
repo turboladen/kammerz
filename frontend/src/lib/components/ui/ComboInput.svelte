@@ -11,9 +11,21 @@
 		warning?: string;
 		/** Render the input text in the mono data font. */
 		mono?: boolean;
+		/** Fired when an option is chosen from the dropdown (not on free typing). */
+		onselect?: (value: string) => void;
 	}
 
-	let { label, hint, placeholder, value = $bindable(), options, normalize, warning, mono = false }: Props = $props();
+	let {
+		label,
+		hint,
+		placeholder,
+		value = $bindable(),
+		options,
+		normalize,
+		warning,
+		mono = false,
+		onselect
+	}: Props = $props();
 
 	let showDropdown = $state(false);
 	let highlightIndex = $state(-1);
@@ -71,9 +83,18 @@
 	}
 
 	function selectOption(option: string) {
-		value = option;
+		// Cancel any pending blur so its normalize can't re-run on a stale value, and
+		// apply `normalize` here too — so the committed value, and the `onselect`
+		// payload, match what a blur would have produced (no divergence for callers
+		// that rely on the normalized value).
+		if (blurTimer) {
+			clearTimeout(blurTimer);
+			blurTimer = undefined;
+		}
+		value = normalize ? normalize(option) : option;
 		showDropdown = false;
 		highlightIndex = -1;
+		onselect?.(value);
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
