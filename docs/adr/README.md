@@ -60,3 +60,4 @@ it's an ADR.
 | [0009](0009-negatives-pickup-derived-state.md)            | Accepted                                             | Negatives-pickup as derived state, parallel to the status machine     |
 | [0010](0010-custom-24h-time-input.md)                     | Accepted                                             | Custom 24-hour time input (drop native `<input type="time">`)         |
 | [0011](0011-full-dates-only.md)                           | Accepted                                             | Dates are always full `YYYY-MM-DD` (drop partial-date entry)          |
+| [0012](0012-chemistry-reference-self-learning.md)         | Accepted                                             | Canonical chemistry reference table + self-learning autocomplete      |
