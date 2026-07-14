@@ -9,20 +9,23 @@ describe('dateFieldError', () => {
 		expect(dateFieldError(undefined)).toBe('');
 	});
 
-	it('accepts complete YYYY, YYYY-MM, and YYYY-MM-DD values', () => {
-		expect(dateFieldError('2026')).toBe('');
-		expect(dateFieldError('2026-06')).toBe('');
+	it('accepts a complete YYYY-MM-DD value', () => {
 		expect(dateFieldError('2026-06-15')).toBe('');
 		expect(dateFieldError('2024-02-29')).toBe(''); // real leap day
 	});
 
+	it('rejects partial dates (YYYY / YYYY-MM) — full dates only', () => {
+		expect(dateFieldError('2026')).toBe('Use YYYY-MM-DD');
+		expect(dateFieldError('2026-06')).toBe('Use YYYY-MM-DD');
+	});
+
 	it('rejects years outside 1800–2100', () => {
-		expect(dateFieldError('1799')).toBe('Year out of range');
-		expect(dateFieldError('2101-01')).toBe('Year out of range');
+		expect(dateFieldError('1799-01-01')).toBe('Year out of range');
+		expect(dateFieldError('2101-01-01')).toBe('Year out of range');
 	});
 
 	it('rejects an out-of-range month', () => {
-		expect(dateFieldError('2026-13')).toBe('Month must be 01–12');
+		expect(dateFieldError('2026-13-01')).toBe('Month must be 01–12');
 		expect(dateFieldError('2026-00-01')).toBe('Month must be 01–12');
 	});
 
@@ -31,10 +34,10 @@ describe('dateFieldError', () => {
 		expect(dateFieldError('2026-04-31')).toBe('Invalid day for this month');
 	});
 
-	it('rejects malformed / partial input', () => {
-		expect(dateFieldError('2026-')).toBe('Use YYYY, YYYY-MM, or YYYY-MM-DD');
-		expect(dateFieldError('06/15/2026')).toBe('Use YYYY, YYYY-MM, or YYYY-MM-DD');
-		expect(dateFieldError('not-a-date')).toBe('Use YYYY, YYYY-MM, or YYYY-MM-DD');
+	it('rejects malformed input', () => {
+		expect(dateFieldError('2026-')).toBe('Use YYYY-MM-DD');
+		expect(dateFieldError('06/15/2026')).toBe('Use YYYY-MM-DD');
+		expect(dateFieldError('not-a-date')).toBe('Use YYYY-MM-DD');
 	});
 });
 

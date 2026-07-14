@@ -346,27 +346,28 @@ async fn roll_deadline_uses_default_30_when_lab_retention_null() {
     assert_eq!(roll["negatives_deadline"], "2026-07-31"); // 2026-07-01 + 30
 }
 
-// validate_date_opt accepts bare `YYYY` and `YYYY-MM`, but SQLite's date() can't
-// add days to those (it yields a garbage negative-year date for `YYYY` and NULL
-// for `YYYY-MM`). The query's `length >= 10` guard must NULL the deadline for a
-// partial received date so the roll shows no countdown instead of a bogus one.
+// Dates are always full `YYYY-MM-DD` (ADR-0011). A partial `date_received` on a
+// lab dev is rejected at the API, so the negatives deadline can only ever be
+// computed from a full date. (The query's `length >= 10` guard remains as defense
+// in depth in case a legacy partial ever slips into the column.)
 #[tokio::test]
-async fn partial_date_received_yields_null_deadline() {
+async fn partial_date_received_is_rejected() {
     let app = open_app().await;
     let res = app.clone().oneshot(get("/api/cameras")).await.unwrap();
     let cams: Vec<Value> = json_body(res).await;
     let camera_id = cams[0]["id"].as_i64().unwrap() as i32;
 
-    for (roll_id, partial) in [("R-YR", "2026"), ("R-YM", "2026-07")] {
-        let res = app
-            .clone()
-            .oneshot(post_json(
-                "/api/rolls",
-                &json!({ "roll_id": roll_id, "camera_id": camera_id, "status": "shot" }),
-            ))
-            .await
-            .unwrap();
-        let roll_pk: i32 = json_body(res).await;
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/rolls",
+            &json!({ "roll_id": "R-PARTIAL", "camera_id": camera_id, "status": "shot" }),
+        ))
+        .await
+        .unwrap();
+    let roll_pk: i32 = json_body(res).await;
+
+    for partial in ["2026", "2026-07"] {
         let res = app
             .clone()
             .oneshot(post_json(
@@ -375,19 +376,10 @@ async fn partial_date_received_yields_null_deadline() {
             ))
             .await
             .unwrap();
-        assert_eq!(res.status(), StatusCode::CREATED);
-
-        let res = app
-            .clone()
-            .oneshot(get(&format!("/api/rolls/{roll_pk}")))
-            .await
-            .unwrap();
-        let roll: Value = json_body(res).await;
-        assert_eq!(roll["negatives_date_received"], partial);
-        assert!(
-            roll["negatives_deadline"].is_null(),
-            "partial received date {partial:?} must yield a null deadline, got {:?}",
-            roll["negatives_deadline"]
+        assert_eq!(
+            res.status(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "partial date_received {partial:?} must be rejected"
         );
     }
 }

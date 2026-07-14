@@ -160,7 +160,7 @@ falls back to the small `icon` circle for filtered "no matches" states.
 
 ### DateConfirm (`frontend/src/lib/components/ui/DateConfirm.svelte`)
 
-Small date-pick dialog (built on `Dialog` + `DateInput`). Confirm / Cancel, with an
+Small date-pick dialog (built on `Dialog` + a native `<Input type="date">`). Confirm / Cancel, with an
 optional **Clear** (commits null) for inline edits. Used for both the
 confirm-on-transition prompt and inline Timeline date editing. No "Skip" — to leave a
 date blank, advance then Clear it in the Timeline.

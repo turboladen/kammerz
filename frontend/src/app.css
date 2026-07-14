@@ -277,3 +277,17 @@ body::after {
 .font-display {
 	font-family: var(--font-display);
 }
+
+/* Native date-picker theming — the app is always-dark (no light theme), but
+   `color-scheme` defaults to the OS setting, so an unstyled `<input type="date">`
+   renders a light-on-light calendar-picker icon (near-invisible on our dark
+   surface) and, in Chromium, a light popup calendar. `color-scheme: dark` fixes
+   both; the icon `filter: invert()` is a belt-and-suspenders nudge for browsers
+   that don't fully dark-theme the icon from `color-scheme` alone. */
+input[type='date'] {
+	color-scheme: dark;
+}
+
+input[type='date']::-webkit-calendar-picker-indicator {
+	filter: invert(0.7);
+}

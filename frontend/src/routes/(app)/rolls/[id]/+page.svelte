@@ -6,7 +6,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
-	import DateInput from '$lib/components/ui/DateInput.svelte';
+	import TimeInput from '$lib/components/ui/TimeInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
@@ -996,11 +996,11 @@
 								<div class="flex-1 border-b border-border-subtle"></div>
 							</div>
 							<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-								<DateInput label="Loaded" bind:value={editDateLoaded} />
-								<DateInput label="Finished shooting" bind:value={editDateFinished} />
-								<DateInput label="Scanned" bind:value={editDateScanned} />
-								<DateInput label="Post-processed" bind:value={editDatePostProcessed} />
-								<DateInput label="Archived" bind:value={editDateArchived} />
+								<Input type="date" label="Loaded" class="h-[38px]" bind:value={editDateLoaded} />
+								<Input type="date" label="Finished shooting" class="h-[38px]" bind:value={editDateFinished} />
+								<Input type="date" label="Scanned" class="h-[38px]" bind:value={editDateScanned} />
+								<Input type="date" label="Post-processed" class="h-[38px]" bind:value={editDatePostProcessed} />
+								<Input type="date" label="Archived" class="h-[38px]" bind:value={editDateArchived} />
 							</div>
 						</div>
 						<Textarea label="Notes" bind:value={editNotes} placeholder="Any notes about this roll..." />
@@ -1132,7 +1132,7 @@
 								</p>
 							</div>
 							<div class="w-44">
-								<DateInput label="Finished shooting" bind:value={finishDate} />
+								<Input type="date" label="Finished shooting" class="h-[38px]" bind:value={finishDate} />
 							</div>
 						</div>
 						<div class="flex items-center gap-2">
@@ -1260,8 +1260,8 @@
 				<Input label="Shutter Speed" bind:value={shotShutterSpeed} placeholder="1/125" />
 			</div>
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-				<DateInput label="Date" bind:value={shotDate} />
-				<Input type="time" label="Time" class="h-[38px]" bind:value={shotTime} />
+				<Input type="date" label="Date" class="h-[38px]" bind:value={shotDate} />
+				<TimeInput label="Time" bind:value={shotTime} />
 				<Input label="Location" bind:value={shotLocation} placeholder="Central Park" />
 			</div>
 

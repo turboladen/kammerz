@@ -1,8 +1,8 @@
 mod common;
 
 use axum::http::StatusCode;
-use common::{get, json_body, open_app, post_json};
-use serde_json::{Value, json};
+use common::{get, json_body, open_app, open_app_with_db};
+use serde_json::Value;
 use tower::ServiceExt;
 
 #[tokio::test]
@@ -14,33 +14,16 @@ async fn stats_returns_200() {
     assert!(stats.is_object(), "stats deserializes into an object");
 }
 
-/// Create a roll with the given `date_loaded` on a seeded camera.
-async fn create_roll_loaded(app: &axum::Router, roll_id: &str, date_loaded: &str) {
-    let res = app.clone().oneshot(get("/api/cameras")).await.unwrap();
-    let cams: Vec<Value> = json_body(res).await;
-    let camera_id = cams[0]["id"].as_i64().unwrap() as i32;
-
-    let payload = json!({
-        "roll_id": roll_id,
-        "camera_id": camera_id,
-        "status": "loaded",
-        "date_loaded": date_loaded
-    });
-    let res = app
-        .clone()
-        .oneshot(post_json("/api/rolls", &payload))
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::CREATED);
-}
-
-/// Regression test for kammerz-4jn: partial `date_loaded` values (which
-/// validate.rs accepts) used to break `/api/stats` — `STRFTIME('%Y-%m', …)`
-/// returns NULL for 'YYYY-MM' (500ing the whole endpoint) and misparses bare
-/// 'YYYY' as a Julian day number ('-4707-06' garbage buckets).
+/// Regression (kammerz-4jn) + defense-in-depth: the API now rejects partial dates
+/// (ADR-0011), but `/api/stats` must still not 500 if a legacy partial
+/// `date_loaded` ever exists in the DB — `STRFTIME('%Y-%m', …)` returns NULL for
+/// 'YYYY-MM' (500ing the endpoint) and misparses bare 'YYYY' as a Julian day
+/// number ('-4707-06' garbage buckets). Seed the partials directly, bypassing API
+/// validation, to keep exercising the stats query's robustness.
 #[tokio::test]
 async fn stats_survives_partial_date_loaded() {
-    let app = open_app().await;
+    use sea_orm::{ActiveModelTrait, Set};
+    let (app, db) = open_app_with_db().await;
 
     // Recent dates so the rolls fall inside the 12-month window.
     let now = chrono::Utc::now();
@@ -48,9 +31,23 @@ async fn stats_survives_partial_date_loaded() {
     let year_month = now.format("%Y-%m").to_string();
     let year = now.format("%Y").to_string();
 
-    create_roll_loaded(&app, "STATS-FULL", &full).await;
-    create_roll_loaded(&app, "STATS-YM", &year_month).await;
-    create_roll_loaded(&app, "STATS-Y", &year).await;
+    for (rid, d) in [
+        ("STATS-FULL", &full),
+        ("STATS-YM", &year_month),
+        ("STATS-Y", &year),
+    ] {
+        entity::roll::ActiveModel {
+            roll_id: Set(rid.to_string()),
+            status: Set(entity::roll::RollStatus::Loaded),
+            date_loaded: Set(Some(d.clone())),
+            created_at: Set("2026-05-01 00:00:00".to_string()),
+            updated_at: Set("2026-05-01 00:00:00".to_string()),
+            ..Default::default()
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+    }
 
     let res = app.oneshot(get("/api/stats")).await.unwrap();
     assert_eq!(

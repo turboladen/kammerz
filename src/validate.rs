@@ -4,8 +4,8 @@
 //! handler runs its inputs through here before touching the DB.
 //!
 //! Date validation (`validate_date_opt`) accepts the same shape as the frontend:
-//! empty (dates are optional) or a *complete* `YYYY`, `YYYY-MM`, or `YYYY-MM-DD`
-//! with year 1800–2100 and — for full dates — a real calendar day.
+//! empty (dates are optional) or a *complete* `YYYY-MM-DD` with year 1800–2100 and
+//! a real calendar day. Partial `YYYY`/`YYYY-MM` are rejected (ADR-0011).
 //!
 //! The remaining helpers cover required strings, non-negative numbers (costs,
 //! counts, dimensions — negatives are nonsensical and skew `/api/stats`), and
@@ -96,7 +96,7 @@ pub fn validate_date_opt(field: &str, value: &Option<String>) -> AppResult<()> {
         Ok(())
     } else {
         Err(AppError::UnprocessableEntity(format!(
-            "{field}: use YYYY, YYYY-MM, or YYYY-MM-DD"
+            "{field}: use YYYY-MM-DD"
         )))
     }
 }
@@ -132,20 +132,13 @@ fn is_valid_time(v: &str) -> bool {
     }
 }
 
-/// True when `v` is a complete `YYYY`, `YYYY-MM`, or `YYYY-MM-DD` within range.
-/// Assumes `v` is already trimmed and non-empty.
+/// True when `v` is a complete `YYYY-MM-DD` within range. Assumes `v` is already
+/// trimmed and non-empty. Partial `YYYY`/`YYYY-MM` are NOT accepted (ADR-0011):
+/// dates are always full; an approximate date is entered as a concrete best-guess
+/// with the "around" phrasing captured in notes.
 fn is_valid_date(v: &str) -> bool {
     let parts: Vec<&str> = v.split('-').collect();
     match parts.as_slice() {
-        // YYYY
-        [y] => parse_fixed(y, 4).is_some_and(in_year_range),
-        // YYYY-MM
-        [y, m] => {
-            let (Some(year), Some(month)) = (parse_fixed(y, 4), parse_fixed(m, 2)) else {
-                return false;
-            };
-            in_year_range(year) && (1..=12).contains(&month)
-        }
         // YYYY-MM-DD — chrono validates the day (leap years, month lengths).
         [y, m, d] => {
             let (Some(year), Some(_), Some(_)) =
@@ -239,12 +232,10 @@ mod tests {
 
     #[test]
     fn complete_valid_dates_accepted() {
-        assert!(ok("d", "2026"));
-        assert!(ok("d", "2026-06"));
         assert!(ok("d", "2026-06-11"));
         assert!(ok("d", "2024-02-29")); // leap day
-        assert!(ok("d", "1800"));
-        assert!(ok("d", "2100-12-31"));
+        assert!(ok("d", "1800-01-01")); // lower year bound
+        assert!(ok("d", "2100-12-31")); // upper year bound
     }
 
     #[test]
@@ -258,6 +249,8 @@ mod tests {
 
     #[test]
     fn incomplete_input_rejected() {
+        assert!(err("d", "2026")); // bare year — partials no longer accepted (ADR-0011)
+        assert!(err("d", "2026-06")); // year-month
         assert!(err("d", "2026-"));
         assert!(err("d", "2026-06-"));
         assert!(err("d", "26"));
@@ -268,7 +261,7 @@ mod tests {
     #[test]
     fn out_of_range_year_rejected() {
         assert!(err("d", "1700-01-01"));
-        assert!(err("d", "2200"));
+        assert!(err("d", "2200-01-01"));
     }
 
     #[test]

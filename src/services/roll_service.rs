@@ -53,10 +53,10 @@ pub struct RollWithDetails {
     // Negatives-pickup ingredients (LEFT JOINed from the roll's lab dev + its lab).
     // All Option because a roll may have no lab dev. `negatives_deadline` is
     // date_received + retention (default 30), computed in SQL; the frontend
-    // derives the live countdown/state from it. It is NULL unless date_received
-    // is a full `YYYY-MM-DD` (validate_date_opt also accepts bare `YYYY`/`YYYY-MM`,
-    // for which SQLite's date() yields garbage/NULL — the `length >= 10` guard in
-    // the query excludes those so a partial date shows no countdown, not a bogus one).
+    // derives the live countdown/state from it. Dates are always full `YYYY-MM-DD`
+    // (validate_date_opt rejects partials — ADR-0011), but the query keeps a
+    // `length >= 10` guard as defense in depth: SQLite's date() yields garbage/NULL
+    // for a bare `YYYY`/`YYYY-MM`, so a legacy partial shows no countdown, not a bogus one.
     pub lab_dev_id: Option<i32>,
     pub lab_name: Option<String>,
     pub negatives_date_received: Option<String>,
