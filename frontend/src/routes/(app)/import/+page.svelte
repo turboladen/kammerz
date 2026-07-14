@@ -12,7 +12,7 @@
 	import { listLenses } from '$lib/api/lenses';
 	import { lensDisplayName } from '$lib/utils/lens';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
-	import { coerceApproxDate, dateFieldError } from '$lib/utils/date';
+	import { appendNote, coerceApproxDate, dateFieldError } from '$lib/utils/date';
 	import type { ParsedRoll, Camera, FilmStock, Lens, ImportRollDto, ModelInfo, RollStatus } from '$lib/types';
 	import { ChevronDown, ChevronUp, Eye, EyeOff, RefreshCw, Trash2 } from 'lucide-svelte';
 
@@ -257,11 +257,7 @@
 			const finished = coerceApproxDate(parsed.date_finished);
 			dateLoaded = loaded.date;
 			dateFinished = finished.date;
-			let notes = parsed.notes ?? '';
-			for (const frag of [loaded.note, finished.note]) {
-				if (frag) notes = notes ? `${notes} (${frag})` : frag;
-			}
-			rollNotes = notes;
+			rollNotes = appendNote(appendNote(parsed.notes ?? '', loaded.note), finished.note);
 
 			// Auto-match camera from prefix
 			cameraGuess = parsed.camera_prefix_guess ?? '';
@@ -301,15 +297,13 @@
 			// (ADR-0011: approximate dates are a concrete best-guess, imprecision noted).
 			shots = parsed.shots.map((s) => {
 				const { date, note } = coerceApproxDate(s.date);
-				const base = s.notes ?? '';
-				const notes = note ? (base ? `${base} (${note})` : note) : base;
 				return {
 					frame_number: s.frame_number,
 					aperture: s.aperture ?? '',
 					shutter_speed: s.shutter_speed ?? '',
 					date,
 					location: s.location ?? '',
-					notes
+					notes: appendNote(s.notes ?? '', note)
 				};
 			});
 
@@ -538,8 +532,20 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 							{/if}
 						</div>
 						<Input label="Frame Count" type="number" bind:value={frameCount} />
-						<Input type="date" label="Date Loaded" class="h-[38px]" bind:value={dateLoaded} />
-						<Input type="date" label="Finished Shooting" class="h-[38px]" bind:value={dateFinished} />
+						<Input
+							type="date"
+							label="Date Loaded"
+							class="h-[38px]"
+							bind:value={dateLoaded}
+							error={dateFieldError(dateLoaded)}
+						/>
+						<Input
+							type="date"
+							label="Finished Shooting"
+							class="h-[38px]"
+							bind:value={dateFinished}
+							error={dateFieldError(dateFinished)}
+						/>
 						<div class="col-span-2">
 							<Input label="Notes" bind:value={rollNotes} />
 						</div>

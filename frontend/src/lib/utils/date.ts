@@ -89,3 +89,16 @@ export function coerceApproxDate(raw: string | null | undefined): { date: string
 	}
 	return { date: v, note: null }; // can't best-guess — leave it for dateFieldError to flag
 }
+
+/**
+ * Append an optional note `fragment` to an existing `base` notes string. A blank
+ * fragment is a no-op; a non-blank one is parenthesized when `base` already has
+ * content (`"golden hour (approx date: 1998)"`) or stands alone otherwise. Skips
+ * the append when `base` already contains the fragment so a note the AI already
+ * added (per the import prompt) isn't duplicated by `coerceApproxDate`'s own note.
+ */
+export function appendNote(base: string, fragment: string | null | undefined): string {
+	const frag = (fragment ?? '').trim();
+	if (!frag || base.includes(frag)) return base;
+	return base ? `${base} (${frag})` : frag;
+}

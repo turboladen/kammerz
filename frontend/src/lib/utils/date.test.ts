@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coerceApproxDate, dateFieldError, todayLocal } from './date';
+import { appendNote, coerceApproxDate, dateFieldError, todayLocal } from './date';
 
 describe('dateFieldError', () => {
 	it('accepts empty/nullish values (dates are optional)', () => {
@@ -77,6 +77,28 @@ describe('coerceApproxDate', () => {
 		// Impossible month in a year-month partial.
 		expect(coerceApproxDate('1998-13')).toEqual({ date: '1998-13', note: null });
 		expect(dateFieldError('1998-13')).not.toBe('');
+	});
+});
+
+describe('appendNote', () => {
+	it('is a no-op for a blank fragment', () => {
+		expect(appendNote('golden hour', null)).toBe('golden hour');
+		expect(appendNote('golden hour', undefined)).toBe('golden hour');
+		expect(appendNote('golden hour', '   ')).toBe('golden hour');
+		expect(appendNote('', null)).toBe('');
+	});
+
+	it('stands alone when base is empty, parenthesizes when base has content', () => {
+		expect(appendNote('', 'approx date: 1998')).toBe('approx date: 1998');
+		expect(appendNote('golden hour', 'approx date: 1998')).toBe('golden hour (approx date: 1998)');
+	});
+
+	it('does not duplicate a fragment the base already contains', () => {
+		// e.g. the AI already added the approx note per the import prompt.
+		expect(appendNote('approx date: 1998', 'approx date: 1998')).toBe('approx date: 1998');
+		expect(appendNote('shot at dusk. approx date: 1998', 'approx date: 1998')).toBe(
+			'shot at dusk. approx date: 1998'
+		);
 	});
 });
 
