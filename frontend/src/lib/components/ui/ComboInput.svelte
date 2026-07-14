@@ -11,9 +11,21 @@
 		warning?: string;
 		/** Render the input text in the mono data font. */
 		mono?: boolean;
+		/** Fired when an option is chosen from the dropdown (not on free typing). */
+		onselect?: (value: string) => void;
 	}
 
-	let { label, hint, placeholder, value = $bindable(), options, normalize, warning, mono = false }: Props = $props();
+	let {
+		label,
+		hint,
+		placeholder,
+		value = $bindable(),
+		options,
+		normalize,
+		warning,
+		mono = false,
+		onselect
+	}: Props = $props();
 
 	let showDropdown = $state(false);
 	let highlightIndex = $state(-1);
@@ -74,6 +86,7 @@
 		value = option;
 		showDropdown = false;
 		highlightIndex = -1;
+		onselect?.(option);
 	}
 
 	function handleKeydown(e: KeyboardEvent) {

@@ -1,4 +1,5 @@
 pub mod camera_service;
+pub mod chemical_service;
 pub mod development_service;
 pub mod film_stock_service;
 pub mod import_service;

@@ -16,6 +16,7 @@ use crate::error::{AppError, AppResult, DbOptionExt, OptionExt};
 use crate::extract::{Json, Path};
 use crate::patch::{double_option, now_string, trim_opt};
 use crate::routes::{Op, friendly_err, friendly_txn_err};
+use crate::services::chemical_service::{ChemicalService, GroupedChemicals};
 use crate::services::development_service::{
     DevelopmentService, LabDevListItem, SelfDevWithStages, StageInput,
 };
@@ -155,6 +156,17 @@ pub fn router() -> Router<AppState> {
             "/self/{id}",
             axum::routing::put(update_self_dev).delete(delete_self_dev),
         )
+        .route("/chemicals", get(list_chemicals))
+}
+
+// --- Chemistry reference handler ---
+
+/// Canonical chemistry reference grouped by type, for the self-dev autocomplete.
+async fn list_chemicals(
+    _: RequireAuth,
+    State(db): State<DatabaseConnection>,
+) -> AppResult<axum::Json<GroupedChemicals>> {
+    Ok(axum::Json(ChemicalService::list_grouped(&db).await?))
 }
 
 // --- Lab Development handlers ---
@@ -494,6 +506,10 @@ async fn create_self_dev(
                 };
                 let result = DevelopmentService::create_self_dev(txn, model).await?;
 
+                // Self-learning: record any novel chemistry values so they become
+                // future autocomplete suggestions (kammerz-9fx). Same transaction.
+                ChemicalService::upsert_from_self_dev(txn, &result).await?;
+
                 if let Some(stages) = data.stages {
                     DevelopmentService::set_stages(txn, result.id, stages_to_inputs(stages))
                         .await?;
@@ -597,6 +613,10 @@ async fn update_self_dev(
             model.updated_at = Set(now);
 
             let result = DevelopmentService::update_self_dev(txn, model).await?;
+
+            // Self-learning: record any novel chemistry values so they become
+            // future autocomplete suggestions (kammerz-9fx). Same transaction.
+            ChemicalService::upsert_from_self_dev(txn, &result).await?;
 
             if let Some(stages) = data.stages {
                 DevelopmentService::set_stages(txn, id, stages_to_inputs(stages)).await?;

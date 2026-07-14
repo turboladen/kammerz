@@ -5,6 +5,7 @@ import type {
 	DevelopmentSelfInsert,
 	DevStage,
 	DevStageInsert,
+	GroupedChemicals,
 	LabDevListItem,
 	SelfDevListItem
 } from '$lib/types';
@@ -50,3 +51,7 @@ export const listDevStages = (developmentSelfId: number) =>
 // --- List all self-developments ---
 
 export const listAllSelfDevelopments = () => request<SelfDevListItem[]>('GET', '/api/development/self');
+
+// --- Chemistry reference ---
+
+export const getChemicals = () => request<GroupedChemicals>('GET', '/api/development/chemicals');
