@@ -2,7 +2,6 @@
 
 - **Status:** Superseded by [ADR-0004](0004-remove-fuzzy-dates.md)
 - **Date:** 2026-06-03
-- **Superseded-by:** [ADR-0004](0004-remove-fuzzy-dates.md) (2026-06-21)
 - **Related:** [ADR-0004](0004-remove-fuzzy-dates.md) (successor); the original lifecycle-date-capture design is in git history
 
 ## Context

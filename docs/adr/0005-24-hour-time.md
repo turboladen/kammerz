@@ -21,7 +21,7 @@ formatter (`formatLocalTime` is the target); no site uses a default
 `toLocaleTimeString()`. For _entry_, values are already stored 24-hour; the
 locale-bound native picker display is either accepted as-is (value is correct) or
 replaced with a custom 24-hour input — that sub-choice is decided during
-implementation and recorded here if it lands as a real component.
+implementation and, if a custom component lands, captured in a follow-up ADR.
 
 ## Consequences
 
@@ -32,4 +32,4 @@ implementation and recorded here if it lands as a real component.
   `kammerz-twp`.
 - **Open sub-decision:** whether to keep the native `<input type="time">` (correct
   value, locale-formatted display) or build a 24-hour input. To be settled in
-  `kammerz-twp`; amend this ADR if a custom input is adopted.
+  `kammerz-twp`; if a custom input is adopted, capture it in a follow-up (superseding) ADR rather than editing this one.
