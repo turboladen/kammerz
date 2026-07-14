@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Select from '$lib/components/ui/Select.svelte';
-	import DateInput from '$lib/components/ui/DateInput.svelte';
+	import TimeInput from '$lib/components/ui/TimeInput.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -178,8 +178,8 @@
 	<!-- Expanded fields: date / time / location / notes -->
 	{#if showMore}
 		<div class="mt-3 grid grid-cols-1 gap-3 border-t border-border-subtle pt-3 sm:grid-cols-2">
-			<DateInput label="Date" bind:value={date} />
-			<Input type="time" label="Time" class="h-[38px]" bind:value={time} />
+			<Input type="date" label="Date" class="h-[38px]" bind:value={date} />
+			<TimeInput label="Time" bind:value={time} />
 			<div class="flex flex-col gap-1 sm:col-span-2">
 				<label for="qab-location" class="text-xs font-medium text-text-muted">Location</label>
 				<input

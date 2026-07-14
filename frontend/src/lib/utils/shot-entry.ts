@@ -1,4 +1,5 @@
 import { createShot, suggestNextFrame } from '$lib/api/shots';
+import { parseTime } from '$lib/utils/time';
 
 export interface QuickShotInput {
 	rollId: number;
@@ -21,13 +22,18 @@ export interface QuickShotInput {
  */
 export async function logShot(input: QuickShotInput): Promise<string> {
 	const lensIds = input.lensId ? [Number(input.lensId)] : [];
+	// Canonicalize 24h time (e.g. "1430" → "14:30") so a keyboard Save (⌘/Ctrl+Enter)
+	// that fires before the TimeInput's blur-normalize still sends a value the backend's
+	// strict `validate_time` accepts. A non-empty unparseable value is passed through so
+	// the 422 surfaces it instead of silently dropping the shot's time.
+	const rawTime = input.time?.trim() || '';
 	await createShot({
 		roll_id: input.rollId,
 		frame_number: input.frameNumber.trim(),
 		aperture: input.aperture?.trim() || null,
 		shutter_speed: input.shutterSpeed?.trim() || null,
 		date: input.date?.trim() || null,
-		time: input.time?.trim() || null,
+		time: parseTime(rawTime) || rawTime || null,
 		location: input.location?.trim() || null,
 		gps_lat: null,
 		gps_lon: null,

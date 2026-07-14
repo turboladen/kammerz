@@ -5,7 +5,7 @@
 	// (commit null). There is no "Skip" — callers that want a blank date clear it
 	// from the Timeline afterward.
 	import Dialog from './Dialog.svelte';
-	import DateInput from './DateInput.svelte';
+	import Input from './Input.svelte';
 	import Button from './Button.svelte';
 	import { dateFieldError } from '$lib/utils/date';
 
@@ -52,15 +52,13 @@
 
 <Dialog bind:open {title} onclose={oncancel}>
 	<div class="space-y-4">
-		<DateInput label="Date" bind:value={draft} />
+		<Input type="date" label="Date" class="h-[38px]" bind:value={draft} />
 		{#if !allowClear}
 			<!-- Transition prompt (no Clear button): surface the otherwise-invisible
-			     escape hatches — partial dates (a bare year or year-month) are accepted by
-			     dateFieldError, and an undated milestone can be edited or cleared later from
-			     the Timeline. (kammerz-cb7) -->
+			     escape hatch — an undated milestone can still be edited or cleared later
+			     from the Timeline. (kammerz-cb7) -->
 			<p class="text-xs text-text-muted">
-				A rough date is fine — enter just a year (2024) or year-month (2024-03). You can change or clear it later from
-				the Timeline.
+				Pick the date this happened — you can change or clear it later from the Timeline.
 			</p>
 		{/if}
 		<div class="flex justify-end gap-2">

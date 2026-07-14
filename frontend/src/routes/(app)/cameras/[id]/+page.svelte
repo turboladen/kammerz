@@ -4,7 +4,6 @@
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
-	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
@@ -448,10 +447,16 @@
 				<Input label="Serial Number" bind:value={editSerialNumber} />
 			</div>
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-				<DateInput label="Date Purchased" bind:value={editDatePurchased} />
+				<Input type="date" label="Date Purchased" class="h-[38px]" bind:value={editDatePurchased} />
 				<ComboInput label="Purchased From" bind:value={editPurchasedFrom} options={vendorOptions} />
 			</div>
-			<DateInput label="Date Sold" bind:value={editDateSold} hint="Leave empty if you still own it" />
+			<Input
+				type="date"
+				label="Date Sold"
+				class="h-[38px]"
+				bind:value={editDateSold}
+				hint="Leave empty if you still own it"
+			/>
 			<Textarea label="Notes" bind:value={editNotes} />
 			{#if error}
 				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
@@ -687,7 +692,7 @@
 			options={maintProviderOptions}
 		/>
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-			<DateInput label="Date" bind:value={maintDateDone} />
+			<Input type="date" label="Date" class="h-[38px]" bind:value={maintDateDone} />
 			<Input label="Cost ($)" bind:value={maintCost} type="number" step="0.01" placeholder="0.00" />
 		</div>
 		<Textarea label="Notes" bind:value={maintNotes} placeholder="What was done..." />

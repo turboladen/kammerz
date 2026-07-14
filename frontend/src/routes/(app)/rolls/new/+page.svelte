@@ -3,7 +3,6 @@
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
-	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
@@ -251,7 +250,7 @@
 						hint={frameCountHint}
 						oninput={() => (frameCountAutoFilledFrom = null)}
 					/>
-					<DateInput label="Date Loaded" bind:value={dateLoaded} />
+					<Input type="date" label="Date Loaded" class="h-[38px]" bind:value={dateLoaded} />
 				</div>
 
 				<Textarea label="Notes" bind:value={notes} placeholder="Any notes about this roll..." />

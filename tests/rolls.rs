@@ -175,10 +175,11 @@ async fn create_roll_with_malformed_date_is_rejected() {
 }
 
 #[tokio::test]
-async fn create_roll_with_partial_date_is_accepted() {
+async fn create_roll_with_partial_date_is_rejected() {
     let app = open_app().await;
     let camera_id = seeded_camera_id(&app).await;
-    // YYYY and YYYY-MM remain valid (matches DateInput behavior).
+    // Dates are always full YYYY-MM-DD now (ADR-0011); partial YYYY / YYYY-MM are
+    // rejected at the API — an approximate date is a concrete best-guess + notes.
     let payload = json!({
         "roll_id": "PARTIAL-DATE",
         "camera_id": camera_id,
@@ -189,7 +190,7 @@ async fn create_roll_with_partial_date_is_accepted() {
         .oneshot(post_json("/api/rolls", &payload))
         .await
         .unwrap();
-    assert_eq!(res.status(), StatusCode::CREATED);
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
 
 #[tokio::test]

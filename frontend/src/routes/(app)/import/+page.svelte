@@ -4,7 +4,6 @@
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
-	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import { listModels, parseNote, importParsedRoll } from '$lib/api/import';
 	import { getSetting, setSetting } from '$lib/api/settings';
@@ -72,8 +71,8 @@
 	// Block import while a required field is empty or any roll/per-shot date is
 	// malformed. roll_id and shot frame_number are TEXT NOT NULL (and roll_id is
 	// UNIQUE), but they're LLM-prefilled and user-editable, so guard them here.
-	// The shot dates use plain text inputs (not DateInput), so this is also their
-	// only validation gate.
+	// The shot dates use plain text inputs (not the native date picker), so this
+	// is also their only validation gate.
 	const importBlocker = $derived(
 		!rollId.trim()
 			? 'Roll ID is required.'
@@ -524,8 +523,8 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 							{/if}
 						</div>
 						<Input label="Frame Count" type="number" bind:value={frameCount} />
-						<DateInput label="Date Loaded" bind:value={dateLoaded} />
-						<DateInput label="Finished Shooting" bind:value={dateFinished} />
+						<Input type="date" label="Date Loaded" class="h-[38px]" bind:value={dateLoaded} />
+						<Input type="date" label="Finished Shooting" class="h-[38px]" bind:value={dateFinished} />
 						<div class="col-span-2">
 							<Input label="Notes" bind:value={rollNotes} />
 						</div>

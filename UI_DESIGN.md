@@ -145,12 +145,14 @@ Roll status pills with a small color dot indicator:
 
 Same animations and styling as Dialog, smaller max-width (`max-w-sm`).
 
-### Input, Select, Textarea, ComboInput
+### Input, Select, Textarea, ComboInput, TimeInput
 
 - Full border style: `border-border bg-surface`
 - Focus: `border-accent ring-1 ring-accent/50`
 - Labels: `text-xs font-medium text-text-muted`
 - Hints: `text-xs text-text-faint`
+- **Dates** use the native `<Input type="date">` (full `YYYY-MM-DD` only — ADR-0011); add `class="h-[38px]"` for row parity.
+- **Time** uses the custom **`TimeInput`** — a 24-hour `HH:MM` text field (ADR-0010) because native `<input type="time">` renders 12-hour in en-US locales. Accepts `H:MM`/`HH:MM`/`HHMM`, normalizes to `HH:MM` on blur, shows an inline error for a completed-but-invalid entry. Shares the same border/focus/label styling.
 
 ### EmptyState (`frontend/src/lib/components/ui/EmptyState.svelte`)
 
@@ -160,7 +162,7 @@ falls back to the small `icon` circle for filtered "no matches" states.
 
 ### DateConfirm (`frontend/src/lib/components/ui/DateConfirm.svelte`)
 
-Small date-pick dialog (built on `Dialog` + `DateInput`). Confirm / Cancel, with an
+Small date-pick dialog (built on `Dialog` + a native `<Input type="date">`). Confirm / Cancel, with an
 optional **Clear** (commits null) for inline edits. Used for both the
 confirm-on-transition prompt and inline Timeline date editing. No "Skip" — to leave a
 date blank, advance then Clear it in the Timeline.

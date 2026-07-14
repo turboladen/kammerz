@@ -3,7 +3,7 @@
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import DateInput from '$lib/components/ui/DateInput.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import RollRow from '$lib/components/rolls/RollRow.svelte';
 	import QuickAddBar from '$lib/components/rolls/QuickAddBar.svelte';
@@ -244,7 +244,7 @@
 								</p>
 							</div>
 							<div class="w-44">
-								<DateInput label="Finished shooting" bind:value={finishDate} />
+								<Input type="date" label="Finished shooting" class="h-[38px]" bind:value={finishDate} />
 							</div>
 						</div>
 						<div class="flex items-center gap-2">
