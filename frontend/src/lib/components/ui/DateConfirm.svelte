@@ -1,9 +1,9 @@
 <script lang="ts">
-	// Small date-pick dialog used for both inline Timeline edits and the
+	// Small date-pick dialog used for both inline Lifecycle-dates edits and the
 	// confirm-on-transition prompt. Seeds an editable date (default today from the
 	// caller), Confirm commits it, Cancel aborts. Inline edits also offer Clear
 	// (commit null). There is no "Skip" — callers that want a blank date clear it
-	// from the Timeline afterward.
+	// from the Lifecycle dates section afterward.
 	import Dialog from './Dialog.svelte';
 	import Input from './Input.svelte';
 	import Button from './Button.svelte';
@@ -56,9 +56,9 @@
 		{#if !allowClear}
 			<!-- Transition prompt (no Clear button): surface the otherwise-invisible
 			     escape hatch — an undated milestone can still be edited or cleared later
-			     from the Timeline. (kammerz-cb7) -->
+			     from the Lifecycle dates section. (kammerz-cb7) -->
 			<p class="text-xs text-text-muted">
-				Pick the date this happened — you can change or clear it later from the Timeline.
+				Pick the date this happened — you can change or clear it later from Lifecycle dates.
 			</p>
 		{/if}
 		<div class="flex justify-end gap-2">
