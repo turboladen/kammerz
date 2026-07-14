@@ -84,7 +84,9 @@ const MILESTONE_STATUS: Record<MilestoneKey, RollStatus> = {
 
 /** Whether the roll has reached a milestone's rung, using the canonical union ordering so the
  *  comparison is robust regardless of dev path. An unknown current status (not in the order)
- *  counts as before everything, so only already-dated milestones stay editable. */
+ *  counts as not-yet-reached for every rung, so no milestone is editable — a fail-closed
+ *  default. This is unreachable in practice: `allStatusOrder` is gated to exactly match the
+ *  backend `RollStatus` enum by tests/status_flows.rs, so any drift fails `cargo test`. */
 function milestoneReached(key: MilestoneKey, status: RollStatus): boolean {
 	const current = allStatusOrder.indexOf(status);
 	return current >= 0 && current >= allStatusOrder.indexOf(MILESTONE_STATUS[key]);
