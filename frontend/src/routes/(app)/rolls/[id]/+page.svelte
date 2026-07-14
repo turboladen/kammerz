@@ -121,6 +121,10 @@
 	let shotLensId = $state('');
 	let shotError = $state('');
 	const shotDateError = $derived(dateFieldError(shotDate));
+	// Time to send: canonical 24h `HH:MM` when valid (e.g. "1430" → "14:30"), null when
+	// blank/whitespace, else the trimmed raw so the backend 422 surfaces a mistyped time
+	// instead of it being silently dropped. Trims so whitespace-only collapses to null.
+	const shotTimePayload = $derived(parseTime(shotTime) || shotTime.trim() || null);
 	const hasEditDateError = $derived(
 		!!(
 			dateFieldError(editDateLoaded) ||
@@ -552,7 +556,7 @@
 					aperture: shotAperture || null,
 					shutter_speed: shotShutterSpeed || null,
 					date: shotDate || null,
-					time: parseTime(shotTime) || shotTime || null,
+					time: shotTimePayload,
 					location: shotLocation || null,
 					notes: shotNotes || null,
 					lens_ids: lensIds
@@ -564,7 +568,7 @@
 					aperture: shotAperture || null,
 					shutter_speed: shotShutterSpeed || null,
 					date: shotDate || null,
-					time: parseTime(shotTime) || shotTime || null,
+					time: shotTimePayload,
 					location: shotLocation || null,
 					gps_lat: null,
 					gps_lon: null,
@@ -595,7 +599,7 @@
 				aperture: shotAperture || null,
 				shutter_speed: shotShutterSpeed || null,
 				date: shotDate || null,
-				time: parseTime(shotTime) || shotTime || null,
+				time: shotTimePayload,
 				location: shotLocation || null,
 				gps_lat: null,
 				gps_lon: null,
