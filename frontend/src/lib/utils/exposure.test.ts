@@ -21,6 +21,9 @@ describe('normalizeAperture', () => {
 		expect(normalizeAperture('5.6')).toBe('5.6');
 		expect(normalizeAperture(normalizeAperture('f/5.6'))).toBe('5.6');
 	});
+	it('strips a repeated f/ prefix and all commas so the result is fully bare', () => {
+		expect(normalizeAperture('f/f/2,8')).toBe('2.8');
+	});
 	it('returns empty for empty input', () => {
 		expect(normalizeAperture('')).toBe('');
 	});
@@ -30,6 +33,11 @@ describe('normalizeShutter', () => {
 	it('strips a trailing s', () => {
 		expect(normalizeShutter('1/250s')).toBe('1/250');
 		expect(normalizeShutter('30 s')).toBe('30');
+	});
+	it('strips full sec / secs / seconds suffixes (not just the final s)', () => {
+		expect(normalizeShutter('1/250sec')).toBe('1/250');
+		expect(normalizeShutter('1/250secs')).toBe('1/250');
+		expect(normalizeShutter('1/250seconds')).toBe('1/250');
 	});
 	it('leaves fractions, seconds, and B untouched', () => {
 		expect(normalizeShutter('1/250')).toBe('1/250');

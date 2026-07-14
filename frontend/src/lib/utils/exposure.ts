@@ -143,9 +143,12 @@ const RECOGNIZED_SHUTTERS = new Set([
 	'T'
 ]);
 
-/** Strip a leading f//f, comma→dot, remove whitespace. Emits a bare aperture. */
+/** Strip any leading f//f run, all commas→dots, remove whitespace. Emits a bare aperture. */
 export function normalizeAperture(v: string): string {
-	return v.replace(/\s+/g, '').replace(/^f\/?/i, '').replace(',', '.');
+	return v
+		.replace(/\s+/g, '')
+		.replace(/^[f/]+/i, '')
+		.replace(/,/g, '.');
 }
 
 /** Strip a trailing s/sec/seconds and whitespace. Emits a bare shutter value. */

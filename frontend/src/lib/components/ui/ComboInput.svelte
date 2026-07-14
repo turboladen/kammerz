@@ -18,6 +18,12 @@
 	let showDropdown = $state(false);
 	let highlightIndex = $state(-1);
 	let inputEl: HTMLInputElement | undefined = $state();
+	// True only while the input actually holds focus. `showDropdown` is NOT a
+	// focus proxy — Escape closes the dropdown without blurring — so the warning
+	// and its border gate on this instead (kammerz-dzuy).
+	let isFocused = $state(false);
+	// Pending blur close/normalize; cancelled if the field is refocused in time.
+	let blurTimer: ReturnType<typeof setTimeout> | undefined;
 
 	// Unique per-instance id base so input/listbox/option ids don't collide
 	// when multiple ComboInputs render on one page (e.g. Brand + Purchased From).
@@ -42,16 +48,25 @@
 	});
 
 	function handleFocus() {
+		// Cancel a pending blur close so a quick refocus doesn't drop the dropdown
+		// or normalize mid-edit on a stale timer.
+		if (blurTimer) {
+			clearTimeout(blurTimer);
+			blurTimer = undefined;
+		}
+		isFocused = true;
 		showDropdown = true;
 		highlightIndex = -1;
 	}
 
 	function handleBlur() {
+		isFocused = false;
 		// Delay to allow click on dropdown option to register
-		setTimeout(() => {
+		blurTimer = setTimeout(() => {
 			showDropdown = false;
 			highlightIndex = -1;
 			if (normalize) value = normalize(value);
+			blurTimer = undefined;
 		}, 150);
 	}
 
@@ -117,9 +132,9 @@
 		aria-controls={listboxId}
 		aria-activedescendant={highlightIndex >= 0 ? optionId(highlightIndex) : undefined}
 		class="rounded-lg border bg-surface px-3 py-2 text-sm text-text placeholder-text-faint
-			transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50
+			transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50
 			{mono ? 'font-mono' : ''}
-			{warning && !showDropdown ? 'border-amber-500/60 focus:border-amber-500' : 'border-border focus:border-accent'}"
+			{warning && !isFocused ? 'border-amber-500/60' : 'border-border'}"
 	/>
 	{#if expanded}
 		<div
@@ -145,7 +160,7 @@
 	{#if hint}
 		<span class="text-xs text-text-faint">{hint}</span>
 	{/if}
-	{#if warning && !showDropdown}
+	{#if warning && !isFocused}
 		<span class="text-xs text-amber-400">{warning}</span>
 	{/if}
 </div>
