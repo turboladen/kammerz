@@ -106,10 +106,11 @@ impl StatsService {
         let total_cost = total_lab_dev_cost + total_maintenance_cost;
 
         // --- Rolls per month (last 12 months) ---
-        // date_loaded may be a partial date — validate.rs accepts YYYY and
-        // YYYY-MM alongside YYYY-MM-DD. STRFTIME('%Y-%m', …) returns NULL for
-        // 'YYYY-MM' (failing the non-Option `month` and 500ing the endpoint)
-        // and misparses bare 'YYYY' as a Julian day number, so bucket by
+        // Dates are always full YYYY-MM-DD now (validate.rs rejects partials —
+        // ADR-0011), but this stays defensive against a legacy partial `date_loaded`
+        // in the DB: STRFTIME('%Y-%m', …) returns NULL for 'YYYY-MM' (failing the
+        // non-Option `month` and 500ing the endpoint) and misparses bare 'YYYY' as a
+        // Julian day number, so bucket by
         // SUBSTR instead: anything with at least a year+month prefix lands in
         // its month, year-only dates are skipped (no month to bucket by), and
         // the 12-month window compares at month precision.

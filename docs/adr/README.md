@@ -58,3 +58,5 @@ it's an ADR.
 | [0007](0007-data-driven-roll-status-sync.md)              | Accepted                                             | Data-driven roll status: auto-sync from milestone dates + dev records |
 | [0008](0008-roll-detail-two-pane-activity-log.md)         | Accepted                                             | Roll detail: chevron status control + append-only activity log        |
 | [0009](0009-negatives-pickup-derived-state.md)            | Accepted                                             | Negatives-pickup as derived state, parallel to the status machine     |
+| [0010](0010-custom-24h-time-input.md)                     | Accepted                                             | Custom 24-hour time input (drop native `<input type="time">`)         |
+| [0011](0011-full-dates-only.md)                           | Accepted                                             | Dates are always full `YYYY-MM-DD` (drop partial-date entry)          |

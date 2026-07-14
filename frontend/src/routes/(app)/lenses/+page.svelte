@@ -3,7 +3,6 @@
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
-	import DateInput from '$lib/components/ui/DateInput.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
@@ -461,10 +460,16 @@
 			<Input label="Serial Number" bind:value={serialNumber} />
 		</div>
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-			<DateInput label="Date Purchased" bind:value={datePurchased} />
+			<Input type="date" label="Date Purchased" class="h-[38px]" bind:value={datePurchased} />
 			<ComboInput label="Purchased From" bind:value={purchasedFrom} options={vendorOptions} />
 		</div>
-		<DateInput label="Date Sold" bind:value={dateSold} hint="Leave empty if you still own it" />
+		<Input
+			type="date"
+			label="Date Sold"
+			class="h-[38px]"
+			bind:value={dateSold}
+			hint="Leave empty if you still own it"
+		/>
 		<Textarea label="Notes" bind:value={notes} />
 		{#if error}
 			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
@@ -538,10 +543,16 @@
 				<Input label="Serial Number" bind:value={serialNumber} />
 			</div>
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-				<DateInput label="Date Purchased" bind:value={datePurchased} />
+				<Input type="date" label="Date Purchased" class="h-[38px]" bind:value={datePurchased} />
 				<ComboInput label="Purchased From" bind:value={purchasedFrom} options={vendorOptions} />
 			</div>
-			<DateInput label="Date Sold" bind:value={dateSold} hint="Leave empty if you still own it" />
+			<Input
+				type="date"
+				label="Date Sold"
+				class="h-[38px]"
+				bind:value={dateSold}
+				hint="Leave empty if you still own it"
+			/>
 			<Textarea label="Notes" bind:value={notes} />
 			{#if error}
 				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
