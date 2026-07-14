@@ -12,7 +12,7 @@
 	import { listLenses } from '$lib/api/lenses';
 	import { lensDisplayName } from '$lib/utils/lens';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
-	import { dateFieldError } from '$lib/utils/date';
+	import { appendNote, coerceApproxDate, dateFieldError } from '$lib/utils/date';
 	import type { ParsedRoll, Camera, FilmStock, Lens, ImportRollDto, ModelInfo, RollStatus } from '$lib/types';
 	import { ChevronDown, ChevronUp, Eye, EyeOff, RefreshCw, Trash2 } from 'lucide-svelte';
 
@@ -248,12 +248,16 @@
 			filmStocks = fsList;
 			allLenses = lensList;
 
-			// Populate editable fields from parsed data
+			// Populate editable fields from parsed data. Coerce partial/AI-parsed
+			// roll dates to a best-guess full date (the native picker would silently
+			// drop a partial), routing any imprecision into the roll notes.
 			rollId = parsed.roll_id;
 			frameCount = parsed.frame_count != null ? String(parsed.frame_count) : '';
-			dateLoaded = parsed.date_loaded ?? '';
-			dateFinished = parsed.date_finished ?? '';
-			rollNotes = parsed.notes ?? '';
+			const loaded = coerceApproxDate(parsed.date_loaded);
+			const finished = coerceApproxDate(parsed.date_finished);
+			dateLoaded = loaded.date;
+			dateFinished = finished.date;
+			rollNotes = appendNote(appendNote(parsed.notes ?? '', loaded.note), finished.note);
 
 			// Auto-match camera from prefix
 			cameraGuess = parsed.camera_prefix_guess ?? '';
@@ -288,15 +292,20 @@
 				if (match) lensId = String(match.id);
 			}
 
-			// Populate editable shots
-			shots = parsed.shots.map((s) => ({
-				frame_number: s.frame_number,
-				aperture: s.aperture ?? '',
-				shutter_speed: s.shutter_speed ?? '',
-				date: s.date ?? '',
-				location: s.location ?? '',
-				notes: s.notes ?? ''
-			}));
+			// Populate editable shots. Coerce a partial/year-only AI date to a
+			// best-guess full date + a note fragment so it never blocks the import
+			// (ADR-0011: approximate dates are a concrete best-guess, imprecision noted).
+			shots = parsed.shots.map((s) => {
+				const { date, note } = coerceApproxDate(s.date);
+				return {
+					frame_number: s.frame_number,
+					aperture: s.aperture ?? '',
+					shutter_speed: s.shutter_speed ?? '',
+					date,
+					location: s.location ?? '',
+					notes: appendNote(s.notes ?? '', note)
+				};
+			});
 
 			step = 'preview';
 		} catch (err) {
@@ -523,8 +532,20 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 							{/if}
 						</div>
 						<Input label="Frame Count" type="number" bind:value={frameCount} />
-						<Input type="date" label="Date Loaded" class="h-[38px]" bind:value={dateLoaded} />
-						<Input type="date" label="Finished Shooting" class="h-[38px]" bind:value={dateFinished} />
+						<Input
+							type="date"
+							label="Date Loaded"
+							class="h-[38px]"
+							bind:value={dateLoaded}
+							error={dateFieldError(dateLoaded)}
+						/>
+						<Input
+							type="date"
+							label="Finished Shooting"
+							class="h-[38px]"
+							bind:value={dateFinished}
+							error={dateFieldError(dateFinished)}
+						/>
 						<div class="col-span-2">
 							<Input label="Notes" bind:value={rollNotes} />
 						</div>
