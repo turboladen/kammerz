@@ -34,7 +34,7 @@
 		fixedLensLabel: string;
 		saving: boolean;
 		error: string;
-		onsave: (entry: SaveEntry) => void;
+		onsave: (entry: SaveEntry) => Promise<boolean>;
 	}
 
 	let {
@@ -64,9 +64,9 @@
 		localLensId = lensIdProp;
 	});
 
-	function handleSave() {
+	async function handleSave() {
 		if (!frameNumber.trim()) return;
-		onsave({
+		const saved = await onsave({
 			frameNumber,
 			aperture: normalizeAperture(aperture),
 			shutterSpeed: normalizeShutter(shutterSpeed),
@@ -76,7 +76,11 @@
 			location,
 			notes
 		});
-		// Clear per-shot fields on save (parent re-seeds frameNumber via the nextFrameNumber derived)
+		// Only clear the per-shot fields once the save actually succeeded — otherwise a
+		// failed save (network / 422) would wipe the user's aperture/shutter/notes with
+		// nothing persisted, forcing a retype. (kammerz-rh6r)
+		if (!saved) return;
+		// Clear per-shot fields on SUCCESS (parent re-seeds frameNumber via the nextFrameNumber derived)
 		aperture = '';
 		shutterSpeed = '';
 		notes = '';
