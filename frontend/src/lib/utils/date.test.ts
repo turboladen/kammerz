@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dateFieldError, todayLocal } from './date';
+import { coerceApproxDate, dateFieldError, todayLocal } from './date';
 
 describe('dateFieldError', () => {
 	it('accepts empty/nullish values (dates are optional)', () => {
@@ -38,6 +38,45 @@ describe('dateFieldError', () => {
 		expect(dateFieldError('2026-')).toBe('Use YYYY-MM-DD');
 		expect(dateFieldError('06/15/2026')).toBe('Use YYYY-MM-DD');
 		expect(dateFieldError('not-a-date')).toBe('Use YYYY-MM-DD');
+	});
+});
+
+describe('coerceApproxDate', () => {
+	it('returns empty with no note for empty/nullish input', () => {
+		expect(coerceApproxDate('')).toEqual({ date: '', note: null });
+		expect(coerceApproxDate('   ')).toEqual({ date: '', note: null });
+		expect(coerceApproxDate(null)).toEqual({ date: '', note: null });
+		expect(coerceApproxDate(undefined)).toEqual({ date: '', note: null });
+	});
+
+	it('passes a valid full date through unchanged with no note', () => {
+		expect(coerceApproxDate('2026-06-15')).toEqual({ date: '2026-06-15', note: null });
+		expect(coerceApproxDate('2024-02-29')).toEqual({ date: '2024-02-29', note: null }); // leap day
+		expect(coerceApproxDate('  1998-03-04  ')).toEqual({ date: '1998-03-04', note: null }); // trimmed
+	});
+
+	it('coerces a year-only value to Jan 1 + an approx note', () => {
+		expect(coerceApproxDate('1998')).toEqual({ date: '1998-01-01', note: 'approx date: 1998' });
+	});
+
+	it('coerces a year-month value to the 1st + an approx note', () => {
+		expect(coerceApproxDate('1998-05')).toEqual({ date: '1998-05-01', note: 'approx date: 1998-05' });
+	});
+
+	it('passes an unparseable value through unchanged so dateFieldError can flag it', () => {
+		expect(coerceApproxDate('5/16/21')).toEqual({ date: '5/16/21', note: null });
+		expect(coerceApproxDate('not-a-date')).toEqual({ date: 'not-a-date', note: null });
+		// A value that isn't best-guessable must stay visible as an error, not vanish.
+		expect(dateFieldError('5/16/21')).not.toBe('');
+	});
+
+	it('passes an out-of-range or invalid partial through unchanged rather than emitting a bad date', () => {
+		// Year out of the 1800–2100 window: the Jan-1 candidate fails dateFieldError.
+		expect(coerceApproxDate('1700')).toEqual({ date: '1700', note: null });
+		expect(dateFieldError('1700')).not.toBe('');
+		// Impossible month in a year-month partial.
+		expect(coerceApproxDate('1998-13')).toEqual({ date: '1998-13', note: null });
+		expect(dateFieldError('1998-13')).not.toBe('');
 	});
 });
 

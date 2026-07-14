@@ -124,7 +124,7 @@ Output ONLY valid JSON matching this schema (no markdown fences, no explanation)
 Rules:
 - If a shot says "Same" for any value, propagate the previous shot's value for that field.
 - Frame ranges like "21-24" should be a single shot entry with frame_number "21-24".
-- Normalize dates: "1/10" in context of year 2017 → "2017-01-10"; "5/16/21" → "2021-05-16"; "2/28/2021" → "2021-02-28". If only month/day with no year context, use null for date.
+- Normalize dates: "1/10" in context of year 2017 → "2017-01-10"; "5/16/21" → "2021-05-16"; "2/28/2021" → "2021-02-28". If only month/day with no year context, use null for date. If only a year is known (e.g. "1998"), use a best-guess full date "1998-01-01" and add "approx date: 1998" to that shot's notes; likewise a year+month (e.g. "1998-05") → "1998-05-01" with an "approx date: 1998-05" note. Never emit a bare year or "YYYY-MM" in a date field — dates must always be a full "YYYY-MM-DD" or null.
 - "?" means null for that field.
 - "H1", "H2" are large format holder notations — use as frame_number.
 - Time annotations like "10:40pm" or "7:27pm" should go in shot notes, not in date.

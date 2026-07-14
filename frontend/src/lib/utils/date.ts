@@ -52,3 +52,40 @@ export function dateFieldError(value: string | null | undefined): string {
 	}
 	return '';
 }
+
+/**
+ * Coerce a raw (possibly AI-parsed) date into a full `YYYY-MM-DD` best-guess plus
+ * an optional note describing any imprecision. Per ADR-0011 an approximate date is
+ * stored as a concrete best-guess with the imprecision noted — never a partial — so
+ * this lets the import review keep a year-only extraction (e.g. `1998`) instead of
+ * hard-blocking the whole roll on it.
+ *
+ *   '' / null / undefined        -> { date: '',           note: null }
+ *   valid full YYYY-MM-DD        -> { date: <same>,       note: null }        (passthrough)
+ *   year-only  'YYYY'            -> { date: 'YYYY-01-01',  note: 'approx date: YYYY' }
+ *   year-month 'YYYY-MM'         -> { date: 'YYYY-MM-01',  note: 'approx date: YYYY-MM' }
+ *   anything else (unparseable)  -> { date: <same>,       note: null }        (passthrough)
+ *
+ * Reuses `dateFieldError` for validity/range so the 1800–2100 bounds and calendar
+ * rules stay in one place. A value we can't confidently best-guess (garbage, or a
+ * year/year-month whose candidate is out of range) is passed through UNCHANGED — so
+ * `dateFieldError` still flags that field red and the import blocker forces the user
+ * to fix it, rather than silently dropping the value.
+ */
+export function coerceApproxDate(raw: string | null | undefined): { date: string; note: string | null } {
+	const v = (raw ?? '').trim();
+	if (!v) return { date: '', note: null };
+	if (!dateFieldError(v)) return { date: v, note: null }; // already a valid full date
+
+	const ym = v.match(/^(\d{4})-(\d{2})$/);
+	if (ym) {
+		const candidate = `${ym[1]}-${ym[2]}-01`;
+		if (!dateFieldError(candidate)) return { date: candidate, note: `approx date: ${v}` };
+	}
+	const y = v.match(/^(\d{4})$/);
+	if (y) {
+		const candidate = `${y[1]}-01-01`;
+		if (!dateFieldError(candidate)) return { date: candidate, note: `approx date: ${v}` };
+	}
+	return { date: v, note: null }; // can't best-guess — leave it for dateFieldError to flag
+}
