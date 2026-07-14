@@ -10,30 +10,63 @@ export interface FrameCell {
 export const DEFAULT_FRAMES = 36;
 
 /**
+ * Parse a frame number for ordering/classification. Uses `Number()` (not `parseInt`) so a
+ * partly-numeric string like "36A" is treated as non-numeric (null) rather than 36 —
+ * `parseInt("36A")` would wrongly yield 36. Returns null for blank, NaN, or ±Infinity so
+ * only genuine finite numbers get repositioned; everything else stays put (trailing).
+ */
+function parseFrameNumber(fn: string): number | null {
+	const t = fn.trim();
+	if (t === '') return null;
+	const num = Number(t);
+	return Number.isFinite(num) ? num : null;
+}
+
+/**
  * Map a roll's shots onto numbered frame slots `1..n` (n = frameCount, or
- * DEFAULT_FRAMES when null). The first empty slot is flagged `isNext`. Shots whose
- * frame number falls outside `1..n` (e.g. "37", "00", "36A" over-rolls) are appended
- * after the numbered slots, never flagged next. Shared by the roll-detail page and the
- * Quick Entry page so the film strip behaves identically in both.
+ * DEFAULT_FRAMES when null). The first empty slot is flagged `isNext`. Shots whose frame
+ * number falls outside `1..n` are ordered so the strip reads left-to-right: sub-1 leaders
+ * (e.g. "0", "00") are PREPENDED before slot 1 ascending, over-roll frames (e.g. "37") are
+ * appended after slot n ascending, and unparseable / in-range-but-unslotted frames (e.g.
+ * "36A", "01") trail at the very end in insertion order (kammerz-m7a). Extras are never
+ * flagged next. Shared by the roll-detail page and the Quick Entry page so the film strip
+ * behaves identically in both.
  */
 export function buildFrameCells(shots: Shot[], frameCount: number | null): FrameCell[] {
 	const n = frameCount ?? DEFAULT_FRAMES;
 	const byFrame = new Map<string, Shot>();
 	for (const s of shots) byFrame.set(s.frame_number.trim(), s);
 
-	const cells: FrameCell[] = [];
+	const slots: FrameCell[] = [];
 	let nextAssigned = false;
 	for (let i = 1; i <= n; i++) {
 		const fn = String(i);
 		const shot = byFrame.get(fn) ?? null;
 		const isNext = !shot && !nextAssigned;
 		if (isNext) nextAssigned = true;
-		cells.push({ frameNumber: fn, shot, isNext });
+		slots.push({ frameNumber: fn, shot, isNext });
 		byFrame.delete(fn);
 	}
-	// Extras: any shot whose frame_number wasn't a 1..n slot (e.g. "37", "00", "36A").
-	for (const [fn, shot] of byFrame) cells.push({ frameNumber: fn, shot, isNext: false });
-	return cells;
+
+	// Extras: shots whose frame_number wasn't a 1..n slot. Partition by parsed value so the
+	// strip stays in reading order instead of dumping everything after slot n. Carry the
+	// value parsed here so the sort compares cached numbers instead of re-parsing per call.
+	const below: { cell: FrameCell; num: number }[] = []; // numeric < 1 → before slot 1
+	const over: { cell: FrameCell; num: number }[] = []; // numeric > n → after slot n
+	const trailing: FrameCell[] = []; // non-numeric, or in-range unslotted numerics → end
+	for (const [fn, shot] of byFrame) {
+		const num = parseFrameNumber(fn);
+		const cell: FrameCell = { frameNumber: fn, shot, isNext: false };
+		if (num !== null && num < 1) below.push({ cell, num });
+		else if (num !== null && num > n) over.push({ cell, num });
+		else trailing.push(cell);
+	}
+	// Stable sort (ES2019+) keeps equal-valued strings (e.g. "0" and "00") in insertion order.
+	const byValue = (a: { num: number }, b: { num: number }) => a.num - b.num;
+	below.sort(byValue);
+	over.sort(byValue);
+
+	return [...below.map((e) => e.cell), ...slots, ...over.map((e) => e.cell), ...trailing];
 }
 
 /**
