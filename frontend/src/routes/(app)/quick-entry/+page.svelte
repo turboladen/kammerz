@@ -143,8 +143,8 @@
 		time: string;
 		location: string;
 		notes: string;
-	}) {
-		if (!selectedRoll || !entry.frameNumber.trim()) return;
+	}): Promise<boolean> {
+		if (!selectedRoll || !entry.frameNumber.trim()) return false;
 		quickError = '';
 		quickSaving = true;
 		try {
@@ -152,8 +152,10 @@
 			sessionCount++;
 			jumpFrame = '';
 			[shots, rolls] = await Promise.all([listShotsForRoll(selectedRoll.id), listRolls()]);
+			return true;
 		} catch (err) {
 			quickError = err instanceof Error ? err.message : String(err);
+			return false;
 		} finally {
 			quickSaving = false;
 		}

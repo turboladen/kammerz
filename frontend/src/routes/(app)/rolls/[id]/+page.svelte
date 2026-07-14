@@ -896,15 +896,17 @@
 		time: string;
 		location: string;
 		notes: string;
-	}) {
-		if (!roll || !entry.frameNumber.trim()) return;
+	}): Promise<boolean> {
+		if (!roll || !entry.frameNumber.trim()) return false;
 		quickError = '';
 		quickSaving = true;
 		try {
 			await logShot({ rollId: roll.id, ...entry });
 			await loadRollData('shot-add');
+			return true;
 		} catch (err) {
 			quickError = err instanceof Error ? err.message : String(err);
+			return false;
 		} finally {
 			quickSaving = false;
 		}
