@@ -39,6 +39,9 @@ describe('normalizeShutter', () => {
 	it('returns empty for empty input', () => {
 		expect(normalizeShutter('')).toBe('');
 	});
+	it('is idempotent', () => {
+		expect(normalizeShutter(normalizeShutter('1/250s'))).toBe('1/250');
+	});
 });
 
 describe('isRecognizedAperture', () => {
@@ -80,5 +83,9 @@ describe('suggestion lists are bare', () => {
 		expect(APERTURE_SUGGESTIONS.every((v) => !v.toLowerCase().startsWith('f'))).toBe(true);
 		expect(SHUTTER_SUGGESTIONS).toContain('1/250');
 		expect(SHUTTER_SUGGESTIONS.every((v) => !v.endsWith('s'))).toBe(true);
+	});
+	it('every suggestion is a recognized value (no self-flagging on blur)', () => {
+		expect(APERTURE_SUGGESTIONS.every(isRecognizedAperture)).toBe(true);
+		expect(SHUTTER_SUGGESTIONS.every(isRecognizedShutter)).toBe(true);
 	});
 });
