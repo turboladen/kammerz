@@ -47,9 +47,21 @@ pub const NORMALIZATIONS: &[(&str, &str, &str)] = &[
     ("clearing_agent", "Hypo clear", "Kodak Hypo Clearing Agent"),
 ];
 
-/// Apply one guarded, idempotent normalization. `field` MUST be a fixed column
-/// identifier from [`NORMALIZATIONS`] (never user input); `from`/`to` are escaped
-/// as string literals. Shared with the migration's `up` so the test and the
+/// The five `development_selves` chemistry columns `apply_normalization` may touch.
+/// Interpolating `field` as a SQL identifier is only safe for these fixed names, so
+/// the guard below rejects anything else — making the "never user input" contract
+/// self-enforcing even though this helper is `pub` and re-exported.
+const CHEMISTRY_COLUMNS: &[&str] = &[
+    "developer",
+    "fixer",
+    "stop_bath",
+    "wetting_agent",
+    "clearing_agent",
+];
+
+/// Apply one guarded, idempotent normalization. `field` MUST be one of
+/// [`CHEMISTRY_COLUMNS`] (never user input) — enforced below; `from`/`to` are
+/// escaped as string literals. Shared with the migration's `up` so the test and the
 /// migration apply the same step.
 pub async fn apply_normalization(
     db: &impl ConnectionTrait,
@@ -57,6 +69,11 @@ pub async fn apply_normalization(
     from: &str,
     to: &str,
 ) -> Result<(), DbErr> {
+    if !CHEMISTRY_COLUMNS.contains(&field) {
+        return Err(DbErr::Custom(format!(
+            "apply_normalization: refusing to interpolate non-chemistry column '{field}'"
+        )));
+    }
     let from_esc = from.replace('\'', "''");
     let to_esc = to.replace('\'', "''");
     db.execute_unprepared(&format!(

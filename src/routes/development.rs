@@ -165,8 +165,8 @@ pub fn router() -> Router<AppState> {
 async fn list_chemicals(
     _: RequireAuth,
     State(db): State<DatabaseConnection>,
-) -> AppResult<axum::Json<GroupedChemicals>> {
-    Ok(axum::Json(ChemicalService::list_grouped(&db).await?))
+) -> AppResult<Json<GroupedChemicals>> {
+    Ok(Json(ChemicalService::list_grouped(&db).await?))
 }
 
 // --- Lab Development handlers ---

@@ -83,10 +83,18 @@
 	}
 
 	function selectOption(option: string) {
-		value = option;
+		// Cancel any pending blur so its normalize can't re-run on a stale value, and
+		// apply `normalize` here too — so the committed value, and the `onselect`
+		// payload, match what a blur would have produced (no divergence for callers
+		// that rely on the normalized value).
+		if (blurTimer) {
+			clearTimeout(blurTimer);
+			blurTimer = undefined;
+		}
+		value = normalize ? normalize(option) : option;
 		showDropdown = false;
 		highlightIndex = -1;
-		onselect?.(option);
+		onselect?.(value);
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
