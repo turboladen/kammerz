@@ -4,6 +4,15 @@
 	import Input from '$lib/components/ui/Input.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import ComboInput from '$lib/components/ui/ComboInput.svelte';
+	import {
+		APERTURE_SUGGESTIONS,
+		SHUTTER_SUGGESTIONS,
+		isRecognizedAperture,
+		isRecognizedShutter,
+		normalizeAperture,
+		normalizeShutter
+	} from '$lib/utils/exposure';
 	import { ChevronDown, ChevronUp } from 'lucide-svelte';
 
 	interface SaveEntry {
@@ -59,8 +68,8 @@
 		if (!frameNumber.trim()) return;
 		onsave({
 			frameNumber,
-			aperture,
-			shutterSpeed,
+			aperture: normalizeAperture(aperture),
+			shutterSpeed: normalizeShutter(shutterSpeed),
 			lensId: isFixedLens ? lensIdProp : localLensId,
 			date,
 			time,
@@ -97,28 +106,29 @@
 			</div>
 		</div>
 
-		<!-- f/ Aperture input — narrow: values like "5.6" / "16" -->
-		<div class="flex flex-col gap-1">
-			<label for="qab-aperture" class="text-xs font-medium text-text-muted">f/</label>
-			<input
-				id="qab-aperture"
-				data-field="aperture"
-				type="text"
-				bind:value={aperture}
+		<!-- f/ Aperture — guided combobox (standard values + free entry) -->
+		<div class="w-20">
+			<ComboInput
+				label="f/"
 				placeholder="5.6"
-				class="h-[38px] w-20 rounded-lg border border-border bg-surface px-3 font-mono text-sm text-text placeholder-text-faint transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+				mono
+				options={APERTURE_SUGGESTIONS}
+				normalize={normalizeAperture}
+				warning={aperture && !isRecognizedAperture(aperture) ? 'Non-standard' : ''}
+				bind:value={aperture}
 			/>
 		</div>
 
-		<!-- Shutter speed input — narrow: values like "1/250" / "4" -->
-		<div class="flex flex-col gap-1">
-			<label for="qab-shutter" class="text-xs font-medium text-text-muted">Shutter</label>
-			<input
-				id="qab-shutter"
-				type="text"
-				bind:value={shutterSpeed}
+		<!-- Shutter — guided combobox -->
+		<div class="w-24">
+			<ComboInput
+				label="Shutter"
 				placeholder="1/250"
-				class="h-[38px] w-24 rounded-lg border border-border bg-surface px-3 font-mono text-sm text-text placeholder-text-faint transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/50"
+				mono
+				options={SHUTTER_SUGGESTIONS}
+				normalize={normalizeShutter}
+				warning={shutterSpeed && !isRecognizedShutter(shutterSpeed) ? 'Non-standard' : ''}
+				bind:value={shutterSpeed}
 			/>
 		</div>
 	</div>
