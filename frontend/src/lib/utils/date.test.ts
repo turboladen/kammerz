@@ -96,9 +96,7 @@ describe('appendNote', () => {
 	it('does not duplicate a fragment the base already contains', () => {
 		// e.g. the AI already added the approx note per the import prompt.
 		expect(appendNote('approx date: 1998', 'approx date: 1998')).toBe('approx date: 1998');
-		expect(appendNote('shot at dusk. approx date: 1998', 'approx date: 1998')).toBe(
-			'shot at dusk. approx date: 1998'
-		);
+		expect(appendNote('shot at dusk. approx date: 1998', 'approx date: 1998')).toBe('shot at dusk. approx date: 1998');
 	});
 });
 
