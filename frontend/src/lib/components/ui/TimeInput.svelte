@@ -25,7 +25,10 @@
 	// inline error / optional-field handling covers it).
 	function normalizeOnBlur() {
 		const parsed = parseTime(value ?? '');
-		if (parsed) value = parsed;
+		// parseTime → '' (blank), null (invalid), or canonical 'HH:MM'. Normalize on
+		// blank (resets stray whitespace to '') and on valid; leave invalid untouched
+		// so the inline error stays visible.
+		if (parsed !== null) value = parsed;
 	}
 </script>
 

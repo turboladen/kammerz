@@ -20,10 +20,6 @@ and capture the "around"/approximation phrasing in the record's **notes** instea
 Approximate dates are still first-class input via partial-date acceptance (`YYYY` or
 `YYYY-MM`) on the concrete columns — a bare year or year-month is a valid date value.
 
-> **Update:** this partial-date-input allowance was later dropped — see
-> [ADR-0011](0011-full-dates-only.md) (dates are always full `YYYY-MM-DD`; approximation
-> lives in notes). The removal of `date_fuzzy` decided here still stands.
-
 Scope: drop the columns from `rolls` and `shots` (migration), remove the field from
 all DTOs, services, routes, validation, and UI; backfill the 65 existing fuzzy rolls
 into concrete date + notes _before_ the drop.

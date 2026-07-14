@@ -44,6 +44,11 @@ calls.
 - **Negative:** a truly year-only historical date can no longer be stored as `YYYY`;
   you enter a best-guess full date and note the imprecision (already the catalog's
   actual practice).
+- **Negative (accepted):** the native picker doesn't self-render an inline field
+  error the way the old `DateInput` did, so the one reachable invalid case — typing
+  an out-of-range year (< 1800 / > 2100) — disables Save via the existing
+  `dateFieldError` gate but without a per-field message. Rare (the picker enforces a
+  valid calendar date otherwise); the Save-disable still prevents bad data.
 - **Defense in depth retained:** the stats query keeps its guard against a partial
   `date_loaded` sneaking in via legacy/direct writes (the `date()`-garbage
   regression, `kammerz-4jn`) — a test now seeds one directly to keep that covered

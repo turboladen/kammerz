@@ -58,7 +58,7 @@
 			     escape hatch — an undated milestone can still be edited or cleared later
 			     from the Timeline. (kammerz-cb7) -->
 			<p class="text-xs text-text-muted">
-				Pick a date, or leave it blank — you can change or clear it later from the Timeline.
+				Pick the date this happened — you can change or clear it later from the Timeline.
 			</p>
 		{/if}
 		<div class="flex justify-end gap-2">

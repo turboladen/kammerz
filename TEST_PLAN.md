@@ -373,7 +373,7 @@
 - [ ] Status badges always use the `<Badge>` component
 - [ ] Card hover: `hover:border-accent/40`
 - [ ] Section headers: `text-xs font-semibold uppercase tracking-wider text-text-faint`
-- [ ] Select height matches Input/DateInput (`h-[38px]`)
+- [ ] Select height matches `Input` (`h-[38px]`); native `<Input type="date">` and `TimeInput` fields align in the same row
 
 ---
 

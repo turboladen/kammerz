@@ -47,6 +47,7 @@
 	} from '$lib/utils/status';
 	import { readDateTarget, STATUS_DATE_TARGET } from '$lib/utils/timeline';
 	import { todayLocal, dateFieldError } from '$lib/utils/date';
+	import { parseTime } from '$lib/utils/time';
 	import type {
 		RollWithDetails,
 		RollInsert,
@@ -551,7 +552,7 @@
 					aperture: shotAperture || null,
 					shutter_speed: shotShutterSpeed || null,
 					date: shotDate || null,
-					time: shotTime || null,
+					time: parseTime(shotTime) || shotTime || null,
 					location: shotLocation || null,
 					notes: shotNotes || null,
 					lens_ids: lensIds
@@ -563,7 +564,7 @@
 					aperture: shotAperture || null,
 					shutter_speed: shotShutterSpeed || null,
 					date: shotDate || null,
-					time: shotTime || null,
+					time: parseTime(shotTime) || shotTime || null,
 					location: shotLocation || null,
 					gps_lat: null,
 					gps_lon: null,
@@ -594,7 +595,7 @@
 				aperture: shotAperture || null,
 				shutter_speed: shotShutterSpeed || null,
 				date: shotDate || null,
-				time: shotTime || null,
+				time: parseTime(shotTime) || shotTime || null,
 				location: shotLocation || null,
 				gps_lat: null,
 				gps_lon: null,
