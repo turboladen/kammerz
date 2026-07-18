@@ -403,3 +403,28 @@ async fn import_roll_blank_shot_time_persists_as_null() {
         "blank import time stored as NULL"
     );
 }
+
+#[tokio::test]
+async fn import_roll_with_unknown_status_is_422() {
+    // With the RollStatus enum retired, `status` is a plain string consumed only
+    // by the date backfill — an unknown value would otherwise silently no-op and
+    // import the roll with an unintended derived lifecycle. The handler must
+    // restore the 422 the enum used to provide via serde.
+    let app = open_app().await;
+    let payload = json!({
+        "roll_id": "IMPORT-BADSTATUS",
+        "status": "developped",
+        "shots": []
+    });
+    let res = app
+        .oneshot(post_json("/api/import/roll", &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: Value = json_body(res).await;
+    let msg = body["error"]["message"].as_str().unwrap_or_default();
+    assert!(
+        msg.contains("unknown status") && msg.contains("developped"),
+        "message should name the bad status: {msg}"
+    );
+}

@@ -26,7 +26,6 @@ async fn new_negatives_columns_round_trip() {
     // A roll to hang the lab dev off (FK). Insert minimally via entity.
     let roll = entity::roll::ActiveModel {
         roll_id: Set("R-NEG-1".into()),
-        status: Set(entity::roll::RollStatus::Shot),
         created_at: Set("2026-07-01 00:00:00".into()),
         updated_at: Set("2026-07-01 00:00:00".into()),
         ..Default::default()
@@ -65,7 +64,6 @@ async fn new_negatives_columns_round_trip() {
     // m20260222_000019_schema_hardening), so this can't reuse `roll.id`.
     let roll2 = entity::roll::ActiveModel {
         roll_id: Set("R-NEG-2".into()),
-        status: Set(entity::roll::RollStatus::Shot),
         created_at: Set("2026-07-01 00:00:00".into()),
         updated_at: Set("2026-07-01 00:00:00".into()),
         ..Default::default()

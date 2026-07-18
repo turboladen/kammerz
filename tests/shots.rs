@@ -12,16 +12,10 @@ async fn first_camera_id(app: &axum::Router) -> i32 {
 }
 
 async fn create_loaded_roll(app: &axum::Router, roll_id: &str) -> i32 {
-    create_roll_at_status(app, roll_id, "loaded").await
-}
-
-/// Create a roll directly at a given status (mirrors tests/development.rs).
-async fn create_roll_at_status(app: &axum::Router, roll_id: &str, status: &str) -> i32 {
     let camera_id = first_camera_id(app).await;
     let payload = json!({
         "roll_id": roll_id,
         "camera_id": camera_id,
-        "status": status,
         "date_loaded": "2026-05-01"
     });
     let res = app
@@ -90,7 +84,7 @@ async fn create_shot_transaction_links_lens_and_syncs_status() {
     let count: u64 = json_body(res).await;
     assert_eq!(count, 1);
 
-    // Roll status auto-synced loaded → shooting inside the same transaction.
+    // Roll now derives to shooting: a shot exists and shooting isn't finished.
     let res = app
         .oneshot(get(&format!("/api/rolls/{roll_pk}")))
         .await
@@ -98,7 +92,7 @@ async fn create_shot_transaction_links_lens_and_syncs_status() {
     let roll: Value = json_body(res).await;
     assert_eq!(
         roll["status"], "shooting",
-        "auto_sync_status advanced the roll"
+        "a logged shot derives the roll to shooting"
     );
 }
 
@@ -118,7 +112,7 @@ async fn delete_last_shot_reverts_status() {
     assert_eq!(res.status(), StatusCode::CREATED);
     let shot_id: i32 = json_body(res).await;
 
-    // Deleting the only shot should revert shooting → loaded.
+    // Deleting the only shot leaves no shots, so the roll derives back to loaded.
     let res = app
         .clone()
         .oneshot(delete(&format!("/api/shots/{shot_id}")))
@@ -133,20 +127,29 @@ async fn delete_last_shot_reverts_status() {
     let roll: Value = json_body(res).await;
     assert_eq!(
         roll["status"], "loaded",
-        "auto_sync_status reverted the roll"
+        "with no shots the roll derives back to loaded"
     );
 }
 
-// kammerz-8rh no-regression: the delete-last-shot revert is scoped to
-// shooting/shot → loaded. A roll already past 'shot' (e.g. at-lab) that has its
-// only shot deleted must NOT be pulled back to loaded — the dev pipeline status
-// outranks shot bookkeeping.
+// A roll with a lab dev derives to at-lab regardless of its shots. Deleting its
+// only shot must NOT pull it back to loaded — the dev record still drives the
+// derived status (ADR-0013; shooting derivation is independent of the dev tail).
 #[tokio::test]
 async fn delete_last_shot_past_shot_leaves_status_untouched() {
     let app = open_app().await;
-    let roll_pk = create_roll_at_status(&app, "SHOT-DEL-ATLAB", "at-lab").await;
+    let roll_pk = create_loaded_roll(&app, "SHOT-DEL-ATLAB").await;
 
-    // Adding a shot is sync'd only for loaded → shooting; at-lab is unchanged.
+    // A lab dev derives the roll to at-lab.
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/development/lab",
+            &json!({ "roll_id": roll_pk }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+
     let res = app
         .clone()
         .oneshot(post_json(
@@ -172,7 +175,7 @@ async fn delete_last_shot_past_shot_leaves_status_untouched() {
     let roll: Value = json_body(res).await;
     assert_eq!(
         roll["status"], "at-lab",
-        "deleting the last shot of an at-lab roll must not revert it to loaded"
+        "deleting the last shot of a roll with a lab dev must not revert it to loaded"
     );
 }
 

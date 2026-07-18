@@ -6,6 +6,7 @@ use sea_orm::{DatabaseConnection, DbErr, EntityTrait, Set, TransactionTrait};
 use serde::{Deserialize, Serialize};
 
 use crate::AppState;
+use crate::activity::RollActivity;
 use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, OptionExt};
 use crate::extract::{Json, Path};
@@ -16,10 +17,10 @@ use crate::services::roll_event_service::RollEventService;
 use crate::services::roll_service::{RollService, RollWithDetails};
 use crate::services::shot_service::ShotService;
 use crate::validate::{require_nonempty, validate_date_opt, validate_non_negative_i32};
-use entity::roll::{self, PushPull, RollStatus};
+use entity::roll::{self, PushPull};
 use entity::{dev_stage, development_lab, development_self, shot};
 
-// --- DTOs (moved verbatim from commands/rolls.rs) ---
+// --- DTOs ---
 
 #[derive(Debug, Deserialize)]
 pub struct CreateRollDto {
@@ -27,13 +28,17 @@ pub struct CreateRollDto {
     pub camera_id: Option<i32>,
     pub film_stock_id: Option<i32>,
     pub lens_id: Option<i32>,
-    pub status: RollStatus,
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
     pub date_finished: Option<String>,
+    pub scan_started: Option<String>,
     pub date_scanned: Option<String>,
+    pub post_processing_started: Option<String>,
     pub date_post_processed: Option<String>,
     pub date_archived: Option<String>,
+    pub archive_location: Option<String>,
+    pub archive_na: Option<bool>,
+    pub archive_na_reason: Option<String>,
     pub push_pull: Option<PushPull>,
     pub notes: Option<String>,
 }
@@ -48,7 +53,6 @@ pub struct UpdateRollDto {
     pub film_stock_id: Option<Option<i32>>,
     #[serde(deserialize_with = "double_option")]
     pub lens_id: Option<Option<i32>>,
-    pub status: Option<RollStatus>,
     #[serde(deserialize_with = "double_option")]
     pub frame_count: Option<Option<i32>>,
     #[serde(deserialize_with = "double_option")]
@@ -56,22 +60,51 @@ pub struct UpdateRollDto {
     #[serde(deserialize_with = "double_option")]
     pub date_finished: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
+    pub scan_started: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
     pub date_scanned: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub post_processing_started: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
     pub date_post_processed: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
     pub date_archived: Option<Option<String>>,
+    #[serde(deserialize_with = "double_option")]
+    pub archive_location: Option<Option<String>>,
+    pub archive_na: Option<bool>,
+    #[serde(deserialize_with = "double_option")]
+    pub archive_na_reason: Option<Option<String>>,
     #[serde(deserialize_with = "double_option")]
     pub push_pull: Option<Option<PushPull>>,
     #[serde(deserialize_with = "double_option")]
     pub notes: Option<Option<String>>,
 }
 
+// --- Response view: a roll row plus its server-derived activity fields ---
+
+/// A roll list/detail row with the derived activity view flattened in
+/// (`activities`, `badge`, `group_key`, `done`, compat `status`) so the frontend
+/// never re-derives the lifecycle (ADR-0013).
+#[derive(Debug, Serialize)]
+pub struct RollView {
+    #[serde(flatten)]
+    pub roll: RollWithDetails,
+    #[serde(flatten)]
+    pub activity: RollActivity,
+}
+
+impl From<RollWithDetails> for RollView {
+    fn from(roll: RollWithDetails) -> Self {
+        let activity = roll.activity();
+        RollView { roll, activity }
+    }
+}
+
 // --- Composite roll detail (reduces round-trips) ---
 
 #[derive(Debug, Serialize)]
 pub struct RollDetail {
-    pub roll: RollWithDetails,
+    pub roll: RollView,
     pub shots: Vec<shot::Model>,
     pub shot_lens_pairs: Vec<(i32, i32)>,
     pub lab_dev: Option<development_lab::Model>,
@@ -96,16 +129,18 @@ pub fn router() -> Router<AppState> {
 async fn list(
     _: RequireAuth,
     State(db): State<DatabaseConnection>,
-) -> AppResult<Json<Vec<RollWithDetails>>> {
-    Ok(Json(RollService::list_all_with_details(&db).await?))
+) -> AppResult<Json<Vec<RollView>>> {
+    let rolls = RollService::list_all_with_details(&db).await?;
+    Ok(Json(rolls.into_iter().map(RollView::from).collect()))
 }
 
 async fn get_one(
     _: RequireAuth,
     State(db): State<DatabaseConnection>,
     Path(id): Path<i32>,
-) -> AppResult<Json<Option<RollWithDetails>>> {
-    Ok(Json(RollService::get_with_details(&db, id).await?))
+) -> AppResult<Json<Option<RollView>>> {
+    let roll = RollService::get_with_details(&db, id).await?;
+    Ok(Json(roll.map(RollView::from)))
 }
 
 async fn create(
@@ -115,11 +150,21 @@ async fn create(
 ) -> AppResult<(StatusCode, Json<i32>)> {
     validate_date_opt("date_loaded", &data.date_loaded)?;
     validate_date_opt("date_finished", &data.date_finished)?;
+    validate_date_opt("scan_started", &data.scan_started)?;
     validate_date_opt("date_scanned", &data.date_scanned)?;
+    validate_date_opt("post_processing_started", &data.post_processing_started)?;
     validate_date_opt("date_post_processed", &data.date_post_processed)?;
     validate_date_opt("date_archived", &data.date_archived)?;
     let roll_id = require_nonempty("roll_id", &data.roll_id)?;
     validate_non_negative_i32("frame_count", data.frame_count)?;
+
+    // Archiving is done XOR N/A (ADR-0013): a recorded archive date wins and
+    // clears the N/A flag.
+    let has_archive_date = data
+        .date_archived
+        .as_ref()
+        .is_some_and(|s| !s.trim().is_empty());
+    let archive_na = data.archive_na.unwrap_or(false) && !has_archive_date;
 
     let now = now_string();
     let model = roll::ActiveModel {
@@ -127,13 +172,17 @@ async fn create(
         camera_id: Set(data.camera_id),
         film_stock_id: Set(data.film_stock_id),
         lens_id: Set(data.lens_id),
-        status: Set(data.status),
         frame_count: Set(data.frame_count),
         date_loaded: trim_opt(data.date_loaded),
         date_finished: trim_opt(data.date_finished),
+        scan_started: trim_opt(data.scan_started),
         date_scanned: trim_opt(data.date_scanned),
+        post_processing_started: trim_opt(data.post_processing_started),
         date_post_processed: trim_opt(data.date_post_processed),
         date_archived: trim_opt(data.date_archived),
+        archive_location: trim_opt(data.archive_location),
+        archive_na: Set(archive_na),
+        archive_na_reason: trim_opt(data.archive_na_reason),
         push_pull: Set(data.push_pull),
         notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
@@ -148,8 +197,6 @@ async fn create(
                     txn,
                     result.id,
                     entity::roll_event::RollEventType::RollLoaded,
-                    None,
-                    None,
                     None,
                     None,
                     "Roll loaded".to_string(),
@@ -173,8 +220,6 @@ async fn update(
         .one(&db)
         .await?
         .or_404("Roll", id)?;
-    let prev_status = existing.status.clone();
-    let requested_status = data.status.clone();
 
     if let Some(v) = &data.date_loaded {
         validate_date_opt("date_loaded", v)?;
@@ -182,8 +227,14 @@ async fn update(
     if let Some(v) = &data.date_finished {
         validate_date_opt("date_finished", v)?;
     }
+    if let Some(v) = &data.scan_started {
+        validate_date_opt("scan_started", v)?;
+    }
     if let Some(v) = &data.date_scanned {
         validate_date_opt("date_scanned", v)?;
+    }
+    if let Some(v) = &data.post_processing_started {
+        validate_date_opt("post_processing_started", v)?;
     }
     if let Some(v) = &data.date_post_processed {
         validate_date_opt("date_post_processed", v)?;
@@ -210,9 +261,6 @@ async fn update(
     if let Some(v) = data.lens_id {
         model.lens_id = Set(v);
     }
-    if let Some(v) = data.status {
-        model.status = Set(v);
-    }
     if let Some(v) = data.frame_count {
         model.frame_count = Set(v);
     }
@@ -222,8 +270,14 @@ async fn update(
     if let Some(v) = data.date_finished {
         model.date_finished = trim_opt(v);
     }
+    if let Some(v) = data.scan_started {
+        model.scan_started = trim_opt(v);
+    }
     if let Some(v) = data.date_scanned {
         model.date_scanned = trim_opt(v);
+    }
+    if let Some(v) = data.post_processing_started {
+        model.post_processing_started = trim_opt(v);
     }
     if let Some(v) = data.date_post_processed {
         model.date_post_processed = trim_opt(v);
@@ -231,23 +285,36 @@ async fn update(
     if let Some(v) = data.date_archived {
         model.date_archived = trim_opt(v);
     }
+    if let Some(v) = data.archive_location {
+        model.archive_location = trim_opt(v);
+    }
+    if let Some(v) = data.archive_na {
+        model.archive_na = Set(v);
+    }
+    if let Some(v) = data.archive_na_reason {
+        model.archive_na_reason = trim_opt(v);
+    }
     if let Some(v) = data.push_pull {
         model.push_pull = Set(v);
     }
     if let Some(v) = data.notes {
         model.notes = trim_opt(v);
     }
+
+    // Archiving is done XOR N/A (ADR-0013): whichever this update sets wins and
+    // clears the other. A recorded archive date takes priority.
+    let sets_archive_date = matches!(&model.date_archived, Set(Some(s)) if !s.trim().is_empty());
+    if sets_archive_date {
+        model.archive_na = Set(false);
+    } else if matches!(&model.archive_na, Set(true)) {
+        model.date_archived = Set(None);
+    }
+
     model.updated_at = Set(now);
 
     db.transaction::<_, (), DbErr>(|txn| {
         Box::pin(async move {
             RollService::update(txn, model).await?;
-            if let Some(new_status) = requested_status {
-                if new_status != prev_status {
-                    RollEventService::record_status_change(txn, id, prev_status, new_status)
-                        .await?;
-                }
-            }
             Ok(())
         })
     })
@@ -271,8 +338,9 @@ async fn list_for_camera(
     _: RequireAuth,
     State(db): State<DatabaseConnection>,
     Path(camera_id): Path<i32>,
-) -> AppResult<Json<Vec<RollWithDetails>>> {
-    Ok(Json(RollService::list_for_camera(&db, camera_id).await?))
+) -> AppResult<Json<Vec<RollView>>> {
+    let rolls = RollService::list_for_camera(&db, camera_id).await?;
+    Ok(Json(rolls.into_iter().map(RollView::from).collect()))
 }
 
 async fn suggest_id(
@@ -282,7 +350,7 @@ async fn suggest_id(
     Ok(Json(RollService::suggest_id(&db).await?))
 }
 
-// --- Composite roll detail (ported from commands/rolls.rs::get_roll_detail) ---
+// --- Composite roll detail ---
 
 async fn get_detail(
     _: RequireAuth,
@@ -310,7 +378,7 @@ async fn get_detail(
     let events = RollEventService::list_for_roll(&db, id).await?;
 
     Ok(Json(RollDetail {
-        roll,
+        roll: RollView::from(roll),
         shots,
         shot_lens_pairs,
         lab_dev,

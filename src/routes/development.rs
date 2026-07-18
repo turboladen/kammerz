@@ -21,11 +21,9 @@ use crate::services::development_service::{
     DevelopmentService, LabDevListItem, SelfDevWithStages, StageInput,
 };
 use crate::services::roll_event_service::RollEventService;
-use crate::services::roll_service::RollService;
 use crate::validate::{
     require_nonempty, validate_date_opt, validate_non_negative_f64, validate_non_negative_i32,
 };
-use entity::roll::RollStatus;
 use entity::{dev_stage, development_lab, development_self};
 
 // --- DTOs (moved verbatim from commands/development.rs) ---
@@ -236,25 +234,12 @@ async fn create_lab_dev(
                 };
                 let result = model.insert(txn).await?;
 
-                // Auto-advance forward: → at-lab (or lab-done if a received date was
-                // stored), from any prior status on the lab path including an orphaned
-                // at-lab. A roll orphaned cross-flow on the self path with no self dev
-                // is adopted onto the lab path here (kammerz-e2u). Derive the signal
-                // from the persisted value so the status decision matches exactly what
-                // `trim_opt` stored (empty → None).
-                RollService::create_synced_lab_dev_status(
-                    txn,
-                    data.roll_id,
-                    result.date_received.is_some(),
-                )
-                .await?;
-
+                // The Development activity now derives from this record's dates
+                // (ADR-0013) — no stored status to advance or adopt.
                 RollEventService::record(
                     txn,
                     data.roll_id,
                     entity::roll_event::RollEventType::LabDevAdded,
-                    None,
-                    None,
                     Some(entity::roll_event::RefKind::LabDev),
                     Some(result.id),
                     "Lab development added".to_string(),
@@ -295,13 +280,6 @@ async fn update_lab_dev(
 
     let now = now_string();
 
-    // Status is driven by the *presence* of a received date. Capture it before
-    // the model is consumed so we can tell a status-relevant edit from one that
-    // merely echoes the unchanged date (kammerz-3wg): only the former resyncs,
-    // so an unrelated edit (e.g. notes) never silently undoes a confirmed
-    // backward status move.
-    let old_received_present = existing.date_received.is_some();
-
     // Which specialized negatives action (if any) this edit performs — captured
     // before `existing` is consumed. Pickup takes priority over waive over a
     // plain edit for the journal entry.
@@ -338,17 +316,8 @@ async fn update_lab_dev(
 
             let result = DevelopmentService::update_lab_dev(txn, model).await?;
 
-            // Data-driven status reconcile (kammerz-42u): adding a received date
-            // advances → lab-done, clearing it reverts lab-done → at-lab. Only
-            // resync when the received-date presence actually changed in this
-            // update (kammerz-3wg) — an edit that re-sends the same date must not
-            // disturb a status the user moved by hand.
-            let new_received_present = result.date_received.is_some();
-            if new_received_present != old_received_present {
-                RollService::resync_lab_dev_status(txn, result.roll_id, new_received_present)
-                    .await?;
-            }
-
+            // The Development/Scanning activities derive from this record's dates
+            // (ADR-0013) — no stored status to reconcile.
             let (event_type, summary) = if picking_up {
                 (
                     entity::roll_event::RollEventType::NegativesPickedUp,
@@ -369,8 +338,6 @@ async fn update_lab_dev(
                 txn,
                 result.roll_id,
                 event_type,
-                None,
-                None,
                 Some(entity::roll_event::RefKind::LabDev),
                 Some(id),
                 summary,
@@ -400,36 +367,14 @@ async fn delete_lab_dev(
                 .or_404_db("Lab development", id)?;
             let roll_id = dev.roll_id;
 
-            // Delete the dev record
+            // Delete the dev record. The Development activity re-derives from the
+            // (now absent) record (ADR-0013) — no stored status to revert.
             development_lab::Entity::delete_by_id(id).exec(txn).await?;
-
-            // Auto-revert: at-lab/lab-done → shot when lab dev is removed
-            // (only if no self-dev record exists — sibling dev takes priority).
-            // The create-side mutual-exclusion guard makes a sibling impossible
-            // for new data; this check remains as defense-in-depth for rolls
-            // that acquired both records before the guard existed (kammerz-ysw).
-            let has_self_dev = development_self::Entity::find()
-                .filter(development_self::Column::RollId.eq(roll_id))
-                .count(txn)
-                .await?
-                > 0;
-
-            if !has_self_dev {
-                RollService::auto_sync_status(
-                    txn,
-                    roll_id,
-                    &[RollStatus::AtLab, RollStatus::LabDone],
-                    RollStatus::Shot,
-                )
-                .await?;
-            }
 
             RollEventService::record(
                 txn,
                 roll_id,
                 entity::roll_event::RollEventType::LabDevRemoved,
-                None,
-                None,
                 None,
                 None,
                 "Lab development removed".to_string(),
@@ -515,25 +460,12 @@ async fn create_self_dev(
                         .await?;
                 }
 
-                // Auto-advance forward: → developing (or developed if a processed date
-                // was stored), from any prior status on the self path including an
-                // orphaned developing. A roll orphaned cross-flow on the lab path with
-                // no lab dev is adopted onto the self path here (kammerz-e2u). Derive
-                // the signal from the persisted value so the status decision matches
-                // exactly what `trim_opt` stored (empty → None).
-                RollService::create_synced_self_dev_status(
-                    txn,
-                    data.roll_id,
-                    result.date_processed.is_some(),
-                )
-                .await?;
-
+                // The Development activity now derives from this record's dates
+                // (ADR-0013) — no stored status to advance or adopt.
                 RollEventService::record(
                     txn,
                     data.roll_id,
                     entity::roll_event::RollEventType::SelfDevAdded,
-                    None,
-                    None,
                     Some(entity::roll_event::RefKind::SelfDev),
                     Some(result.id),
                     "Self development added".to_string(),
@@ -567,11 +499,6 @@ async fn update_self_dev(
     }
 
     let now = now_string();
-
-    // Mirror of update_lab_dev (kammerz-3wg): status is driven by the presence
-    // of a processed date, so capture it before the model is consumed and only
-    // resync when that presence actually changes in this update.
-    let old_processed_present = existing.date_processed.is_some();
 
     db.transaction::<_, (), DbErr>(|txn| {
         Box::pin(async move {
@@ -622,23 +549,12 @@ async fn update_self_dev(
                 DevelopmentService::set_stages(txn, id, stages_to_inputs(stages)).await?;
             }
 
-            // Data-driven status reconcile (kammerz-42u): adding a processed date
-            // advances → developed, clearing it reverts developed → developing.
-            // Only resync when the processed-date presence actually changed in
-            // this update (kammerz-3wg) — an unrelated edit must not undo a
-            // hand-set status.
-            let new_processed_present = result.date_processed.is_some();
-            if new_processed_present != old_processed_present {
-                RollService::resync_self_dev_status(txn, result.roll_id, new_processed_present)
-                    .await?;
-            }
-
+            // The Development/Scanning activities derive from this record's dates
+            // (ADR-0013) — no stored status to reconcile.
             RollEventService::record(
                 txn,
                 result.roll_id,
                 entity::roll_event::RollEventType::SelfDevEdited,
-                None,
-                None,
                 Some(entity::roll_event::RefKind::SelfDev),
                 Some(id),
                 "Self development edited".to_string(),
@@ -668,36 +584,15 @@ async fn delete_self_dev(
                 .or_404_db("Self development", id)?;
             let roll_id = dev.roll_id;
 
-            // Delete the dev record (dev stages cascade-deleted by FK)
+            // Delete the dev record (dev stages cascade-deleted by FK). The
+            // Development activity re-derives from the (now absent) record
+            // (ADR-0013) — no stored status to revert.
             development_self::Entity::delete_by_id(id).exec(txn).await?;
-
-            // Auto-revert: developing/developed → shot when self dev is removed
-            // (only if no lab-dev record exists — sibling dev takes priority).
-            // The create-side mutual-exclusion guard makes a sibling impossible
-            // for new data; this check remains as defense-in-depth for rolls
-            // that acquired both records before the guard existed (kammerz-ysw).
-            let has_lab_dev = development_lab::Entity::find()
-                .filter(development_lab::Column::RollId.eq(roll_id))
-                .count(txn)
-                .await?
-                > 0;
-
-            if !has_lab_dev {
-                RollService::auto_sync_status(
-                    txn,
-                    roll_id,
-                    &[RollStatus::Developing, RollStatus::Developed],
-                    RollStatus::Shot,
-                )
-                .await?;
-            }
 
             RollEventService::record(
                 txn,
                 roll_id,
                 entity::roll_event::RollEventType::SelfDevRemoved,
-                None,
-                None,
                 None,
                 None,
                 "Self development removed".to_string(),

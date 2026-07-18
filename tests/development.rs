@@ -6,22 +6,8 @@ use sea_orm::{ActiveModelTrait, Set};
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
-/// Seed a self dev directly in the DB, bypassing the API's lab/self
+/// Seed a lab dev directly in the DB, bypassing the API's lab/self
 /// mutual-exclusion guard (kammerz-ysw) — simulates legacy both-dev data.
-async fn insert_self_dev_directly(db: &sea_orm::DatabaseConnection, roll_pk: i32) {
-    entity::development_self::ActiveModel {
-        roll_id: Set(roll_pk),
-        developer: Set(Some("Rodinal".into())),
-        created_at: Set("2026-05-01T00:00:00Z".into()),
-        updated_at: Set("2026-05-01T00:00:00Z".into()),
-        ..Default::default()
-    }
-    .insert(db)
-    .await
-    .unwrap();
-}
-
-/// Lab-side twin of [`insert_self_dev_directly`].
 async fn insert_lab_dev_directly(db: &sea_orm::DatabaseConnection, roll_pk: i32) {
     entity::development_lab::ActiveModel {
         roll_id: Set(roll_pk),
@@ -49,19 +35,48 @@ async fn roll_status(app: &axum::Router, roll_pk: i32) -> String {
     roll["status"].as_str().unwrap().to_string()
 }
 
-/// Create a roll directly at a given status. Used to simulate imported rolls
-/// orphaned past 'shot' with no backing dev record.
+/// Create a roll whose recorded dates derive to `status` (ADR-0013 — there is no
+/// stored status). Sets the lifecycle dates the derivation reads: `date_finished`
+/// for shot and beyond, then `date_scanned` / `date_post_processed` /
+/// `date_archived` for the tail statuses. Dev-backed statuses (at-lab, developing,
+/// …) get the shot-level dates here; the test creates the matching dev record to
+/// drive the derivation the rest of the way.
 async fn create_roll_at_status(app: &axum::Router, roll_id: &str, status: &str) -> i32 {
     let res = app.clone().oneshot(get("/api/cameras")).await.unwrap();
     let cams: Vec<Value> = json_body(res).await;
     let camera_id = cams[0]["id"].as_i64().unwrap() as i32;
 
-    let payload = json!({
+    let mut payload = json!({
         "roll_id": roll_id,
         "camera_id": camera_id,
-        "status": status,
         "date_loaded": "2026-05-01"
     });
+    let order = [
+        "loaded",
+        "shooting",
+        "shot",
+        "at-lab",
+        "lab-done",
+        "developing",
+        "developed",
+        "scanned",
+        "post-processed",
+        "archived",
+    ];
+    let rank = order.iter().position(|s| *s == status).unwrap_or(0);
+    let obj = payload.as_object_mut().unwrap();
+    if rank >= 2 {
+        obj.insert("date_finished".into(), json!("2026-05-02"));
+    }
+    if rank >= 7 {
+        obj.insert("date_scanned".into(), json!("2026-05-13"));
+    }
+    if rank >= 8 {
+        obj.insert("date_post_processed".into(), json!("2026-05-14"));
+    }
+    if rank >= 9 {
+        obj.insert("date_archived".into(), json!("2026-05-20"));
+    }
     let res = app
         .clone()
         .oneshot(post_json("/api/rolls", &payload))
@@ -77,7 +92,7 @@ async fn create_self_dev_with_stages_and_lists() {
     let roll_pk = create_shot_roll(&app, "DEV-SELF").await;
 
     // POST a self-dev with a couple of stages — exercises the transactional
-    // create + set_stages + auto_sync_status path.
+    // create + set_stages path.
     let payload = json!({
         "roll_id": roll_pk,
         "developer": "Rodinal",
@@ -109,7 +124,7 @@ async fn create_self_dev_with_stages_and_lists() {
     assert_eq!(stages[0]["duration_seconds"], 660);
     assert_eq!(stages[1]["stage_name"], "Fix");
 
-    // Roll status auto-advanced → developing inside the transaction.
+    // Roll derives to developing from the newly-created self dev record.
     let res = app
         .clone()
         .oneshot(get(&format!("/api/rolls/{roll_pk}")))
@@ -737,58 +752,6 @@ async fn delete_self_dev_reverts_developed_to_shot() {
     );
 }
 
-// kammerz-8rh sibling-skip: when BOTH dev records exist, deleting the lab dev
-// must NOT revert the status because the surviving self dev still justifies a
-// post-shot status. The API rejects creating the sibling since kammerz-ysw, so
-// seed it directly in the DB — simulating a roll corrupted before that guard
-// existed; the delete handlers keep the sibling check as defense-in-depth.
-#[tokio::test]
-async fn delete_lab_dev_skips_revert_when_self_dev_exists() {
-    let (app, db) = open_app_with_db().await;
-    let roll_pk = create_shot_roll(&app, "DEL-LAB-SIBLING").await;
-    let lab_id = create_lab_dev(&app, roll_pk, json!({})).await;
-    assert_eq!(roll_status(&app, roll_pk).await, "at-lab");
-    insert_self_dev_directly(&db, roll_pk).await;
-    assert_eq!(roll_status(&app, roll_pk).await, "at-lab");
-
-    let res = app
-        .clone()
-        .oneshot(delete(&format!("/api/development/lab/{lab_id}")))
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::NO_CONTENT);
-    assert_eq!(
-        roll_status(&app, roll_pk).await,
-        "at-lab",
-        "lab dev delete skips the revert while a sibling self dev exists"
-    );
-}
-
-// kammerz-8rh sibling-skip, mirrored: deleting the self dev while a lab dev
-// survives must not revert. As above, the lab sibling is seeded directly in
-// the DB because the API has rejected sibling creates since kammerz-ysw.
-#[tokio::test]
-async fn delete_self_dev_skips_revert_when_lab_dev_exists() {
-    let (app, db) = open_app_with_db().await;
-    let roll_pk = create_shot_roll(&app, "DEL-SELF-SIBLING").await;
-    let self_id = create_self_dev(&app, roll_pk, json!({ "developer": "HC-110" })).await;
-    assert_eq!(roll_status(&app, roll_pk).await, "developing");
-    insert_lab_dev_directly(&db, roll_pk).await;
-    assert_eq!(roll_status(&app, roll_pk).await, "developing");
-
-    let res = app
-        .clone()
-        .oneshot(delete(&format!("/api/development/self/{self_id}")))
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::NO_CONTENT);
-    assert_eq!(
-        roll_status(&app, roll_pk).await,
-        "developing",
-        "self dev delete skips the revert while a sibling lab dev exists"
-    );
-}
-
 // kammerz-8rh no-regression: status beyond the dev record's range is untouched —
 // deleting a lab dev from a scanned roll must not pull it back to shot.
 #[tokio::test]
@@ -863,91 +826,15 @@ async fn create_self_dev_on_scanned_roll_stays_scanned() {
     );
 }
 
-// --- kammerz-3wg: dev-record edits must not silently undo a confirmed backward
-//     status move. Resync only fires when the status-driving date PRESENCE
-//     actually changes in the update, not on an edit that merely echoes it. ---
+// --- Dev-record creation drives the compat status directly (ADR-0013). These
+//     scenarios previously exercised kammerz-e2u "cross-flow adoption" of an
+//     orphaned stored status; with the status now derived from the dev record's
+//     dates there is nothing to adopt — the derived value simply follows the
+//     record. The date-labelled `create_roll_at_status` argument seeds only the
+//     shot-level date, so the created dev record determines the result. ---
 
-/// PUT a roll's status directly (the chevron/confirm path writes status only,
-/// never dates). Returns once NO_CONTENT is confirmed.
-async fn put_roll_status(app: &axum::Router, roll_pk: i32, status: &str) {
-    let res = app
-        .clone()
-        .oneshot(put_json(
-            &format!("/api/rolls/{roll_pk}"),
-            &json!({ "status": status }),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::NO_CONTENT);
-}
-
-// kammerz-3wg: roll at lab-done with date_received; user confirms a backward
-// move to at-lab (status-only write). Later editing an UNRELATED field of the
-// lab dev (notes) — whose payload still echoes the unchanged date_received —
-// must NOT silently revert the roll back to lab-done.
-#[tokio::test]
-async fn update_lab_dev_notes_only_keeps_confirmed_backward_at_lab() {
-    let app = open_app().await;
-    let roll_pk = create_shot_roll(&app, "3WG-LAB").await;
-    let dev_id = create_lab_dev(&app, roll_pk, json!({ "date_received": "2026-05-10" })).await;
-    assert_eq!(roll_status(&app, roll_pk).await, "lab-done");
-
-    // User confirms a backward chevron move to at-lab.
-    put_roll_status(&app, roll_pk, "at-lab").await;
-    assert_eq!(roll_status(&app, roll_pk).await, "at-lab");
-
-    // Edit notes only; the frontend echoes the still-set date_received.
-    let res = app
-        .clone()
-        .oneshot(put_json(
-            &format!("/api/development/lab/{dev_id}"),
-            &json!({ "notes": "dropped at front desk", "date_received": "2026-05-10" }),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::NO_CONTENT);
-    assert_eq!(
-        roll_status(&app, roll_pk).await,
-        "at-lab",
-        "a notes-only edit echoing the unchanged received date must not revert the confirmed at-lab move"
-    );
-}
-
-// kammerz-3wg mirror: self dev edit that echoes the unchanged processed date
-// must not silently revert a confirmed developed → developing backward move.
-#[tokio::test]
-async fn update_self_dev_notes_only_keeps_confirmed_backward_developing() {
-    let app = open_app().await;
-    let roll_pk = create_shot_roll(&app, "3WG-SELF").await;
-    let dev_id = create_self_dev(&app, roll_pk, json!({ "date_processed": "2026-05-12" })).await;
-    assert_eq!(roll_status(&app, roll_pk).await, "developed");
-
-    put_roll_status(&app, roll_pk, "developing").await;
-    assert_eq!(roll_status(&app, roll_pk).await, "developing");
-
-    let res = app
-        .clone()
-        .oneshot(put_json(
-            &format!("/api/development/self/{dev_id}"),
-            &json!({ "notes": "re-fixed for clearing", "date_processed": "2026-05-12" }),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::NO_CONTENT);
-    assert_eq!(
-        roll_status(&app, roll_pk).await,
-        "developing",
-        "a notes-only edit echoing the unchanged processed date must not revert the confirmed developing move"
-    );
-}
-
-// --- kammerz-e2u: creating a dev record on a roll orphaned at a SIBLING-path
-//     status (no backing record) must adopt the roll onto the new path, not
-//     no-op and leave the status contradicting the only dev record. ---
-
-// kammerz-e2u: roll orphaned at 'developing' (self-path, no self dev record);
-// the user records a LAB dev with a received date. The roll must adopt the lab
-// path and land at lab-done, not stay stranded at developing.
+// A lab dev with a received date derives to lab-done regardless of any prior
+// (now non-existent) stored status.
 #[tokio::test]
 async fn create_lab_dev_with_received_date_adopts_orphan_developing_to_lab_done() {
     let app = open_app().await;
@@ -1037,70 +924,6 @@ async fn create_self_dev_rejected_does_not_adopt_when_lab_dev_seeded() {
         roll_status(&app, roll_pk).await,
         "at-lab",
         "a rejected self dev must not adopt a roll that already has a lab dev sibling"
-    );
-}
-
-// kammerz-e2u × kammerz-3wg interaction: cross-flow ADOPTION is a CREATE-only
-// affordance. Editing an existing dev record must never relocate a roll the
-// user deliberately positioned on the sibling flow. Here a self-dev roll the
-// user manually moved to a lab-path status (at-lab), then cleared the processed
-// date on — a presence-changing edit, so resync runs — must NOT be snapped
-// onto the self path by the adoption logic; it stays where the user put it.
-#[tokio::test]
-async fn update_self_dev_clearing_date_does_not_adopt_user_moved_cross_flow_roll() {
-    let app = open_app().await;
-    let roll_pk = create_shot_roll(&app, "E2U-NOADOPT-SELF").await;
-    let dev_id = create_self_dev(&app, roll_pk, json!({ "date_processed": "2026-05-12" })).await;
-    assert_eq!(roll_status(&app, roll_pk).await, "developed");
-
-    // User deliberately moves the roll cross-flow to a lab-path status.
-    put_roll_status(&app, roll_pk, "at-lab").await;
-    assert_eq!(roll_status(&app, roll_pk).await, "at-lab");
-
-    // Clearing the processed date is a presence change, so resync runs — but the
-    // update path must not adopt the off-flow roll back onto the self path.
-    let res = app
-        .clone()
-        .oneshot(put_json(
-            &format!("/api/development/self/{dev_id}"),
-            &json!({ "date_processed": null }),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::NO_CONTENT);
-    assert_eq!(
-        roll_status(&app, roll_pk).await,
-        "at-lab",
-        "clearing a date on an existing self dev must not adopt a user-moved cross-flow roll onto the self path"
-    );
-}
-
-// Mirror: a lab-dev roll the user moved cross-flow to a self-path status
-// (developing), then cleared the received date on, stays at developing — the
-// update path never adopts it back onto the lab path.
-#[tokio::test]
-async fn update_lab_dev_clearing_date_does_not_adopt_user_moved_cross_flow_roll() {
-    let app = open_app().await;
-    let roll_pk = create_shot_roll(&app, "E2U-NOADOPT-LAB").await;
-    let dev_id = create_lab_dev(&app, roll_pk, json!({ "date_received": "2026-05-10" })).await;
-    assert_eq!(roll_status(&app, roll_pk).await, "lab-done");
-
-    put_roll_status(&app, roll_pk, "developing").await;
-    assert_eq!(roll_status(&app, roll_pk).await, "developing");
-
-    let res = app
-        .clone()
-        .oneshot(put_json(
-            &format!("/api/development/lab/{dev_id}"),
-            &json!({ "date_received": null }),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::NO_CONTENT);
-    assert_eq!(
-        roll_status(&app, roll_pk).await,
-        "developing",
-        "clearing a date on an existing lab dev must not adopt a user-moved cross-flow roll onto the lab path"
     );
 }
 

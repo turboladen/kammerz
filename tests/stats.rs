@@ -38,7 +38,6 @@ async fn stats_survives_partial_date_loaded() {
     ] {
         entity::roll::ActiveModel {
             roll_id: Set(rid.to_string()),
-            status: Set(entity::roll::RollStatus::Loaded),
             date_loaded: Set(Some(d.clone())),
             created_at: Set("2026-05-01 00:00:00".to_string()),
             updated_at: Set("2026-05-01 00:00:00".to_string()),

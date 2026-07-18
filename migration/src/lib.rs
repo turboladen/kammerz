@@ -29,10 +29,15 @@ mod m20260711_000026_add_negatives_pickup;
 mod m20260713_000027_sync_catalog_after_import;
 mod m20260713_000028_create_chemicals;
 mod m20260713_000029_normalize_dev_chemistry;
+mod m20260718_000030_activity_lifecycle;
 
 /// Re-exported so `tests/chemicals.rs` exercises the exact normalization data and
 /// apply step the m..029 migration uses (no drift between test and migration).
 pub use m20260713_000029_normalize_dev_chemistry::{NORMALIZATIONS, apply_normalization};
+
+/// Re-exported so `tests/` and `import.rs` reuse the exact status→date backfill
+/// mapping the m..030 activity-lifecycle migration applies (kammerz-b0ix).
+pub use m20260718_000030_activity_lifecycle::{BACKFILL_ORDER, BackfilledDates, backfilled_dates};
 
 pub struct Migrator;
 
@@ -69,6 +74,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260713_000027_sync_catalog_after_import::Migration),
             Box::new(m20260713_000028_create_chemicals::Migration),
             Box::new(m20260713_000029_normalize_dev_chemistry::Migration),
+            Box::new(m20260718_000030_activity_lifecycle::Migration),
         ]
     }
 }

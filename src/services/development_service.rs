@@ -5,7 +5,29 @@ use ::entity::dev_stage::{self, Entity as DevStage};
 use ::entity::development_lab::{self, Entity as DevelopmentLab};
 use ::entity::development_self::{self, Entity as DevelopmentSelf};
 use ::entity::film_stock::FilmStockType;
-use ::entity::roll::RollStatus;
+
+use crate::activity::{ActivitySignals, legacy_status};
+
+/// Compat legacy status for a dev-list row (ADR-0013). A dev record always
+/// exists here, so the roll is at least at-lab/developing; the derivation picks
+/// the exact value from the tail dates.
+fn dev_roll_status(
+    is_lab_dev: bool,
+    dev_completion: Option<String>,
+    date_scanned: Option<String>,
+    date_post_processed: Option<String>,
+    date_archived: Option<String>,
+) -> String {
+    legacy_status(&ActivitySignals {
+        has_dev: true,
+        is_lab_dev,
+        dev_completion,
+        date_scanned,
+        date_post_processed,
+        date_archived,
+        ..Default::default()
+    })
+}
 
 /// A self-development list item with its ordered stages merged in.
 /// Returned by the `list_all_self_developments` endpoint.
@@ -22,7 +44,15 @@ pub struct SelfDevListItem {
     pub dev_id: i32,
     pub roll_pk: i32,
     pub roll_id: String,
-    pub roll_status: RollStatus,
+    // Compat legacy status, computed in Rust after the query (placeholder in SQL).
+    pub roll_status: String,
+    // Roll tail dates for the compat derivation — not part of the wire contract.
+    #[serde(skip)]
+    pub roll_date_scanned: Option<String>,
+    #[serde(skip)]
+    pub roll_date_post_processed: Option<String>,
+    #[serde(skip)]
+    pub roll_date_archived: Option<String>,
     pub film_stock_brand: Option<String>,
     pub film_stock_name: Option<String>,
     pub film_stock_iso: Option<i32>,
@@ -52,7 +82,15 @@ pub struct LabDevListItem {
     pub dev_id: i32,
     pub roll_pk: i32,
     pub roll_id: String,
-    pub roll_status: RollStatus,
+    // Compat legacy status, computed in Rust after the query (placeholder in SQL).
+    pub roll_status: String,
+    // Roll tail dates for the compat derivation — not part of the wire contract.
+    #[serde(skip)]
+    pub roll_date_scanned: Option<String>,
+    #[serde(skip)]
+    pub roll_date_post_processed: Option<String>,
+    #[serde(skip)]
+    pub roll_date_archived: Option<String>,
     pub film_stock_brand: Option<String>,
     pub film_stock_name: Option<String>,
     pub film_stock_iso: Option<i32>,
@@ -73,7 +111,10 @@ const LIST_LAB_DEVS_SQL: &str = "\
         dl.id AS dev_id, \
         r.id AS roll_pk, \
         r.roll_id, \
-        r.status AS roll_status, \
+        '' AS roll_status, \
+        r.date_scanned AS roll_date_scanned, \
+        r.date_post_processed AS roll_date_post_processed, \
+        r.date_archived AS roll_date_archived, \
         fs.brand AS film_stock_brand, \
         fs.name AS film_stock_name, \
         fs.iso AS film_stock_iso, \
@@ -99,7 +140,10 @@ const LIST_SELF_DEVS_SQL: &str = "\
         ds.id AS dev_id, \
         r.id AS roll_pk, \
         r.roll_id, \
-        r.status AS roll_status, \
+        '' AS roll_status, \
+        r.date_scanned AS roll_date_scanned, \
+        r.date_post_processed AS roll_date_post_processed, \
+        r.date_archived AS roll_date_archived, \
         fs.brand AS film_stock_brand, \
         fs.name AS film_stock_name, \
         fs.iso AS film_stock_iso, \
@@ -178,12 +222,22 @@ impl DevelopmentService {
     /// lab context. Lab devs have no stages, so this returns the flat rows
     /// directly (no batch-merge step like the self-dev list).
     pub async fn list_all_lab_devs(db: &DatabaseConnection) -> Result<Vec<LabDevListItem>, DbErr> {
-        LabDevListItem::find_by_statement(Statement::from_string(
+        let mut items = LabDevListItem::find_by_statement(Statement::from_string(
             db.get_database_backend(),
             LIST_LAB_DEVS_SQL.to_string(),
         ))
         .all(db)
-        .await
+        .await?;
+        for item in &mut items {
+            item.roll_status = dev_roll_status(
+                true,
+                item.date_received.clone(),
+                item.roll_date_scanned.clone(),
+                item.roll_date_post_processed.clone(),
+                item.roll_date_archived.clone(),
+            );
+        }
+        Ok(items)
     }
 
     // --- Self Development ---
@@ -273,12 +327,22 @@ impl DevelopmentService {
     pub async fn list_all_self_devs(
         db: &DatabaseConnection,
     ) -> Result<Vec<SelfDevListItem>, DbErr> {
-        SelfDevListItem::find_by_statement(Statement::from_string(
+        let mut items = SelfDevListItem::find_by_statement(Statement::from_string(
             db.get_database_backend(),
             LIST_SELF_DEVS_SQL.to_string(),
         ))
         .all(db)
-        .await
+        .await?;
+        for item in &mut items {
+            item.roll_status = dev_roll_status(
+                false,
+                item.date_processed.clone(),
+                item.roll_date_scanned.clone(),
+                item.roll_date_post_processed.clone(),
+                item.roll_date_archived.clone(),
+            );
+        }
+        Ok(items)
     }
 
     pub async fn list_stages_for_dev_ids(

@@ -2,10 +2,7 @@ use axum::Router;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::{get, post};
-use sea_orm::{
-    ColumnTrait, DatabaseConnection, DbErr, EntityTrait, PaginatorTrait, QueryFilter, Set,
-    TransactionTrait,
-};
+use sea_orm::{DatabaseConnection, DbErr, EntityTrait, Set, TransactionTrait};
 use serde::Deserialize;
 
 use crate::AppState;
@@ -15,12 +12,10 @@ use crate::extract::{Json, Path};
 use crate::patch::{double_option, now_string, trim, trim_opt};
 use crate::routes::{Op, friendly_err, friendly_txn_err};
 use crate::services::roll_event_service::RollEventService;
-use crate::services::roll_service::RollService;
 use crate::services::shot_service::ShotService;
 use crate::validate::{
     require_nonempty, validate_date_opt, validate_lat, validate_lon, validate_time,
 };
-use entity::roll::RollStatus;
 use entity::shot;
 
 // --- DTOs (moved verbatim from commands/shots.rs) ---
@@ -94,7 +89,7 @@ async fn get_one(
     Ok(Json(ShotService::get_by_id(&db, id).await?))
 }
 
-// --- Create shot (transactional: create + set_lenses + auto_sync_status) ---
+// --- Create shot (transactional: create + set_lenses) ---
 
 async fn create(
     _: RequireAuth,
@@ -135,21 +130,12 @@ async fn create(
                     }
                 }
 
-                // Auto-advance: loaded → shooting when first shot is added
-                RollService::auto_sync_status(
-                    txn,
-                    data.roll_id,
-                    &[RollStatus::Loaded],
-                    RollStatus::Shooting,
-                )
-                .await?;
-
+                // Shooting activity now derives from shot presence (ADR-0013) —
+                // no stored status to advance.
                 RollEventService::record(
                     txn,
                     data.roll_id,
                     entity::roll_event::RollEventType::ShotLogged,
-                    None,
-                    None,
                     Some(entity::roll_event::RefKind::Shot),
                     Some(result.id),
                     format!("Frame {} logged", result.frame_number),
@@ -237,8 +223,6 @@ async fn update(
                 txn,
                 roll_id,
                 entity::roll_event::RollEventType::ShotEdited,
-                None,
-                None,
                 Some(entity::roll_event::RefKind::Shot),
                 Some(id),
                 "Shot edited".to_string(),
@@ -254,7 +238,7 @@ async fn update(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// --- Delete shot (transactional: delete + auto_sync_status revert) ---
+// --- Delete shot (transactional) ---
 
 async fn delete_one(
     _: RequireAuth,
@@ -270,31 +254,15 @@ async fn delete_one(
                 .or_404_db("Shot", id)?;
             let roll_id = shot_record.roll_id;
 
-            // Delete the shot (shot_lenses cascade-deleted by FK)
+            // Delete the shot (shot_lenses cascade-deleted by FK). The Shooting
+            // activity re-derives from the remaining shots (ADR-0013) — no stored
+            // status to revert.
             shot::Entity::delete_by_id(id).exec(txn).await?;
-
-            // Auto-revert: shooting/shot → loaded when last shot is removed
-            let remaining = shot::Entity::find()
-                .filter(shot::Column::RollId.eq(roll_id))
-                .count(txn)
-                .await?;
-
-            if remaining == 0 {
-                RollService::auto_sync_status(
-                    txn,
-                    roll_id,
-                    &[RollStatus::Shooting, RollStatus::Shot],
-                    RollStatus::Loaded,
-                )
-                .await?;
-            }
 
             RollEventService::record(
                 txn,
                 roll_id,
                 entity::roll_event::RollEventType::ShotDeleted,
-                None,
-                None,
                 None,
                 None,
                 format!("Frame {} deleted", shot_record.frame_number),
