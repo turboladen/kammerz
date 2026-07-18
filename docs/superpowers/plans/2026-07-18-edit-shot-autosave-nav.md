@@ -369,7 +369,7 @@ git commit -m "fix(shots): auto-save edits when navigating shots in the edit dia
 
 **Interfaces:**
 
-- Consumes: `BASE` from `./shared`; the running release binary + storageState auth the smoke suite already provides. FrameStrip filled-frame buttons have `aria-label` matching `/^Frame 1,.*click to edit/`; dialog nav buttons are `aria-label="Next shot"` / `"Previous shot"`. The `Dialog` component has `role="dialog"` — ALL in-dialog locators must scope through it, because the QuickAddBar behind the dialog also renders a `<textarea>` (its Notes field) and a "Save & Next" button.
+- Consumes: `BASE` from `./shared`; the running release binary + storageState auth the smoke suite already provides. FrameStrip filled-frame buttons have `aria-label` matching `/^Frame 1[ ,].*click to edit/` — the comma-prefixed segments (date, f/, shutter, time) only appear when those optional fields are set, and this test seeds bare shots, so the label is exactly `Frame 1 — click to edit`; the character class matches both forms; dialog nav buttons are `aria-label="Next shot"` / `"Previous shot"`. The `Dialog` component has `role="dialog"` — ALL in-dialog locators must scope through it, because the QuickAddBar behind the dialog also renders a `<textarea>` (its Notes field) and a "Save & Next" button.
 - Produces: nothing downstream.
 
 - [ ] **Step 1: Write the test**
@@ -403,7 +403,7 @@ test('edit-shot dialog auto-saves edits when navigating between shots (kammerz-1
 	// Open the Edit Shot dialog on frame 1 via the FrameStrip. Scope every
 	// in-dialog locator through role=dialog — the QuickAddBar behind it also
 	// has a <textarea> and a "Save & Next" button.
-	await page.getByRole('button', { name: /^Frame 1,.*click to edit/ }).click();
+	await page.getByRole('button', { name: /^Frame 1[ ,].*click to edit/ }).click();
 	const dialog = page.getByRole('dialog');
 	await expect(dialog.getByText('Shot 1 of 2')).toBeVisible();
 
