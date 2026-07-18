@@ -224,10 +224,12 @@ impl StatsService {
             backend,
             "SELECT r.date_finished, r.date_scanned, r.date_post_processed, \
                     r.date_archived, r.archive_na, \
-                    (SELECT COUNT(*) FROM shots s WHERE s.roll_id = r.id) AS shot_count, \
+                    COALESCE(sc.shot_count, 0) AS shot_count, \
                     dl.id AS lab_dev_id, dl.date_received AS lab_completion, \
                     ds.id AS self_dev_id, ds.date_processed AS self_completion \
              FROM rolls r \
+             LEFT JOIN (SELECT roll_id, COUNT(*) AS shot_count FROM shots GROUP BY roll_id) sc \
+                    ON sc.roll_id = r.id \
              LEFT JOIN development_labs dl ON dl.roll_id = r.id \
              LEFT JOIN development_selves ds ON ds.roll_id = r.id"
                 .to_owned(),

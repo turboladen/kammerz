@@ -159,6 +159,19 @@ async fn import_parsed_roll(
         }
     }
 
+    // Reject an unknown legacy status outright: `backfilled_dates` treats it as
+    // rank-0 (a silent no-op), which would mask client drift/typos and import the
+    // roll with an unintended derived lifecycle. The old `RollStatus` enum got
+    // this 422 for free from serde; with the enum retired, enforce it here
+    // against the same canonical value set the backfill ranks by.
+    if !migration::BACKFILL_ORDER.contains(&data.status.as_str()) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "unknown status \"{}\" — expected one of: {}",
+            data.status,
+            migration::BACKFILL_ORDER.join(", ")
+        )));
+    }
+
     // No stored status (ADR-0013): translate the legacy status the import UI
     // sends into lifecycle dates so the roll derives to the intended activity
     // state. Borrow only recorded dates (max shot date / provided dates) — never
