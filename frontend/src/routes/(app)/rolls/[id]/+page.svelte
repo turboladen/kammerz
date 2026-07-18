@@ -42,6 +42,7 @@
 	import { listLabs } from '$lib/api/labs';
 	import { lensDisplayName, buildLensOptions } from '$lib/utils/lens';
 	import { buildFrameCells } from '$lib/utils/frames';
+	import { buildShotUpdatePayload, shotFormsEqual, type ShotFormFields } from '$lib/utils/shot-form';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import {
@@ -130,6 +131,24 @@
 	let shotNotes = $state('');
 	let shotLensId = $state('');
 	let shotError = $state('');
+	// Snapshot of the form as loaded when the Edit dialog opened — navigation
+	// compares against it to decide whether it must save first (kammerz-11o3).
+	let shotOpenSnapshot: ShotFormFields | null = $state(null);
+	// Guards double-fired navigation while a nav-triggered save is in flight.
+	let shotNavSaving = $state(false);
+
+	function currentShotFormFields(): ShotFormFields {
+		return {
+			frameNumber: shotFrameNumber,
+			aperture: shotAperture,
+			shutterSpeed: shotShutterSpeed,
+			date: shotDate,
+			time: shotTime,
+			location: shotLocation,
+			notes: shotNotes,
+			lensId: shotLensId
+		};
+	}
 	const shotDateError = $derived(dateFieldError(shotDate));
 	// Time to send: canonical 24h `HH:MM` when valid (e.g. "1430" → "14:30"), null when
 	// blank/whitespace, else the trimmed raw so the backend 422 surfaces a mistyped time
@@ -475,6 +494,7 @@
 		shotNotes = '';
 		shotLensId = '';
 		shotError = '';
+		shotOpenSnapshot = null;
 	}
 
 	async function openAddShotDialog(frame?: string) {
@@ -534,14 +554,52 @@
 		const ids = shotLensMap[shot.id] ?? [];
 		shotLensId = ids.length > 0 ? String(ids[0]) : '';
 		shotError = '';
+		shotOpenSnapshot = currentShotFormFields();
 		showShotDialog = true;
 	}
 
+	// Navigate to an adjacent shot, saving the current one's edits first if the
+	// form is dirty (kammerz-11o3). The target is captured by POSITION before the
+	// save/reload (that's the shot the user saw next to the arrow), then re-looked
+	// up BY ID afterward — a frame-number edit can reorder orderedShots.
+	async function navigateToShot(direction: -1 | 1) {
+		if (shotNavSaving || editingShotId == null) return;
+		const target = orderedShots[currentShotIdx + direction];
+		if (!target) return;
+		const fields = currentShotFormFields();
+		if (shotOpenSnapshot == null || !shotFormsEqual(fields, shotOpenSnapshot)) {
+			shotError = '';
+			if (!fields.frameNumber.trim()) {
+				shotError = 'Frame number is required.';
+				return;
+			}
+			if (shotDateError) return; // arrows are disabled too — belt and suspenders
+			shotNavSaving = true;
+			try {
+				await updateShot(editingShotId, buildShotUpdatePayload(fields));
+				// loadRollData never throws — it catches internally and sets the page
+				// `error` state — so check it explicitly: navigating on a failed reload
+				// would seed the next shot from stale data (and, if the user came back,
+				// re-seed THIS shot's pre-save values). The save itself succeeded; stay
+				// put with the error banner visible.
+				await loadRollData('shot-add');
+				if (error) return;
+			} catch (err) {
+				shotError = err instanceof Error ? err.message : String(err);
+				return; // stay on this shot — the user can see and fix the failure
+			} finally {
+				shotNavSaving = false;
+			}
+		}
+		const fresh = orderedShots.find((s) => s.id === target.id);
+		if (fresh) openEditShotDialog(fresh);
+	}
+
 	function goPrevShot() {
-		if (hasPrevShot) openEditShotDialog(orderedShots[currentShotIdx - 1]);
+		if (hasPrevShot) void navigateToShot(-1);
 	}
 	function goNextShot() {
-		if (hasNextShot) openEditShotDialog(orderedShots[currentShotIdx + 1]);
+		if (hasNextShot) void navigateToShot(1);
 	}
 
 	function handleShotDialogKeydown(e: KeyboardEvent) {
@@ -567,16 +625,7 @@
 		const lensIds = shotLensId ? [Number(shotLensId)] : [];
 		try {
 			if (editingShotId) {
-				await updateShot(editingShotId, {
-					frame_number: shotFrameNumber.trim(),
-					aperture: normalizeAperture(shotAperture) || null,
-					shutter_speed: normalizeShutter(shotShutterSpeed) || null,
-					date: shotDate || null,
-					time: shotTimePayload,
-					location: shotLocation || null,
-					notes: shotNotes || null,
-					lens_ids: lensIds
-				});
+				await updateShot(editingShotId, buildShotUpdatePayload(currentShotFormFields()));
 			} else {
 				await createShot({
 					roll_id: id,
@@ -1291,7 +1340,7 @@
 				<div class="flex items-center justify-between">
 					<button
 						class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:bg-surface-overlay hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
-						disabled={!hasPrevShot}
+						disabled={!hasPrevShot || shotNavSaving || !!shotDateError}
 						onclick={goPrevShot}
 						aria-label="Previous shot"
 						title="Previous shot"
@@ -1303,7 +1352,7 @@
 					{/if}
 					<button
 						class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:bg-surface-overlay hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
-						disabled={!hasNextShot}
+						disabled={!hasNextShot || shotNavSaving || !!shotDateError}
 						onclick={goNextShot}
 						aria-label="Next shot"
 						title="Next shot"
