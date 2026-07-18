@@ -49,45 +49,22 @@ async fn detail_includes_events_array() {
 }
 
 #[tokio::test]
-async fn manual_status_change_logs_event() {
-    let app = open_app().await;
-    let id = create_roll(&app, "EVT-2", "loaded").await;
-
-    let res = app
-        .clone()
-        .oneshot(put_json(
-            &format!("/api/rolls/{id}"),
-            &json!({ "status": "shooting" }),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::NO_CONTENT);
-
-    let events = events_for(&app, id).await;
-    let sc = events
-        .iter()
-        .find(|e| e["event_type"] == "status_changed")
-        .expect("expected a status_changed event");
-    assert_eq!(sc["from_status"], "loaded");
-    assert_eq!(sc["to_status"], "shooting");
-}
-
-#[tokio::test]
 async fn events_are_newest_first() {
     let app = open_app().await;
     let id = create_roll(&app, "EVT-3", "loaded").await;
+    // Log a shot so there are two events (roll_loaded, then shot_logged).
     app.clone()
-        .oneshot(put_json(
-            &format!("/api/rolls/{id}"),
-            &json!({ "status": "shooting" }),
+        .oneshot(post_json(
+            "/api/shots",
+            &json!({ "roll_id": id, "frame_number": "1" }),
         ))
         .await
         .unwrap();
     let events = events_for(&app, id).await;
     // Both events land in the same second, so this ordering relies on the
     // `id DESC` tiebreak in `list_for_roll` (occurred_at DESC, id DESC) — the
-    // later-inserted status_changed has the higher id and sorts first.
-    assert_eq!(events.first().unwrap()["event_type"], "status_changed");
+    // later-inserted shot_logged has the higher id and sorts first.
+    assert_eq!(events.first().unwrap()["event_type"], "shot_logged");
     assert_eq!(events.last().unwrap()["event_type"], "roll_loaded");
 }
 
@@ -109,7 +86,7 @@ async fn first_shot(app: &axum::Router, roll_id: i32, frame: &str) -> i32 {
 }
 
 #[tokio::test]
-async fn logging_a_shot_logs_shot_and_autosync_events() {
+async fn logging_a_shot_logs_shot_event() {
     let app = open_app().await;
     let id = create_roll(&app, "EVT-4", "loaded").await;
     let shot_id = first_shot(&app, id, "1").await;
@@ -122,12 +99,11 @@ async fn logging_a_shot_logs_shot_and_autosync_events() {
     assert_eq!(shot_ev["ref_kind"], "shot");
     assert_eq!(shot_ev["ref_id"], shot_id);
 
-    // First shot auto-advances loaded → shooting, which must also be logged.
+    // No status_changed event: the shooting activity now derives from shot
+    // presence (ADR-0013) rather than a stored-status transition.
     assert!(
-        events.iter().any(|e| e["event_type"] == "status_changed"
-            && e["from_status"] == "loaded"
-            && e["to_status"] == "shooting"),
-        "expected auto-sync status_changed loaded→shooting, got: {events:?}"
+        !events.iter().any(|e| e["event_type"] == "status_changed"),
+        "activity model emits no status_changed events, got: {events:?}"
     );
 }
 
@@ -191,10 +167,9 @@ async fn editing_a_shot_logs_event() {
 }
 
 #[tokio::test]
-async fn deleting_last_shot_logs_delete_and_reverts_status() {
+async fn deleting_last_shot_logs_delete_event() {
     let app = open_app().await;
     let id = create_roll(&app, "EVT-7", "loaded").await;
-    // First shot auto-advances loaded → shooting.
     let shot_id = first_shot(&app, id, "1").await;
 
     let res = app
@@ -209,13 +184,11 @@ async fn deleting_last_shot_logs_delete_and_reverts_status() {
         events.iter().any(|e| e["event_type"] == "shot_deleted"),
         "expected a shot_deleted event, got: {events:?}"
     );
-    // Removing the last shot auto-reverts shooting → loaded; that backward move
-    // must be logged too.
+    // No status_changed event: removing the shot simply re-derives the roll's
+    // status (ADR-0013), it does not emit a stored-status transition.
     assert!(
-        events.iter().any(|e| e["event_type"] == "status_changed"
-            && e["from_status"] == "shooting"
-            && e["to_status"] == "loaded"),
-        "expected auto-revert status_changed shooting→loaded, got: {events:?}"
+        !events.iter().any(|e| e["event_type"] == "status_changed"),
+        "activity model emits no status_changed events, got: {events:?}"
     );
 }
 

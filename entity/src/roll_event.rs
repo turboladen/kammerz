@@ -1,10 +1,8 @@
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::roll::RollStatus;
-
 /// What kind of thing happened to a roll. Total enum — adding a variant forces
-/// every match to be updated (mirrors RollStatus).
+/// every match to be updated.
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
 #[sea_orm(rs_type = "String", db_type = "Text")]
 pub enum RollEventType {
@@ -72,8 +70,10 @@ pub struct Model {
     pub id: i32,
     pub roll_id: i32,
     pub event_type: RollEventType,
-    pub from_status: Option<RollStatus>,
-    pub to_status: Option<RollStatus>,
+    // Plain strings: the `status` enum was retired (ADR-0013), but historical
+    // `status_changed` rows keep their legacy status text for the activity journal.
+    pub from_status: Option<String>,
+    pub to_status: Option<String>,
     pub ref_kind: Option<RefKind>,
     pub ref_id: Option<i32>,
     pub summary: String,

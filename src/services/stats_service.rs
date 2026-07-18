@@ -1,7 +1,26 @@
+use std::collections::HashMap;
+
 use sea_orm::*;
 use serde::Serialize;
 
+use crate::activity::{ActivitySignals, legacy_status};
+
 pub struct StatsService;
+
+/// Per-roll activity-derivation signals for the `rolls_by_status` distribution.
+#[derive(Debug, FromQueryResult)]
+struct StatusSignalRow {
+    date_finished: Option<String>,
+    date_scanned: Option<String>,
+    date_post_processed: Option<String>,
+    date_archived: Option<String>,
+    archive_na: bool,
+    shot_count: i64,
+    lab_dev_id: Option<i32>,
+    lab_completion: Option<String>,
+    self_dev_id: Option<i32>,
+    self_completion: Option<String>,
+}
 
 #[derive(Debug, Serialize, FromQueryResult)]
 pub struct CountRow {
@@ -198,16 +217,54 @@ impl StatsService {
         .await?;
 
         // --- Rolls by status ---
-        let rolls_by_status = RankedItem::find_by_statement(Statement::from_string(
+        // There is no stored status (ADR-0013): derive each roll's compat status
+        // from its activity signals and tally in Rust, preserving the endpoint's
+        // shape (RankedItem, ordered by count desc).
+        let status_rows = StatusSignalRow::find_by_statement(Statement::from_string(
             backend,
-            "SELECT status AS label, COUNT(*) AS count \
-             FROM rolls \
-             GROUP BY status \
-             ORDER BY count DESC"
+            "SELECT r.date_finished, r.date_scanned, r.date_post_processed, \
+                    r.date_archived, r.archive_na, \
+                    (SELECT COUNT(*) FROM shots s WHERE s.roll_id = r.id) AS shot_count, \
+                    dl.id AS lab_dev_id, dl.date_received AS lab_completion, \
+                    ds.id AS self_dev_id, ds.date_processed AS self_completion \
+             FROM rolls r \
+             LEFT JOIN development_labs dl ON dl.roll_id = r.id \
+             LEFT JOIN development_selves ds ON ds.roll_id = r.id"
                 .to_owned(),
         ))
         .all(db)
         .await?;
+
+        let mut status_counts: HashMap<String, i64> = HashMap::new();
+        for row in status_rows {
+            let is_lab_dev = row.lab_dev_id.is_some();
+            let sig = ActivitySignals {
+                shot_count: row.shot_count,
+                date_loaded: None,
+                date_finished: row.date_finished,
+                has_dev: is_lab_dev || row.self_dev_id.is_some(),
+                is_lab_dev,
+                dev_started: None,
+                dev_completion: if is_lab_dev {
+                    row.lab_completion
+                } else {
+                    row.self_completion
+                },
+                scan_started: None,
+                date_scanned: row.date_scanned,
+                post_processing_started: None,
+                date_post_processed: row.date_post_processed,
+                date_archived: row.date_archived,
+                archive_na: row.archive_na,
+            };
+            *status_counts.entry(legacy_status(&sig)).or_insert(0) += 1;
+        }
+        let mut rolls_by_status: Vec<RankedItem> = status_counts
+            .into_iter()
+            .map(|(label, count)| RankedItem { label, count })
+            .collect();
+        // Count desc, then label asc for a deterministic order.
+        rolls_by_status.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.label.cmp(&b.label)));
 
         // --- Rolls by lens mount ---
         let rolls_by_mount = RankedItem::find_by_statement(Statement::from_string(

@@ -66,13 +66,14 @@ async fn malformed_json_body_is_400_envelope() {
 #[tokio::test]
 async fn invalid_enum_value_is_422_envelope() {
     let app = open_app().await;
-    // Well-formed JSON, but `status` is not a valid RollStatus variant. axum
-    // classifies a deserialize (data) error as 422.
+    // Well-formed JSON, but `push_pull` is not a valid PushPull variant. axum
+    // classifies a deserialize (data) error as 422. (`status` was retired with the
+    // enum — ADR-0013 — so push_pull is now the roll's constrained-enum field.)
     let res = app
         .oneshot(post_raw(
             "/api/rolls",
             Some("application/json"),
-            r#"{"roll_id":"A1","status":"bogus"}"#,
+            r#"{"roll_id":"A1","push_pull":"bogus"}"#,
         ))
         .await
         .unwrap();
@@ -81,8 +82,8 @@ async fn invalid_enum_value_is_422_envelope() {
     // The message should name the offending field so enum drift (Rust vs TS) is
     // diagnosable from the client.
     assert!(
-        message.contains("status"),
-        "expected the field name `status` in message, got: {message}"
+        message.contains("push_pull"),
+        "expected the field name `push_pull` in message, got: {message}"
     );
 }
 

@@ -3,41 +3,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
 #[sea_orm(rs_type = "String", db_type = "Text")]
-pub enum RollStatus {
-    #[sea_orm(string_value = "loaded")]
-    #[serde(rename = "loaded")]
-    Loaded,
-    #[sea_orm(string_value = "shooting")]
-    #[serde(rename = "shooting")]
-    Shooting,
-    #[sea_orm(string_value = "shot")]
-    #[serde(rename = "shot")]
-    Shot,
-    #[sea_orm(string_value = "at-lab")]
-    #[serde(rename = "at-lab")]
-    AtLab,
-    #[sea_orm(string_value = "lab-done")]
-    #[serde(rename = "lab-done")]
-    LabDone,
-    #[sea_orm(string_value = "developing")]
-    #[serde(rename = "developing")]
-    Developing,
-    #[sea_orm(string_value = "developed")]
-    #[serde(rename = "developed")]
-    Developed,
-    #[sea_orm(string_value = "scanned")]
-    #[serde(rename = "scanned")]
-    Scanned,
-    #[sea_orm(string_value = "post-processed")]
-    #[serde(rename = "post-processed")]
-    PostProcessed,
-    #[sea_orm(string_value = "archived")]
-    #[serde(rename = "archived")]
-    Archived,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
-#[sea_orm(rs_type = "String", db_type = "Text")]
 pub enum PushPull {
     #[sea_orm(string_value = "-2")]
     #[serde(rename = "-2")]
@@ -65,13 +30,19 @@ pub struct Model {
     pub camera_id: Option<i32>,
     pub film_stock_id: Option<i32>,
     pub lens_id: Option<i32>,
-    pub status: RollStatus,
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
     pub date_finished: Option<String>,
+    // Activity-lifecycle columns (ADR-0013): the state of each activity derives
+    // from date presence — see `kammerz::activity`. `status` was dropped (m..030).
+    pub scan_started: Option<String>,
     pub date_scanned: Option<String>,
+    pub post_processing_started: Option<String>,
     pub date_post_processed: Option<String>,
     pub date_archived: Option<String>,
+    pub archive_location: Option<String>,
+    pub archive_na: bool,
+    pub archive_na_reason: Option<String>,
     pub push_pull: Option<PushPull>,
     pub notes: Option<String>,
     pub created_at: String,

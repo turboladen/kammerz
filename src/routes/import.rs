@@ -18,7 +18,8 @@ use crate::services::settings_service::SettingsService;
 use crate::validate::{
     require_nonempty, validate_date_opt, validate_non_negative_i32, validate_time,
 };
-use entity::roll::{self, PushPull, RollStatus};
+use entity::roll::{self, PushPull};
+use migration::backfilled_dates;
 
 const DEFAULT_MODEL: &str = "claude-sonnet-4-5-20250929";
 
@@ -30,7 +31,11 @@ pub struct ImportRollDto {
     pub camera_id: Option<i32>,
     pub film_stock_id: Option<i32>,
     pub lens_id: Option<i32>,
-    pub status: RollStatus,
+    /// Legacy lifecycle status the import UI still sends. There is no stored
+    /// status (ADR-0013); it is consumed only to backfill lifecycle dates so the
+    /// imported roll derives to the intended activity state (kammerz-gsj6 tracks
+    /// the dev-stage-status import gap).
+    pub status: String,
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
     pub date_finished: Option<String>,
@@ -154,6 +159,40 @@ async fn import_parsed_roll(
         }
     }
 
+    // No stored status (ADR-0013): translate the legacy status the import UI
+    // sends into lifecycle dates so the roll derives to the intended activity
+    // state. Borrow only recorded dates (max shot date / provided dates) — never
+    // fabricated (kammerz-gsj6: a dev-stage status with no dev record degrades).
+    let max_shot_date = data
+        .shots
+        .iter()
+        .filter_map(|s| s.date.as_deref().map(str::trim).filter(|d| !d.is_empty()))
+        .max()
+        .map(str::to_string);
+    let date_loaded_in = data
+        .date_loaded
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let date_finished_in = data
+        .date_finished
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let filled = backfilled_dates(
+        &data.status,
+        date_loaded_in,
+        date_finished_in,
+        max_shot_date.as_deref(),
+        None,
+        None,
+        None,
+        None,
+    );
+    let date_finished_final = date_finished_in
+        .map(str::to_string)
+        .or(filled.date_finished);
+
     let now = now_string();
 
     let roll_model = roll::ActiveModel {
@@ -161,10 +200,11 @@ async fn import_parsed_roll(
         camera_id: Set(data.camera_id),
         film_stock_id: Set(data.film_stock_id),
         lens_id: Set(data.lens_id),
-        status: Set(data.status),
         frame_count: Set(data.frame_count),
         date_loaded: trim_opt(data.date_loaded),
-        date_finished: trim_opt(data.date_finished),
+        date_finished: Set(date_finished_final),
+        date_scanned: Set(filled.date_scanned),
+        date_archived: Set(filled.date_archived),
         push_pull: Set(data.push_pull),
         notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
