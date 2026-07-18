@@ -174,6 +174,56 @@ test('roll detail shows status control, frame strip, quick-add, and activity (ka
 });
 
 /**
+ * Regression guard for kammerz-11o3: edits made in the Edit Shot dialog must
+ * survive < > navigation to an adjacent shot (auto-save-on-navigate). The old
+ * behavior re-seeded the shared form fields from the target shot, silently
+ * discarding unsaved edits.
+ */
+test('edit-shot dialog auto-saves edits when navigating between shots (kammerz-11o3)', async ({ page }) => {
+	const created = await page.request.post(`${BASE}/api/rolls`, {
+		data: { roll_id: `E2E-NAV-${Date.now()}`, status: 'loaded', frame_count: 36 }
+	});
+	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
+	const rollId: number = await created.json();
+
+	const shotIds: number[] = [];
+	for (const frame of ['1', '2']) {
+		const res = await page.request.post(`${BASE}/api/shots`, {
+			data: { roll_id: rollId, frame_number: frame, lens_ids: [] }
+		});
+		expect(res.ok(), `create shot ${frame} failed: ${res.status()}`).toBeTruthy();
+		shotIds.push(await res.json());
+	}
+
+	await page.goto(`${BASE}/rolls/${rollId}`);
+	await page.waitForLoadState('networkidle');
+
+	// Open the Edit Shot dialog on frame 1 via the FrameStrip. Scope every
+	// in-dialog locator through role=dialog — the QuickAddBar behind it also
+	// has a <textarea> and a "Save & Next" button.
+	await page.getByRole('button', { name: /^Frame 1[ ,].*click to edit/ }).click();
+	const dialog = page.getByRole('dialog');
+	await expect(dialog.getByText('Shot 1 of 2')).toBeVisible();
+
+	// Edit shot 1's notes, then navigate — this must auto-save shot 1.
+	await dialog.locator('textarea').fill('note one');
+	await dialog.getByRole('button', { name: 'Next shot' }).click();
+	await expect(dialog.getByText('Shot 2 of 2')).toBeVisible();
+
+	// Edit shot 2's notes and save normally.
+	await dialog.locator('textarea').fill('note two');
+	await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+
+	// Both edits persisted server-side.
+	const shot1 = await (await page.request.get(`${BASE}/api/shots/${shotIds[0]}`)).json();
+	const shot2 = await (await page.request.get(`${BASE}/api/shots/${shotIds[1]}`)).json();
+	expect(shot1.notes, 'shot 1 edit must survive < > navigation').toBe('note one');
+	expect(shot2.notes).toBe('note two');
+
+	await page.request.delete(`${BASE}/api/rolls/${rollId}`);
+});
+
+/**
  * Regression guard for kammerz-b21: an uncaught route error must render the
  * themed root +error.svelte (status + headline + a way back), not SvelteKit's
  * bare unstyled "Internal Error" fallback. An unmatched route is the simplest
