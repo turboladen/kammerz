@@ -1,6 +1,6 @@
 # ADR-0007: Data-driven roll status — auto-sync from milestone dates + dev records
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0013](0013-activity-based-roll-lifecycle.md)
 - **Date:** 2026-06-03
 - **Related:** `.claude/rules/domain-conventions.md` ("Data-driven status sync"),
   `src/services/roll_service.rs` (`auto_sync_status`, `advance_status_along`,

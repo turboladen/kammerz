@@ -47,17 +47,18 @@ it's an ADR.
 
 ## Index
 
-| ADR                                                       | Status                                               | Decision                                                              |
-| --------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------- |
-| [0001](0001-record-architecture-decisions.md)             | Accepted                                             | Adopt ADRs for architecture/decision records                          |
-| [0002](0002-axum-sveltekit-spa-architecture.md)           | Accepted                                             | axum + embedded SvelteKit SPA, single self-hosted binary              |
-| [0003](0003-fuzzy-date-field.md)                          | Superseded by [ADR-0004](0004-remove-fuzzy-dates.md) | Free-text `date_fuzzy` field for imprecise dates                      |
-| [0004](0004-remove-fuzzy-dates.md)                        | Accepted                                             | Remove `date_fuzzy`; concrete best-guess date + notes annotation      |
-| [0005](0005-24-hour-time.md)                              | Accepted                                             | Standardize all time display/entry on 24-hour format                  |
-| [0006](0006-accessible-contrast-colorblind-safe-theme.md) | Accepted                                             | Accessible-contrast + colorblind-safe theme tokens                    |
-| [0007](0007-data-driven-roll-status-sync.md)              | Accepted                                             | Data-driven roll status: auto-sync from milestone dates + dev records |
-| [0008](0008-roll-detail-two-pane-activity-log.md)         | Accepted                                             | Roll detail: chevron status control + append-only activity log        |
-| [0009](0009-negatives-pickup-derived-state.md)            | Accepted                                             | Negatives-pickup as derived state, parallel to the status machine     |
-| [0010](0010-custom-24h-time-input.md)                     | Accepted                                             | Custom 24-hour time input (drop native `<input type="time">`)         |
-| [0011](0011-full-dates-only.md)                           | Accepted                                             | Dates are always full `YYYY-MM-DD` (drop partial-date entry)          |
-| [0012](0012-chemistry-reference-self-learning.md)         | Accepted                                             | Canonical chemistry reference table + self-learning autocomplete      |
+| ADR                                                       | Status                                                          | Decision                                                              |
+| --------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------- |
+| [0001](0001-record-architecture-decisions.md)             | Accepted                                                        | Adopt ADRs for architecture/decision records                          |
+| [0002](0002-axum-sveltekit-spa-architecture.md)           | Accepted                                                        | axum + embedded SvelteKit SPA, single self-hosted binary              |
+| [0003](0003-fuzzy-date-field.md)                          | Superseded by [ADR-0004](0004-remove-fuzzy-dates.md)            | Free-text `date_fuzzy` field for imprecise dates                      |
+| [0004](0004-remove-fuzzy-dates.md)                        | Accepted                                                        | Remove `date_fuzzy`; concrete best-guess date + notes annotation      |
+| [0005](0005-24-hour-time.md)                              | Accepted                                                        | Standardize all time display/entry on 24-hour format                  |
+| [0006](0006-accessible-contrast-colorblind-safe-theme.md) | Accepted                                                        | Accessible-contrast + colorblind-safe theme tokens                    |
+| [0007](0007-data-driven-roll-status-sync.md)              | Superseded by [ADR-0013](0013-activity-based-roll-lifecycle.md) | Data-driven roll status: auto-sync from milestone dates + dev records |
+| [0008](0008-roll-detail-two-pane-activity-log.md)         | Accepted                                                        | Roll detail: chevron status control + append-only activity log        |
+| [0009](0009-negatives-pickup-derived-state.md)            | Accepted                                                        | Negatives-pickup as derived state, parallel to the status machine     |
+| [0010](0010-custom-24h-time-input.md)                     | Accepted                                                        | Custom 24-hour time input (drop native `<input type="time">`)         |
+| [0011](0011-full-dates-only.md)                           | Accepted                                                        | Dates are always full `YYYY-MM-DD` (drop partial-date entry)          |
+| [0012](0012-chemistry-reference-self-learning.md)         | Accepted                                                        | Canonical chemistry reference table + self-learning autocomplete      |
+| [0013](0013-activity-based-roll-lifecycle.md)             | Accepted                                                        | Activity-based roll lifecycle: derived states replace the status enum |

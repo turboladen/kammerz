@@ -33,21 +33,21 @@ linear-front/checklist-tail model.)
 No new tables. Activities map onto existing columns plus a few new ones on
 `rolls`:
 
-| Activity        | Start                       | Completion                     | Extra fields                                                    |
-| --------------- | --------------------------- | ------------------------------ | --------------------------------------------------------------- |
-| Shooting        | `date_loaded` (exists)      | `date_finished` (exists)       | —                                                               |
-| Development     | existing lab/self dev records and their date fields | same           | lab-vs-self is a property of the activity, not separate statuses |
-| Scanning        | `scan_started` (new)        | `date_scanned` (exists)        | —                                                               |
-| Post-processing | `post_processing_started` (new) | `date_post_processed` (exists) | —                                                           |
-| Archiving       | — (a moment, not a duration) | `date_archived` (exists)      | `archive_location` (new, text), `archive_na` (new, bool), `archive_na_reason` (new, text) |
+| Activity        | Start                                               | Completion                     | Extra fields                                                                              |
+| --------------- | --------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------- |
+| Shooting        | `date_loaded` (exists)                              | `date_finished` (exists)       | —                                                                                         |
+| Development     | existing lab/self dev records and their date fields | same                           | lab-vs-self is a property of the activity, not separate statuses                          |
+| Scanning        | `scan_started` (new)                                | `date_scanned` (exists)        | —                                                                                         |
+| Post-processing | `post_processing_started` (new)                     | `date_post_processed` (exists) | —                                                                                         |
+| Archiving       | — (a moment, not a duration)                        | `date_archived` (exists)       | `archive_location` (new, text), `archive_na` (new, bool), `archive_na_reason` (new, text) |
 
 **Derived state rules (no stored state):**
 
-- Duration activities: start set + no completion → *in progress*; completion set
-  → *done*; neither → *not started*.
-- Archiving: `date_archived` set → *done*; `archive_na` → *N/A*; else *not
-  done*. N/A and done are mutually exclusive (setting one clears the other).
-- **Implicit completion:** an activity also counts as *done* when a
+- Duration activities: start set + no completion → _in progress_; completion set
+  → _done_; neither → _not started_.
+- Archiving: `date_archived` set → _done_; `archive_na` → _N/A_; else _not
+  done_. N/A and done are mutually exclusive (setting one clears the other).
+- **Implicit completion:** an activity also counts as _done_ when a
   strictly-later activity has any date. Chain: shooting → development →
   each of {scanning, post-processing, archiving}. Post-processing having
   started does **not** imply scanning is done (they overlap); none of the tail
@@ -65,7 +65,7 @@ Backend computes per roll (returned on list + detail responses; the frontend
 never re-derives):
 
 - **Per-activity state** (as above) with dates.
-- **Badge labels:** *all* in-progress activities, rendered compound
+- **Badge labels:** _all_ in-progress activities, rendered compound
   ("Scanning · Post-processing"). When nothing is in progress, a waiting label
   derived from the earliest unresolved activity: "To develop", "To scan",
   "To edit", "To archive". Terminal: "Done".
@@ -82,7 +82,7 @@ Existing behaviors preserved in new terms: dev auto-prompt (starting
 Development opens the lab/self dev form; the record's dates drive the activity
 state exactly as `date_received`/`date_processed` do today), roll-full nudge
 (completes Shooting), backward moves = clearing a date behind a ConfirmDialog.
-The "undecided path" concept disappears — Development is simply *not started*
+The "undecided path" concept disappears — Development is simply _not started_
 until a record exists.
 
 ## Migration & backfill
@@ -92,12 +92,12 @@ where derivation would otherwise regress visible progress, borrowing only
 recorded dates (never fabricated), guarded and idempotent, using the
 `pub const` + apply-fn test seam (kammerz-9fx pattern):
 
-| Old status ≥ | If null, backfill |
-| ------------- | ----------------- |
-| shot | `date_finished` := max(shot dates) ?? `date_loaded` |
-| scanned | `date_scanned` := `date_post_processed` ?? dev completion date |
+| Old status ≥   | If null, backfill                                                                                                                 |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| shot           | `date_finished` := max(shot dates) ?? `date_loaded`                                                                               |
+| scanned        | `date_scanned` := `date_post_processed` ?? dev completion date                                                                    |
 | post-processed | (date_post_processed is prompted on transition; no action if genuinely absent — roll shows "To edit", user corrects on the board) |
-| archived | `date_archived` := `date_post_processed` ?? `date_scanned` ?? dev completion |
+| archived       | `date_archived` := `date_post_processed` ?? `date_scanned` ?? dev completion                                                      |
 
 At-lab/lab-done/developing/developed need no backfill — dev records already
 carry those dates, and implicit completion covers shooting.
@@ -132,12 +132,12 @@ sections:
 
 ## Phasing
 
-| # | Bead | Depends on |
-| - | ---- | ---------- |
-| ① | kammerz-11o3 — Edit Shot auto-save-on-navigate fix | — |
-| ② | Backend: columns migration + backfill + derivation + API contract | — |
-| ③ | Roll page: activity board + adaptive phase layout | ② |
-| ④ | Shots table + view-first dialog | ②, ① |
+| # | Bead                                                              | Depends on |
+| - | ----------------------------------------------------------------- | ---------- |
+| ① | kammerz-11o3 — Edit Shot auto-save-on-navigate fix                | —          |
+| ② | Backend: columns migration + backfill + derivation + API contract | —          |
+| ③ | Roll page: activity board + adaptive phase layout                 | ②          |
+| ④ | Shots table + view-first dialog                                   | ②, ①       |
 
 ## Out of scope
 
