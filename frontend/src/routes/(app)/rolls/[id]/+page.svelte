@@ -577,7 +577,13 @@
 			shotNavSaving = true;
 			try {
 				await updateShot(editingShotId, buildShotUpdatePayload(fields));
+				// loadRollData never throws — it catches internally and sets the page
+				// `error` state — so check it explicitly: navigating on a failed reload
+				// would seed the next shot from stale data (and, if the user came back,
+				// re-seed THIS shot's pre-save values). The save itself succeeded; stay
+				// put with the error banner visible.
 				await loadRollData('shot-add');
+				if (error) return;
 			} catch (err) {
 				shotError = err instanceof Error ? err.message : String(err);
 				return; // stay on this shot — the user can see and fix the failure

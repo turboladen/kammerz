@@ -210,9 +210,13 @@ test('edit-shot dialog auto-saves edits when navigating between shots (kammerz-1
 	await dialog.getByRole('button', { name: 'Next shot' }).click();
 	await expect(dialog.getByText('Shot 2 of 2')).toBeVisible();
 
-	// Edit shot 2's notes and save normally.
+	// Edit shot 2's notes and save normally. The dialog closes only AFTER the
+	// PUT resolves (handleSaveShot awaits updateShot before flipping
+	// showShotDialog), so waiting for it to disappear removes the race between
+	// the async save and the API assertions below.
 	await dialog.locator('textarea').fill('note two');
 	await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+	await expect(dialog).toBeHidden();
 
 	// Both edits persisted server-side.
 	const shot1 = await (await page.request.get(`${BASE}/api/shots/${shotIds[0]}`)).json();
