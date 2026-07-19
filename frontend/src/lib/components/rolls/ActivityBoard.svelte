@@ -154,12 +154,20 @@
 							{@render datedSlot(a.kind, 'start', a.start)}
 							{@render datedSlot(a.kind, 'completion', a.completion)}
 						{:else if a.kind === 'development'}
-							<!-- Branch on RECORD presence, not derived state: implicit completion
-							     (any tail date) marks development done with NO record, and hiding
-							     the Lab/Self choice there forecloses recording a lab dev without
-							     destroying the tail date (kammerz-73to). -->
-							{#if a.state === 'not_started' || !hasDevRecord}
-								<span class="text-[10px] font-medium uppercase tracking-wider text-text-faint">Start</span>
+							<!-- Branch on RECORD presence alone: implicit completion (any tail
+							     date) marks development done with NO record, and hiding the
+							     Lab/Self choice there forecloses recording a lab dev without
+							     destroying the tail date (kammerz-73to). not_started implies
+							     no record (both mirror the backend's has_dev), so no state
+							     check is needed — and record-presence reacts instantly to the
+							     dev dialog's bindable writes, where derived state lags a
+							     reload. The caption says "Record" when the dev already
+							     happened (state is past not_started) so the row never reads
+							     "Done" next to a "Start" affordance. -->
+							{#if !hasDevRecord}
+								<span class="text-[10px] font-medium uppercase tracking-wider text-text-faint">
+									{a.state === 'not_started' ? 'Start' : 'Record'}
+								</span>
 								<Button size="sm" variant="secondary" onclick={() => onchoosepath('lab')}>Lab</Button>
 								<Button size="sm" variant="secondary" onclick={() => onchoosepath('self')}>Self</Button>
 							{:else}
