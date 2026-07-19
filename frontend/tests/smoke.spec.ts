@@ -139,15 +139,16 @@ test('roll detail page loads without an infinite fetch loop (kammerz-8k5)', asyn
 });
 
 /**
- * Smoke test for kammerz-3hq: the two-pane roll detail redesign. The old Timeline
- * section (kammerz-fxl) is replaced by an activity journal; the chevron status
- * control, QuickAddBar, FrameStrip, and RollActivity components replace the former
- * stacked Status + Timeline + Shots sections. Assert the new UI structure is present
- * and the founding "Roll loaded" activity entry appears.
+ * Smoke test for the activity board (kammerz-64ga, replacing the kammerz-3hq chevron
+ * assertions). The chevron status control + Lifecycle-dates section are gone; the
+ * roll page now derives five activities (ADR-0013) and renders them as the activity
+ * board. In the shooting phase the board is collapsed by default — expanding it
+ * reveals the per-activity rows. QuickAddBar + the founding "Roll loaded" journal
+ * entry survive.
  */
-test('roll detail shows status control, frame strip, quick-add, and activity (kammerz-3hq)', async ({ page }) => {
+test('roll detail shows the activity board, quick-add, and activity journal (kammerz-64ga)', async ({ page }) => {
 	const created = await page.request.post(`${BASE}/api/rolls`, {
-		data: { roll_id: `E2E-P2-${Date.now()}`, status: 'loaded', frame_count: 36 }
+		data: { roll_id: `E2E-P3-${Date.now()}`, status: 'loaded', frame_count: 36 }
 	});
 	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
 	const id: number = await created.json();
@@ -155,20 +156,61 @@ test('roll detail shows status control, frame strip, quick-add, and activity (ka
 	await page.goto(`${BASE}/rolls/${id}`);
 	await page.waitForLoadState('networkidle');
 
-	// RollStatusControl renders an h2 with text "Status" (ledger-line header).
-	await expect(page.getByRole('heading', { name: 'Status' })).toBeVisible();
+	// The board renders a ledger-line "Activity" header. A fresh loaded roll is in
+	// the shooting phase, so the board starts collapsed — showing the derived badge
+	// ("Loaded") and a "Show details" affordance.
+	await expect(page.getByRole('heading', { name: 'Activity', exact: true })).toBeVisible();
+	await expect(page.getByText('Show details')).toBeVisible();
 
-	// At least one chevron button is present. For a `loaded` roll the current rung
-	// aria-label is "Current status: Loaded"; other rungs say "Move to …".
-	await expect(page.getByRole('button', { name: /Current status:|Move to/i }).first()).toBeVisible();
+	// Expanding surfaces the per-activity rows. Assert labels unique to the board
+	// (Development also names the DevelopmentSection heading below, so skip it here).
+	await page.getByText('Show details').click();
+	await expect(page.getByText('Shooting', { exact: true })).toBeVisible();
+	await expect(page.getByText('Scanning', { exact: true })).toBeVisible();
+	await expect(page.getByText('Post-processing', { exact: true })).toBeVisible();
+	await expect(page.getByText('Archiving', { exact: true })).toBeVisible();
 
 	// Activity journal shows the founding "Roll loaded" entry (RollActivity.svelte
 	// renders it as a <span class="text-xs text-text-muted">Roll loaded</span>).
 	await expect(page.getByText('Roll loaded')).toBeVisible();
 
-	// QuickAddBar is present: it renders a "Frame" label above the frame number
-	// display and a "Save & Next" primary button.
+	// QuickAddBar is present in the shooting phase: a "Save & Next" primary button.
 	await expect(page.getByRole('button', { name: /Save & Next/i })).toBeVisible();
+
+	await page.request.delete(`${BASE}/api/rolls/${id}`);
+});
+
+/**
+ * Board interaction (kammerz-64ga): completing an activity by setting its date from
+ * the board must persist to the roll and advance the derived lifecycle. Set the
+ * Shooting "Finished" date via the board's date editor, then assert the write landed
+ * (date_finished) and the board reflects it.
+ */
+test('activity board sets a lifecycle date and it persists (kammerz-64ga)', async ({ page }) => {
+	const created = await page.request.post(`${BASE}/api/rolls`, {
+		data: { roll_id: `E2E-P3B-${Date.now()}`, status: 'loaded', frame_count: 36 }
+	});
+	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
+	const id: number = await created.json();
+
+	await page.goto(`${BASE}/rolls/${id}`);
+	await page.waitForLoadState('networkidle');
+
+	// Expand the board (collapsed by default in the shooting phase), then open the
+	// Shooting "Finished" date editor and save (DateConfirm seeds today).
+	await page.getByText('Show details').click();
+	await page.getByRole('button', { name: 'Set Finished date' }).click();
+	const dialog = page.getByRole('dialog');
+	await expect(dialog).toBeVisible();
+	await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+	await expect(dialog).toBeHidden();
+	await page.waitForLoadState('networkidle');
+
+	// The date persisted server-side (date_finished is now set).
+	const roll = await (await page.request.get(`${BASE}/api/rolls/${id}`)).json();
+	expect(roll.date_finished, 'Shooting completion date must persist').toBeTruthy();
+	// And the roll advanced past shooting — the derived badge is no longer "Loaded".
+	expect(roll.badge).not.toBe('Loaded');
 
 	await page.request.delete(`${BASE}/api/rolls/${id}`);
 });
