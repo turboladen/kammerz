@@ -133,7 +133,7 @@
 			type="button"
 			onclick={onToggleExpanded}
 			aria-expanded={expanded}
-			class="flex w-full items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-2.5 text-left transition-colors hover:border-accent/40"
+			class="flex w-full items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-2.5 text-left transition-all duration-150 hover:border-accent/40 hover:-translate-y-px"
 		>
 			<span class="text-sm text-text-muted">{badge}</span>
 			<span class="text-xs text-text-faint">Show details</span>
