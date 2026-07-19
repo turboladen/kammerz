@@ -623,14 +623,20 @@
 		const current = (roll[field] ?? null) as string | null;
 		// Title names the exact slot ("Set Shooting finished date") — the kind alone
 		// is ambiguous between an activity's two slots, and nothing else in the
-		// dialog says which column is being written. slotDateLabel is the same phrase
-		// source as the board's accessible names, so they can't drift.
-		const label = isDatedKind(kind) ? slotDateLabel(kind, slot) : `${activityLabel(kind)} date`;
+		// dialog says which column is being written. boardSlotLabel is the same
+		// phrase source as the board's accessible names, so they can't drift.
 		dateEdit = {
 			field,
 			current,
-			title: `${current ? 'Edit' : 'Set'} ${label}`
+			title: `${current ? 'Edit' : 'Set'} ${boardSlotLabel(kind, slot)}`
 		};
+	}
+
+	// One label producer for BOTH dialog flows (edit title, clear confirm) and the
+	// clear path's focus-restore selector — the dated-kind phrase comes from
+	// slotDateLabel, the non-dated fallback lives only here.
+	function boardSlotLabel(kind: ActivityKind, slot: DateSlot): string {
+		return isDatedKind(kind) ? slotDateLabel(kind, slot) : `${activityLabel(kind)} date`;
 	}
 
 	async function confirmDateEdit(date: string | null) {
@@ -650,13 +656,18 @@
 		if (!field) return;
 		// Slot-qualified for the same reason as the edit title: "Clear the Shooting
 		// date?" can't tell the Loaded × from the adjacent Finished ×.
-		pendingClear = { field, label: isDatedKind(kind) ? slotDateLabel(kind, slot) : `${activityLabel(kind)} date` };
+		pendingClear = { field, label: boardSlotLabel(kind, slot) };
 	}
 
 	async function confirmClearDate() {
 		const p = pendingClear;
 		pendingClear = null;
 		if (!p) return;
+		// Pin the board open BEFORE the write: the × is only reachable on an
+		// expanded board, but a clear that reverts the roll to the shooting phase
+		// (e.g. un-finishing shooting) would flip the collapse default and remove
+		// the very Set button the focus hand-off below targets.
+		boardExpandedOverride = true;
 		await patchRoll({ [p.field]: null } as Partial<RollInsert>);
 		// The × that opened the confirm no longer exists (its date is gone), so the
 		// dialog's focus restore lands on <body>. Hand focus to the slot's Set
@@ -833,7 +844,6 @@
 			dateEdit = null;
 			pendingClear = null;
 			pendingArchiveClear = null;
-			devNotice = '';
 			loading = true;
 			Promise.all([loadRefData(), loadRollData()]).finally(() => {
 				loading = false;
@@ -976,6 +986,7 @@
 				<div class="mb-6">
 					<ActivityBoard
 						{activities}
+						hasDevRecord={!!labDev || !!selfDev}
 						badge={roll?.badge ?? ''}
 						expanded={boardExpanded}
 						archiveLocation={roll?.archive_location ?? null}

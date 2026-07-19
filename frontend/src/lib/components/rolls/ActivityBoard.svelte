@@ -20,6 +20,9 @@
 
 	interface Props {
 		activities: RollActivityItem[];
+		/** Whether a lab/self dev record exists — drives the Development row's
+		 * Start-vs-Edit affordance independently of the derived state. */
+		hasDevRecord: boolean;
 		/** Compound badge string for the collapsed summary. */
 		badge: string;
 		expanded: boolean;
@@ -40,6 +43,7 @@
 
 	let {
 		activities,
+		hasDevRecord,
 		badge,
 		expanded,
 		archiveLocation,
@@ -150,7 +154,11 @@
 							{@render datedSlot(a.kind, 'start', a.start)}
 							{@render datedSlot(a.kind, 'completion', a.completion)}
 						{:else if a.kind === 'development'}
-							{#if a.state === 'not_started'}
+							<!-- Branch on RECORD presence, not derived state: implicit completion
+							     (any tail date) marks development done with NO record, and hiding
+							     the Lab/Self choice there forecloses recording a lab dev without
+							     destroying the tail date (kammerz-73to). -->
+							{#if a.state === 'not_started' || !hasDevRecord}
 								<span class="text-[10px] font-medium uppercase tracking-wider text-text-faint">Start</span>
 								<Button size="sm" variant="secondary" onclick={() => onchoosepath('lab')}>Lab</Button>
 								<Button size="sm" variant="secondary" onclick={() => onchoosepath('self')}>Self</Button>
