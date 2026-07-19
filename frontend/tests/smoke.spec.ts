@@ -115,27 +115,29 @@ test('roll detail page loads without an infinite fetch loop (kammerz-8k5)', asyn
 	});
 	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
 	const id: number = await created.json();
+	// try/finally so a failing assertion can't leak the roll into the shared DB.
+	try {
+		let detailCount = 0;
+		const consoleErrors: string[] = [];
+		page.on('request', (req) => {
+			if (req.url().includes(`/api/rolls/${id}/detail`)) detailCount++;
+		});
+		page.on('console', (msg) => {
+			if (msg.type() === 'error') consoleErrors.push(msg.text());
+		});
 
-	let detailCount = 0;
-	const consoleErrors: string[] = [];
-	page.on('request', (req) => {
-		if (req.url().includes(`/api/rolls/${id}/detail`)) detailCount++;
-	});
-	page.on('console', (msg) => {
-		if (msg.type() === 'error') consoleErrors.push(msg.text());
-	});
+		await page.goto(`${BASE}/rolls/${id}`);
+		await expect(page.locator('h1').first()).toContainText(`E2E-LOOP-`);
+		await page.waitForLoadState('networkidle');
+		// A loop keeps firing past networkidle — give it a fixed window to manifest.
+		await page.waitForTimeout(1500);
 
-	await page.goto(`${BASE}/rolls/${id}`);
-	await expect(page.locator('h1').first()).toContainText(`E2E-LOOP-`);
-	await page.waitForLoadState('networkidle');
-	// A loop keeps firing past networkidle — give it a fixed window to manifest.
-	await page.waitForTimeout(1500);
-
-	expect(detailCount, 'roll /detail should be fetched a bounded number of times, not looped').toBeLessThanOrEqual(2);
-	expect(consoleErrors, 'console errors on roll detail').toEqual([]);
-
-	// Tidy up the throwaway roll so it can't perturb other assertions.
-	await page.request.delete(`${BASE}/api/rolls/${id}`);
+		expect(detailCount, 'roll /detail should be fetched a bounded number of times, not looped').toBeLessThanOrEqual(2);
+		expect(consoleErrors, 'console errors on roll detail').toEqual([]);
+	} finally {
+		// Tidy up the throwaway roll so it can't perturb other assertions.
+		await page.request.delete(`${BASE}/api/rolls/${id}`);
+	}
 });
 
 /**
@@ -161,11 +163,11 @@ test('roll detail shows the activity board, quick-add, and activity journal (kam
 		// the shooting phase, so the board starts collapsed — showing the derived badge
 		// ("Loaded") and a "Show details" affordance.
 		await expect(page.getByRole('heading', { name: 'Activity', exact: true })).toBeVisible();
-		await expect(page.getByText('Show details')).toBeVisible();
+		await expect(page.getByRole('button', { name: /Show details/ })).toBeVisible();
 
 		// Expanding surfaces the per-activity rows. Assert labels unique to the board
 		// (Development also names the DevelopmentSection heading below, so skip it here).
-		await page.getByText('Show details').click();
+		await page.getByRole('button', { name: /Show details/ }).click();
 		await expect(page.getByText('Shooting', { exact: true })).toBeVisible();
 		await expect(page.getByText('Scanning', { exact: true })).toBeVisible();
 		await expect(page.getByText('Post-processing', { exact: true })).toBeVisible();
@@ -203,7 +205,7 @@ test('activity board sets a lifecycle date and it persists (kammerz-64ga)', asyn
 		// Shooting "Finished" date editor and save (DateConfirm seeds today). The
 		// accessible name carries the activity ("Set Shooting finished date") because
 		// caption-only names collide across activities sharing a caption.
-		await page.getByText('Show details').click();
+		await page.getByRole('button', { name: /Show details/ }).click();
 		await page.getByRole('button', { name: 'Set Shooting finished date' }).click();
 		const dialog = page.getByRole('dialog');
 		await expect(dialog).toBeVisible();
@@ -233,46 +235,48 @@ test('edit-shot dialog auto-saves edits when navigating between shots (kammerz-1
 	});
 	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
 	const rollId: number = await created.json();
+	// try/finally so a failing assertion can't leak the roll (and its shots).
+	try {
+		const shotIds: number[] = [];
+		for (const frame of ['1', '2']) {
+			const res = await page.request.post(`${BASE}/api/shots`, {
+				data: { roll_id: rollId, frame_number: frame, lens_ids: [] }
+			});
+			expect(res.ok(), `create shot ${frame} failed: ${res.status()}`).toBeTruthy();
+			shotIds.push(await res.json());
+		}
 
-	const shotIds: number[] = [];
-	for (const frame of ['1', '2']) {
-		const res = await page.request.post(`${BASE}/api/shots`, {
-			data: { roll_id: rollId, frame_number: frame, lens_ids: [] }
-		});
-		expect(res.ok(), `create shot ${frame} failed: ${res.status()}`).toBeTruthy();
-		shotIds.push(await res.json());
+		await page.goto(`${BASE}/rolls/${rollId}`);
+		await page.waitForLoadState('networkidle');
+
+		// Open the Edit Shot dialog on frame 1 via the FrameStrip. Scope every
+		// in-dialog locator through role=dialog — the QuickAddBar behind it also
+		// has a <textarea> and a "Save & Next" button.
+		await page.getByRole('button', { name: /^Frame 1[ ,].*click to edit/ }).click();
+		const dialog = page.getByRole('dialog');
+		await expect(dialog.getByText('Shot 1 of 2')).toBeVisible();
+
+		// Edit shot 1's notes, then navigate — this must auto-save shot 1.
+		await dialog.locator('textarea').fill('note one');
+		await dialog.getByRole('button', { name: 'Next shot' }).click();
+		await expect(dialog.getByText('Shot 2 of 2')).toBeVisible();
+
+		// Edit shot 2's notes and save normally. The dialog closes only AFTER the
+		// PUT resolves (handleSaveShot awaits updateShot before flipping
+		// showShotDialog), so waiting for it to disappear removes the race between
+		// the async save and the API assertions below.
+		await dialog.locator('textarea').fill('note two');
+		await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+		await expect(dialog).toBeHidden();
+
+		// Both edits persisted server-side.
+		const shot1 = await (await page.request.get(`${BASE}/api/shots/${shotIds[0]}`)).json();
+		const shot2 = await (await page.request.get(`${BASE}/api/shots/${shotIds[1]}`)).json();
+		expect(shot1.notes, 'shot 1 edit must survive < > navigation').toBe('note one');
+		expect(shot2.notes).toBe('note two');
+	} finally {
+		await page.request.delete(`${BASE}/api/rolls/${rollId}`);
 	}
-
-	await page.goto(`${BASE}/rolls/${rollId}`);
-	await page.waitForLoadState('networkidle');
-
-	// Open the Edit Shot dialog on frame 1 via the FrameStrip. Scope every
-	// in-dialog locator through role=dialog — the QuickAddBar behind it also
-	// has a <textarea> and a "Save & Next" button.
-	await page.getByRole('button', { name: /^Frame 1[ ,].*click to edit/ }).click();
-	const dialog = page.getByRole('dialog');
-	await expect(dialog.getByText('Shot 1 of 2')).toBeVisible();
-
-	// Edit shot 1's notes, then navigate — this must auto-save shot 1.
-	await dialog.locator('textarea').fill('note one');
-	await dialog.getByRole('button', { name: 'Next shot' }).click();
-	await expect(dialog.getByText('Shot 2 of 2')).toBeVisible();
-
-	// Edit shot 2's notes and save normally. The dialog closes only AFTER the
-	// PUT resolves (handleSaveShot awaits updateShot before flipping
-	// showShotDialog), so waiting for it to disappear removes the race between
-	// the async save and the API assertions below.
-	await dialog.locator('textarea').fill('note two');
-	await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-	await expect(dialog).toBeHidden();
-
-	// Both edits persisted server-side.
-	const shot1 = await (await page.request.get(`${BASE}/api/shots/${shotIds[0]}`)).json();
-	const shot2 = await (await page.request.get(`${BASE}/api/shots/${shotIds[1]}`)).json();
-	expect(shot1.notes, 'shot 1 edit must survive < > navigation').toBe('note one');
-	expect(shot2.notes).toBe('note two');
-
-	await page.request.delete(`${BASE}/api/rolls/${rollId}`);
 });
 
 /**

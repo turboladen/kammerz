@@ -85,14 +85,17 @@
 	<Dialog open={true} title="Archiving" onclose={close}>
 		<div class="space-y-4">
 			<div class="flex flex-col gap-2">
+				<!-- Shared `name` gives the group native radiogroup semantics (single tab
+				     stop, arrow-key roving, "1 of 3" announcements) — bind:group alone
+				     only enforces exclusivity in JS. -->
 				<label class="flex items-center gap-2 text-sm text-text">
-					<input type="radio" value="archived" bind:group={choice} class="accent-accent" /> Archived
+					<input type="radio" name="archive-choice" value="archived" bind:group={choice} class="accent-accent" /> Archived
 				</label>
 				<label class="flex items-center gap-2 text-sm text-text">
-					<input type="radio" value="na" bind:group={choice} class="accent-accent" /> Not applicable
+					<input type="radio" name="archive-choice" value="na" bind:group={choice} class="accent-accent" /> Not applicable
 				</label>
 				<label class="flex items-center gap-2 text-sm text-text">
-					<input type="radio" value="not_yet" bind:group={choice} class="accent-accent" /> Not yet
+					<input type="radio" name="archive-choice" value="not_yet" bind:group={choice} class="accent-accent" /> Not yet
 				</label>
 			</div>
 

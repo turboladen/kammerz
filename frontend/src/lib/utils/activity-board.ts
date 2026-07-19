@@ -88,10 +88,23 @@ export function isDatedKind(kind: ActivityKind): kind is DatedActivityKind {
 }
 
 /**
+ * The one human phrase naming a dated slot — "Shooting finished date",
+ * "Scanning started date". Single source for the board's accessible names, the
+ * DateConfirm titles, and the clear-confirmation labels, so the name a control
+ * announces and the name its dialogs display can never drift apart.
+ */
+export function slotDateLabel(kind: DatedActivityKind, slot: DateSlot): string {
+	return `${activityLabel(kind)} ${SLOT_CAPTIONS[kind][slot].toLowerCase()} date`;
+}
+
+/**
  * Which roll column each activity's start/completion date writes to. Development is
  * intentionally absent — its dates live on the lab/self dev record and are edited
  * through the development dialog, never the board. Archiving is a moment, so it has
- * only a completion column and no start.
+ * only a completion column and no start — and its entry is DECLARATIVE only (it
+ * completes the map + its test): at runtime archiving edits go through the
+ * ArchiveDialog's compound payload (date + location + N/A + reason), never through
+ * onEditDate/onClearDate, which only the dated kinds reach.
  */
 export const ROLL_DATE_FIELD: Partial<Record<ActivityKind, Partial<Record<DateSlot, RollDateField>>>> = {
 	shooting: { start: 'date_loaded', completion: 'date_finished' },

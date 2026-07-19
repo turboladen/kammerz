@@ -7,7 +7,15 @@
 	// inside FadeIn.
 	import { Pencil, X, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import { activityLabel, isDatedKind, SLOT_CAPTIONS, stateLabel, type DateSlot } from '$lib/utils/activity-board';
+	import {
+		activityLabel,
+		isDatedKind,
+		SLOT_CAPTIONS,
+		slotDateLabel,
+		stateLabel,
+		type DatedActivityKind,
+		type DateSlot
+	} from '$lib/utils/activity-board';
 	import type { ActivityKind, ActivityState, RollActivityItem } from '$lib/types';
 
 	interface Props {
@@ -58,8 +66,9 @@
 	}
 </script>
 
-{#snippet dateControl(kind: ActivityKind, slot: DateSlot, date: string | null, label: string)}
-	<!-- Accessible names carry the activity too ("Set Scanning started date"):
+{#snippet dateControl(kind: DatedActivityKind, slot: DateSlot, date: string | null)}
+	<!-- Accessible names use slotDateLabel ("Set Scanning started date") — the same
+	     phrase source as the page's DateConfirm titles and clear-confirm labels:
 	     scanning and post-processing share the 'Started' caption, so caption-only
 	     names would collide for screen readers and role-based test locators. -->
 	<div class="flex items-center gap-1">
@@ -67,7 +76,7 @@
 			type="button"
 			onclick={() => oneditdate(kind, slot)}
 			class="group flex items-center gap-1.5 rounded px-1 py-0.5 transition-colors hover:bg-surface-overlay"
-			aria-label={`${date ? 'Edit' : 'Set'} ${activityLabel(kind)} ${label.toLowerCase()} date`}
+			aria-label={`${date ? 'Edit' : 'Set'} ${slotDateLabel(kind, slot)}`}
 		>
 			<span class="font-mono text-xs {date ? 'text-text' : 'text-text-faint'}">{date ?? 'Set date'}</span>
 			<Pencil
@@ -81,7 +90,7 @@
 				type="button"
 				onclick={() => oncleardate(kind, slot)}
 				class="rounded p-0.5 text-text-faint transition-colors hover:bg-red-500/15 hover:text-red-400"
-				aria-label={`Clear ${activityLabel(kind)} ${label.toLowerCase()} date`}
+				aria-label={`Clear ${slotDateLabel(kind, slot)}`}
 			>
 				<X size={12} strokeWidth={2} aria-hidden="true" />
 			</button>
@@ -89,10 +98,10 @@
 	</div>
 {/snippet}
 
-{#snippet datedSlot(kind: ActivityKind, slot: DateSlot, date: string | null, caption: string)}
+{#snippet datedSlot(kind: DatedActivityKind, slot: DateSlot, date: string | null)}
 	<div class="flex items-center gap-1.5">
-		<span class="text-[10px] font-medium uppercase tracking-wider text-text-faint">{caption}</span>
-		{@render dateControl(kind, slot, date, caption)}
+		<span class="text-[10px] font-medium uppercase tracking-wider text-text-faint">{SLOT_CAPTIONS[kind][slot]}</span>
+		{@render dateControl(kind, slot, date)}
 	</div>
 {/snippet}
 
@@ -138,20 +147,22 @@
 					</span>
 					<div class="flex flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-1">
 						{#if isDatedKind(a.kind)}
-							{@render datedSlot(a.kind, 'start', a.start, SLOT_CAPTIONS[a.kind].start)}
-							{@render datedSlot(a.kind, 'completion', a.completion, SLOT_CAPTIONS[a.kind].completion)}
+							{@render datedSlot(a.kind, 'start', a.start)}
+							{@render datedSlot(a.kind, 'completion', a.completion)}
 						{:else if a.kind === 'development'}
 							{#if a.state === 'not_started'}
 								<span class="text-[10px] font-medium uppercase tracking-wider text-text-faint">Start</span>
 								<Button size="sm" variant="secondary" onclick={() => onchoosepath('lab')}>Lab</Button>
 								<Button size="sm" variant="secondary" onclick={() => onchoosepath('self')}>Self</Button>
 							{:else}
-								<div class="flex items-center gap-1.5">
-									<span class="text-[10px] font-medium uppercase tracking-wider text-text-faint">Completed</span>
-									<span class="font-mono text-xs {a.completion ? 'text-text' : 'text-text-faint'}">
-										{a.completion ?? '—'}
-									</span>
-								</div>
+								<!-- Only a done dev has a completion date; an in-progress row must not
+								     caption its empty slot "Completed" while stating "In progress". -->
+								{#if a.completion}
+									<div class="flex items-center gap-1.5">
+										<span class="text-[10px] font-medium uppercase tracking-wider text-text-faint">Completed</span>
+										<span class="font-mono text-xs text-text">{a.completion}</span>
+									</div>
+								{/if}
 								<Button size="sm" variant="ghost" onclick={onopendev}>Edit</Button>
 							{/if}
 						{:else if a.kind === 'archiving'}

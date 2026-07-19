@@ -6,6 +6,7 @@ import {
 	ROLL_DATE_FIELD,
 	SLOT_CAPTIONS,
 	isDatedKind,
+	slotDateLabel,
 	lastShotSummary
 } from './activity-board';
 import type { Lens, Shot } from '$lib/types';
@@ -158,5 +159,16 @@ describe('SLOT_CAPTIONS / isDatedKind', () => {
 		for (const kind of ['shooting', 'scanning', 'post_processing'] as const) {
 			expect(Object.keys(SLOT_CAPTIONS[kind]).sort()).toEqual(Object.keys(ROLL_DATE_FIELD[kind] ?? {}).sort());
 		}
+	});
+});
+
+describe('slotDateLabel', () => {
+	it('names the exact slot, disambiguating shared captions', () => {
+		expect(slotDateLabel('shooting', 'start')).toBe('Shooting loaded date');
+		expect(slotDateLabel('shooting', 'completion')).toBe('Shooting finished date');
+		expect(slotDateLabel('scanning', 'start')).toBe('Scanning started date');
+		expect(slotDateLabel('post_processing', 'start')).toBe('Post-processing started date');
+		// The two 'Started' captions must yield distinct full phrases.
+		expect(slotDateLabel('scanning', 'start')).not.toBe(slotDateLabel('post_processing', 'start'));
 	});
 });

@@ -565,7 +565,8 @@
 		</div>
 	{:else}
 		<p class="text-sm text-text-faint">
-			No development info yet — use Start development on the activity board above to record lab or self development.
+			No development info yet — use Start development on the activity board above (expand it with Show details if it's
+			collapsed) to record lab or self development.
 		</p>
 	{/if}
 </div>

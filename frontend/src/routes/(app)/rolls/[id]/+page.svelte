@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import PageHeader from '$lib/components/layout/PageHeader.svelte';
@@ -49,7 +49,7 @@
 		activityLabel,
 		isDatedKind,
 		ROLL_DATE_FIELD,
-		SLOT_CAPTIONS,
+		slotDateLabel,
 		type DateSlot,
 		type RollDateField,
 		type ArchivePayload
@@ -623,12 +623,13 @@
 		const current = (roll[field] ?? null) as string | null;
 		// Title names the exact slot ("Set Shooting finished date") — the kind alone
 		// is ambiguous between an activity's two slots, and nothing else in the
-		// dialog says which column is being written.
-		const caption = isDatedKind(kind) ? SLOT_CAPTIONS[kind][slot].toLowerCase() + ' ' : '';
+		// dialog says which column is being written. slotDateLabel is the same phrase
+		// source as the board's accessible names, so they can't drift.
+		const label = isDatedKind(kind) ? slotDateLabel(kind, slot) : `${activityLabel(kind)} date`;
 		dateEdit = {
 			field,
 			current,
-			title: `${current ? 'Edit' : 'Set'} ${activityLabel(kind)} ${caption}date`
+			title: `${current ? 'Edit' : 'Set'} ${label}`
 		};
 	}
 
@@ -647,7 +648,9 @@
 	function onClearDate(kind: ActivityKind, slot: DateSlot) {
 		const field = ROLL_DATE_FIELD[kind]?.[slot];
 		if (!field) return;
-		pendingClear = { field, label: `${activityLabel(kind)} date` };
+		// Slot-qualified for the same reason as the edit title: "Clear the Shooting
+		// date?" can't tell the Loaded × from the adjacent Finished ×.
+		pendingClear = { field, label: isDatedKind(kind) ? slotDateLabel(kind, slot) : `${activityLabel(kind)} date` };
 	}
 
 	async function confirmClearDate() {
@@ -655,6 +658,11 @@
 		pendingClear = null;
 		if (!p) return;
 		await patchRoll({ [p.field]: null } as Partial<RollInsert>);
+		// The × that opened the confirm no longer exists (its date is gone), so the
+		// dialog's focus restore lands on <body>. Hand focus to the slot's Set
+		// button — the control that replaced it. No-ops if the label isn't found.
+		await tick();
+		document.querySelector<HTMLButtonElement>(`[aria-label="Set ${p.label}"]`)?.focus();
 	}
 
 	// Open the dev dialog via the auto-prompt bridge. Single entry point so every
@@ -818,6 +826,14 @@
 			// phase) on every roll change so a manual override doesn't leak across rolls.
 			quickAddOverride = null;
 			boardExpandedOverride = null;
+			// Close any board dialog state left from the previous roll: ArchiveDialog's
+			// seed runs only on the open transition (untracked), so a dialog surviving
+			// a roll change would hold — and then save — the PRIOR roll's draft.
+			showArchiveDialog = false;
+			dateEdit = null;
+			pendingClear = null;
+			pendingArchiveClear = null;
+			devNotice = '';
 			loading = true;
 			Promise.all([loadRefData(), loadRollData()]).finally(() => {
 				loading = false;
@@ -1278,6 +1294,7 @@
 		title={dateEdit.title}
 		value={dateEdit.current ?? todayLocal()}
 		confirmLabel="Save"
+		hint="Pick the date this happened — you can change or clear it later from the activity board."
 		onconfirm={confirmDateEdit}
 		oncancel={() => {
 			dateEdit = null;
@@ -1300,26 +1317,33 @@
 	/>
 {/if}
 
-<!-- Archiving editor -->
-<ArchiveDialog
-	open={showArchiveDialog}
-	dateArchived={roll?.date_archived ?? null}
-	location={roll?.archive_location ?? null}
-	na={roll?.archive_na ?? false}
-	reason={roll?.archive_na_reason ?? null}
-	onsave={handleArchiveSave}
-	onclose={() => {
-		showArchiveDialog = false;
-	}}
-/>
+<!-- Archiving editor — {#if}-gated like every other dialog on this page, so the
+     instance (and its seed effect) exists only while open. -->
+{#if showArchiveDialog}
+	<ArchiveDialog
+		open={true}
+		dateArchived={roll?.date_archived ?? null}
+		location={roll?.archive_location ?? null}
+		na={roll?.archive_na ?? false}
+		reason={roll?.archive_na_reason ?? null}
+		onsave={handleArchiveSave}
+		onclose={() => {
+			showArchiveDialog = false;
+		}}
+	/>
+{/if}
 
-<!-- Confirm clearing a set archive date (backward move) -->
+<!-- Confirm clearing a set archive date (backward move). The copy must say when
+     N/A (+ reason) is what's being applied — 'Remove the archived date?' alone
+     would misrepresent an archived→N/A switch as a pure deletion. -->
 {#if pendingArchiveClear}
 	<ConfirmDialog
 		open={true}
-		title="Remove archived date"
-		message="Remove the archived date? This may move the roll back."
-		confirmLabel="Remove"
+		title={pendingArchiveClear.archive_na ? 'Replace archived date with N/A' : 'Remove archived date'}
+		message={pendingArchiveClear.archive_na
+			? 'Remove the archived date and mark archiving as not applicable? This may move the roll back.'
+			: 'Remove the archived date? This may move the roll back.'}
+		confirmLabel={pendingArchiveClear.archive_na ? 'Apply' : 'Remove'}
 		variant="primary"
 		onconfirm={() => {
 			const p = pendingArchiveClear!;
