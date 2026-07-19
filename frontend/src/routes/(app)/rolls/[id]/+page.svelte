@@ -23,17 +23,14 @@
 	import DateConfirm from '$lib/components/ui/DateConfirm.svelte';
 	import DevelopmentSection from '$lib/components/rolls/DevelopmentSection.svelte';
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
-	import InlineNotice from '$lib/components/ui/InlineNotice.svelte';
-	import RollStatusControl from '$lib/components/rolls/RollStatusControl.svelte';
+	import ActivityBoard from '$lib/components/rolls/ActivityBoard.svelte';
+	import ArchiveDialog from '$lib/components/rolls/ArchiveDialog.svelte';
 	import FrameStrip from '$lib/components/rolls/FrameStrip.svelte';
 	import QuickAddBar from '$lib/components/rolls/QuickAddBar.svelte';
 	import RollActivity from '$lib/components/rolls/RollActivity.svelte';
-	import RollTimeline from '$lib/components/rolls/RollTimeline.svelte';
 	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
 	import FrameCounter from '$lib/components/ui/FrameCounter.svelte';
 	import { getRollDetail, updateRoll, deleteRoll } from '$lib/api/rolls';
-	import { updateLabDev, updateSelfDev } from '$lib/api/development';
-	import type { DateTarget, TimelineMilestone } from '$lib/utils/timeline';
 	import { logShot } from '$lib/utils/shot-entry';
 	import { listCameras } from '$lib/api/cameras';
 	import { listFilmStocks } from '$lib/api/film-stocks';
@@ -45,18 +42,17 @@
 	import { buildShotUpdatePayload, shotFormsEqual, type ShotFormFields } from '$lib/utils/shot-form';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
+	import type { DevAutoPrompt } from '$lib/utils/status';
 	import {
-		statusConfig,
-		getDevPath,
-		getFlowForPath,
-		getPathLabel,
-		devKindForStatus,
-		getStatusLabel,
-		labFlow,
-		selfFlow,
-		type DevAutoPrompt
-	} from '$lib/utils/status';
-	import { buildRollTimeline, readDateTarget, STATUS_DATE_TARGET } from '$lib/utils/timeline';
+		rollPhase,
+		lastShotSummary,
+		activityLabel,
+		ROLL_DATE_FIELD,
+		type RollPhase,
+		type DateSlot,
+		type RollDateField,
+		type ArchivePayload
+	} from '$lib/utils/activity-board';
 	import { todayLocal, dateFieldError } from '$lib/utils/date';
 	import { parseTime } from '$lib/utils/time';
 	import type {
@@ -70,10 +66,10 @@
 		DevelopmentLab,
 		DevelopmentSelf,
 		DevStage,
-		RollStatus,
 		PushPull,
 		LensMount,
-		RollEvent
+		RollEvent,
+		ActivityKind
 	} from '$lib/types';
 	import { Trash2, Printer, ChevronLeft, ChevronRight } from 'lucide-svelte';
 
@@ -97,7 +93,7 @@
 	let showDeleteConfirm = $state(false);
 	let error = $state('');
 
-	// Roll edit mode
+	// Roll edit mode (identity/config only — lifecycle dates now live on the board)
 	let editingRoll = $state(false);
 	let editRollId = $state('');
 	let editCameraId = $state('');
@@ -106,11 +102,6 @@
 	let editFrameCount = $state('');
 	let editPushPull = $state('');
 	let editNotes = $state('');
-	let editDateLoaded = $state('');
-	let editDateFinished = $state('');
-	let editDateScanned = $state('');
-	let editDatePostProcessed = $state('');
-	let editDateArchived = $state('');
 
 	// Shot state
 	let shots: Shot[] = $state([]);
@@ -154,15 +145,6 @@
 	// blank/whitespace, else the trimmed raw so the backend 422 surfaces a mistyped time
 	// instead of it being silently dropped. Trims so whitespace-only collapses to null.
 	const shotTimePayload = $derived(parseTime(shotTime) || shotTime.trim() || null);
-	const hasEditDateError = $derived(
-		!!(
-			dateFieldError(editDateLoaded) ||
-			dateFieldError(editDateFinished) ||
-			dateFieldError(editDateScanned) ||
-			dateFieldError(editDatePostProcessed) ||
-			dateFieldError(editDateArchived)
-		)
-	);
 
 	// Development state (shared with DevelopmentSection component)
 	let labs: Lab[] = $state([]);
@@ -170,47 +152,24 @@
 	let selfDev: DevelopmentSelf | null = $state(null);
 	let devStages: DevStage[] = $state([]);
 	let devAutoPrompt: DevAutoPrompt | null = $state(null);
-	// Inline notice under the chevron bar — set when a prompt-opened dev dialog is
-	// cancelled, so a dropped status click is acknowledged instead of silent.
-	let statusNotice = $state('');
-	// Transient notice for a status the BACKEND auto-changed as a side effect of a
-	// mutation (shot add/delete, dev create/update/delete, Timeline date edit). The
-	// backend's auto-sync repaints the chevron/Badge silently otherwise — this makes
-	// the invisible change legible. Suppressed for explicit chevron clicks / the
-	// roll-full nudge, where the user already drove (and saw) the move (kammerz-9xg).
-	let autoStatusNotice = $state('');
-	// Bumped on each auto-notice so InlineNotice restarts its dismiss timer even when
-	// two consecutive auto-changes produce the same text.
-	let autoStatusNoticeSeq = $state(0);
+	// Notice shown near the activity board when a prompt-opened dev dialog is
+	// cancelled — so a dropped "Start development" click is acknowledged, not silent.
+	let devNotice = $state('');
 
-	// Path-aware status flow
-	const devPath = $derived(roll ? getDevPath(roll.status as RollStatus, !!labDev, !!selfDev) : ('undecided' as const));
-	const statusFlow = $derived(getFlowForPath(devPath));
-	const pathLabel = $derived(getPathLabel(devPath));
+	// Activity journal events (populated from /detail after each load)
+	let events: RollEvent[] = $state([]);
 
-	// Path-aware lifecycle timeline: each reached milestone's date, editable inline
-	// via RollTimeline WITHOUT moving the status (kammerz-2u8). A not-yet-reached
-	// milestone is non-editable — its date is recorded by advancing the status, not
-	// back-filled here (kammerz-fxl).
-	const timeline = $derived(roll ? buildRollTimeline(roll, labDev, selfDev, devPath) : []);
+	// The server-derived activity view drives every lifecycle display. Never re-derive
+	// from dates (ADR-0013) — read the backend's activities/badge/group_key/done.
+	const activities = $derived(roll?.activities ?? []);
+	const phase = $derived<RollPhase>(roll ? rollPhase(roll) : 'shooting');
+	const shootingActivity = $derived(activities.find((a) => a.kind === 'shooting') ?? null);
 
-	// Helper: the current value of a status's target date (for the forward+empty check).
-	// STATUS_DATE_TARGET and the read dispatch live in timeline.ts so the status→date
-	// facts have a single source of truth (see kammerz-mfj).
-	function targetDate(t: DateTarget): string | null {
-		if (!roll) return null;
-		return readDateTarget(t, roll, labDev, selfDev);
-	}
-
-	// Status backward-move confirmation
-	let pendingStatus: RollStatus | null = $state(null);
-	const currentStatusIdx = $derived(roll ? statusFlow.indexOf(roll.status as RollStatus) : -1);
-
-	// Confirm-on-transition prompt state. The label is derived from the pending
-	// status so it can never drift out of sync.
-	let datePromptOpen = $state(false);
-	let datePromptStatus: RollStatus | null = $state(null);
-	const datePromptLabel = $derived.by(() => (datePromptStatus ? statusConfig[datePromptStatus].label : ''));
+	// Board expand/collapse: collapsed by default in the shooting phase (the tail
+	// activities are all not-started then), expanded otherwise. `null` follows the
+	// default; true/false is a user override, reset on roll navigation.
+	let boardExpandedOverride = $state<boolean | null>(null);
+	const boardExpanded = $derived(boardExpandedOverride ?? phase !== 'shooting');
 
 	// Frame progress
 	const frameProgress = $derived.by(() => {
@@ -227,13 +186,15 @@
 	let finishDate = $state(todayLocal());
 	let finishDateSeededFor: number | null = $state(null);
 	const finishDateError = $derived(dateFieldError(finishDate));
+	// Nudge appears only while shooting is genuinely in progress (no finish date, no
+	// dev record) and every frame is exposed — completing Shooting sets date_finished.
 	const showRollFullNudge = $derived(
-		roll?.status === 'shooting' && frameProgress !== null && shots.length >= frameProgress.total && !rollFullDismissed
+		phase === 'shooting' &&
+			shootingActivity?.state === 'in_progress' &&
+			frameProgress !== null &&
+			shots.length >= frameProgress.total &&
+			!rollFullDismissed
 	);
-
-	// Status auto-sync (advance on create, revert on delete) is handled by the
-	// backend commands transactionally. The frontend just calls loadRollData()
-	// after mutations (via DevelopmentSection's onchange) to pick up new status.
 
 	const cameraLabels = $derived(buildCameraLabels(cameras));
 	const cameraOptions = $derived([
@@ -315,10 +276,10 @@
 	const editFrameCountHint = $derived.by(() => {
 		const matchingFormat = editSelectedCamera ? cameraFormatToStockFormat[editSelectedCamera.format] : null;
 		if (matchingFormat === '120' && !editFrameCount) {
-			return '120 film: 6\u00d74.5=15 \u00b7 6\u00d76=12 \u00b7 6\u00d77=10 \u00b7 6\u00d78=9 \u00b7 6\u00d79=8';
+			return '120 film: 6×4.5=15 · 6×6=12 · 6×7=10 · 6×8=9 · 6×9=8';
 		}
 		if (['4x5', '5x7', '8x10'].includes(matchingFormat ?? '') && !editFrameCount) {
-			return 'Sheet film: total sheets loaded (e.g. 6 holders \u00d7 2 = 12)';
+			return 'Sheet film: total sheets loaded (e.g. 6 holders × 2 = 12)';
 		}
 		return undefined;
 	});
@@ -326,8 +287,8 @@
 	// Shot-level lens dropdown options (uses the saved camera, not the edit form camera)
 	const shotLensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens', lensMounts));
 
-	// Activity journal events (populated from /detail after each load)
-	let events: RollEvent[] = $state([]);
+	// "What settings did I just use?" reference card for the shooting phase.
+	const lastShot = $derived(lastShotSummary(shots, shotLensMap, allLenses));
 
 	// Frame cells: map shots onto numbered slots, extras appended after (shared util).
 	const frameCells = $derived(buildFrameCells(shots, roll?.frame_count ?? null));
@@ -343,10 +304,12 @@
 	let quickSaving = $state(false);
 	let quickError = $state('');
 
-	// QuickAddBar visibility: hidden by default on archived rolls, shown otherwise.
-	// null = follow the default; true/false = user override.
+	// QuickAddBar visibility: shown by default in the shooting phase, hidden in
+	// wrap-up/done (post-shooting, transcribing metadata). null = follow the default;
+	// true/false = user override. The Show/Hide entry toggle and FrameStrip open-slot
+	// clicks still cover the forgotten-shot case in any phase.
 	let quickAddOverride = $state<boolean | null>(null);
-	const quickAddVisible = $derived(quickAddOverride ?? roll?.status !== 'archived');
+	const quickAddVisible = $derived(quickAddOverride ?? phase === 'shooting');
 
 	// Default lens id for the QuickAddBar (mirrors the shot dialog's smart cascade,
 	// minus the last-used-on-roll part which is session state — use roll/camera default)
@@ -360,9 +323,7 @@
 	// Reference catalogs (cameras, film stocks, lenses, labs, lens mounts) are
 	// loaded by the page-load $effect — on mount and on roll-id navigation — but
 	// NOT by the mutation refresh path (loadRollData), since no mutation on this
-	// page can change them. That split is the whole point of this page's load:
-	// shot/roll/dev mutations re-pull only the roll's own /detail, not the
-	// rarely-changing reference lists.
+	// page can change them.
 	async function loadRefData() {
 		try {
 			const [cams, stocks, lenses, labsList, mounts] = await Promise.all([
@@ -382,75 +343,22 @@
 		}
 	}
 
-	// Context hint passed into loadRollData so the auto-change notice can describe
-	// the side effect WITHOUT guessing its cause — each mutation call site knows what
-	// it did. 'explicit' = a user-driven status move (chevron / nudge): suppress the
-	// notice even when the status changes. The rest name the mutation that ran so the
-	// message can be specific; an undiffed status (no change) shows nothing regardless.
-	type ReloadReason = 'navigate' | 'explicit' | 'shot-add' | 'shot-delete' | 'dev' | 'roll-edit' | 'timeline';
-
-	// Direction of an auto-change, judged WITHIN a single dev flow. The canonical full
-	// status order interleaves the lab and self branches (at-lab, lab-done, developing,
-	// developed), so a cross-flow move (e.g. recording a lab dev on a roll stranded at
-	// 'developing' snaps it to 'at-lab') would read as "backward" against that flat order
-	// even though it isn't a revert. So we only call it forward/back when BOTH statuses sit
-	// on the same flow; a cross-flow or off-flow pair returns null and the message stays
-	// neutral ("is now"), which is always true regardless of direction.
-	function changeDirection(prev: RollStatus, next: RollStatus): 'forward' | 'back' | null {
-		for (const flow of [labFlow, selfFlow]) {
-			const p = flow.indexOf(prev);
-			const n = flow.indexOf(next);
-			if (p !== -1 && n !== -1) return n > p ? 'forward' : 'back';
-		}
-		return null;
-	}
-
-	// Build the auto-change notice text. The verb states direction when it's
-	// unambiguous (same flow) and stays neutral otherwise. The optional trailing
-	// clause only names a cause the page can GUARANTEE from the mutation that ran and
-	// the resulting status — never something it would have to infer. In particular it
-	// makes no claim about WHY a dev/timeline reload moved the status, because a single
-	// 'dev' reload covers create, edit (a cleared date reverts without removing the
-	// record — kammerz-3wg/PR #66) and delete; asserting "record removed" or "date
-	// cleared" there would lie for the edit case.
-	function statusChangeMessage(prev: RollStatus, next: RollStatus, reason: ReloadReason): string {
-		const label = getStatusLabel(next);
-		const dir = changeDirection(prev, next);
-		const verb = dir === 'forward' ? 'advanced to' : dir === 'back' ? 'moved back to' : 'is now';
-		// Guaranteed causes only: a first shot is the sole thing that lands a roll at
-		// Shooting via shot-add, and emptying the shot list is the sole thing that
-		// reverts to Loaded via shot-delete. Everything else stays cause-free.
-		let cause = '.';
-		if (reason === 'shot-add' && next === 'shooting') cause = ' — the first shot was logged.';
-		else if (reason === 'shot-delete' && next === 'loaded') cause = ' — the roll has no shots left.';
-		return `Status ${verb} ${label}${cause}`;
-	}
-
-	async function loadRollData(reason: ReloadReason = 'navigate') {
-		// Clear any stale error: this component instance is reused across [id]
-		// changes (the $effect re-runs loadRollData()), so a prior failure must
-		// not leak into the next roll's view. The cancel notice is transient for
-		// the same reason — any successful mutation reload supersedes it.
+	async function loadRollData() {
+		// Clear any stale error/notice: this component instance is reused across [id]
+		// changes (the $effect re-runs loadRollData()), so a prior failure must not
+		// leak into the next roll's view.
 		error = '';
-		statusNotice = '';
-		// Navigation and explicit user-driven moves clear any stale auto-change notice
-		// (a prior roll's, or one superseded by an intentional chevron click); auto
-		// reloads keep it until they either set a new one or leave it as-is.
-		if (reason === 'navigate' || reason === 'explicit') autoStatusNotice = '';
-		// Snapshot the status BEFORE the fetch so an auto-change can be detected by
-		// comparing it to the freshly-loaded value below.
-		const prevStatus = roll?.status as RollStatus | undefined;
+		devNotice = '';
 		try {
-			// The composite /detail endpoint collapses the six roll-scoped
-			// round-trips (roll, shots, shot-lens pairs, lab/self dev, dev stages)
-			// into one. Reference catalogs are loaded separately in loadRefData().
+			// The composite /detail endpoint collapses the roll-scoped round-trips
+			// (roll, shots, shot-lens pairs, lab/self dev, dev stages, events) into one.
+			// Reference catalogs are loaded separately in loadRefData().
 			const detail = await getRollDetail(id);
 			roll = detail.roll;
 			// Reset per-roll nudge state ONCE per roll: reflect an already-set
-			// date_finished (e.g. entered via the Edit form) instead of misleadingly
-			// showing today, and clear a stale roll-full dismissal — but NOT on
-			// same-roll mutation reloads, which would clobber an in-progress finish-date
-			// edit or resurrect a banner the user just dismissed (kammerz-hf4).
+			// date_finished instead of misleadingly showing today, and clear a stale
+			// roll-full dismissal — but NOT on same-roll mutation reloads, which would
+			// clobber an in-progress finish-date edit or resurrect a dismissed banner.
 			if (roll.id !== finishDateSeededFor) {
 				finishDateSeededFor = roll.id;
 				finishDate = roll.date_finished ?? todayLocal();
@@ -468,17 +376,6 @@
 				(map[shotId] ??= []).push(lensId);
 			}
 			shotLensMap = map;
-
-			// Surface a backend auto-sync as the LAST step — after the roll data is
-			// applied — so a message-building hiccup (e.g. a status the frontend union
-			// doesn't yet know) can never strand the page on stale data. Suppressed for
-			// 'explicit'/'navigate' (user-driven moves and page loads, which carry no
-			// meaningful "prev" to diff against).
-			const newStatus = roll.status as RollStatus;
-			if (prevStatus && prevStatus !== newStatus && reason !== 'navigate' && reason !== 'explicit') {
-				autoStatusNotice = statusChangeMessage(prevStatus, newStatus, reason);
-				autoStatusNoticeSeq += 1;
-			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -503,8 +400,8 @@
 
 		// Smart date default: last shot's date > roll's date_loaded > empty
 		if (shots.length > 0) {
-			const lastShot = shots[shots.length - 1];
-			if (lastShot.date) shotDate = lastShot.date;
+			const lastShotEntry = shots[shots.length - 1];
+			if (lastShotEntry.date) shotDate = lastShotEntry.date;
 		} else if (roll?.date_loaded) {
 			shotDate = roll.date_loaded;
 		}
@@ -513,8 +410,8 @@
 		if (fixedLens) {
 			shotLensId = String(fixedLens.id);
 		} else if (shots.length > 0) {
-			const lastShot = shots[shots.length - 1];
-			const lastLensIds = shotLensMap[lastShot.id] ?? [];
+			const lastShotEntry = shots[shots.length - 1];
+			const lastLensIds = shotLensMap[lastShotEntry.id] ?? [];
 			if (lastLensIds.length > 0) {
 				shotLensId = String(lastLensIds[0]);
 			} else if (roll?.lens_id) {
@@ -579,10 +476,8 @@
 				await updateShot(editingShotId, buildShotUpdatePayload(fields));
 				// loadRollData never throws — it catches internally and sets the page
 				// `error` state — so check it explicitly: navigating on a failed reload
-				// would seed the next shot from stale data (and, if the user came back,
-				// re-seed THIS shot's pre-save values). The save itself succeeded; stay
-				// put with the error banner visible.
-				await loadRollData('shot-add');
+				// would seed the next shot from stale data.
+				await loadRollData();
 				if (error) return;
 			} catch (err) {
 				shotError = err instanceof Error ? err.message : String(err);
@@ -643,7 +538,7 @@
 			}
 			showShotDialog = false;
 			resetShotForm();
-			await loadRollData('shot-add');
+			await loadRollData();
 		} catch (err) {
 			shotError = err instanceof Error ? err.message : String(err);
 		}
@@ -671,7 +566,7 @@
 				notes: shotNotes || null,
 				lens_ids: lensIds
 			});
-			await loadRollData('shot-add');
+			await loadRollData();
 			// Reset per-shot fields but keep session defaults (date, time, location, lens)
 			try {
 				shotFrameNumber = await suggestNextFrame(id);
@@ -697,167 +592,112 @@
 		error = '';
 		try {
 			await deleteShot(shotId);
-			await loadRollData('shot-delete');
+			await loadRollData();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
 	}
 
-	// Commit a status change. When `date` is provided (from the prompt or the
-	// roll-full nudge) and the move is a forward advance, also write it to the
-	// status's target record. Backward moves never write a date.
-	async function updateStatus(status: RollStatus, date?: string) {
-		error = '';
-		statusNotice = '';
-		try {
-			const patch: Partial<RollInsert> = { status };
-			const target = STATUS_DATE_TARGET[status];
-			const targetIdx = statusFlow.indexOf(status);
-			const advancing = currentStatusIdx === -1 || targetIdx > currentStatusIdx;
+	// --- Activity board handlers ---
 
-			// Roll-owned dates go in the same PATCH as the status. Use Object.assign
-			// with a computed key (not `patch[target.field] = date`) — a union-keyed
-			// index assignment trips TS2322 ("not assignable to never").
-			if (advancing && date && target?.kind === 'roll') {
-				Object.assign(patch, { [target.field]: date });
-			}
-			await updateRoll(id, patch);
+	// Editing (set/change) a roll-owned lifecycle date via DateConfirm.
+	let dateEdit = $state<{ field: RollDateField; current: string | null; title: string } | null>(null);
 
-			// Dev-owned dates (lab/self) are a follow-up write to the dev record —
-			// non-atomic with the status PATCH above. The status is already committed,
-			// so surface a failed date write via `error` but STILL refresh below —
-			// otherwise the UI would keep showing the old status. The date can then be
-			// re-entered from the Timeline. (Roll-owned dates were co-batched above.)
-			try {
-				if (advancing && date && target && target.kind !== 'roll') {
-					await writeDateTarget(target, date);
-				}
-			} catch (err) {
-				error = err instanceof Error ? err.message : String(err);
-			}
-
-			await loadRollData('explicit');
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
-		}
-	}
-
-	// Write a milestone date (or null to clear) to whichever record owns it. Shared
-	// by the inline Timeline editor and the confirm-on-transition flow so the
-	// roll/lab/self dispatch lives in one place. A lab/self target whose dev record
-	// doesn't exist is a no-op (the date lives on that record).
-	async function writeDateTarget(t: DateTarget, date: string | null): Promise<void> {
-		if (t.kind === 'roll') {
-			await updateRoll(id, { [t.field]: date });
-		} else if (t.kind === 'lab' && labDev) {
-			await updateLabDev(labDev.id, { [t.field]: date });
-		} else if (t.kind === 'self' && selfDev) {
-			await updateSelfDev(selfDev.id, { [t.field]: date });
-		}
-	}
-
-	// Persist an inline Timeline milestone-date edit, then refresh. Distinct from a
-	// chevron status move: this only writes the date to its owning record and never
-	// changes the status (a roll-owned date is inert; clearing a dev-owned date can
-	// trigger the backend's data-driven revert, which the 'timeline' reload surfaces
-	// via autoStatusNotice — kammerz-2u8/3wg).
-	async function saveTimelineDate(milestone: TimelineMilestone, date: string | null) {
-		error = '';
-		try {
-			await writeDateTarget(milestone.target, date);
-			await loadRollData('timeline');
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
-		}
-	}
-
-	// Hover/aria hint for each status chevron, derived from the SAME branches
-	// handleStatusClick takes — so the hint can never describe behavior the click
-	// won't perform. Keep these two in lockstep when changing click logic.
-	function statusHint(status: RollStatus): string {
-		const label = statusConfig[status].label;
-		const targetIdx = statusFlow.indexOf(status);
-		const devKind = devKindForStatus(status);
-		const devRecordMissing = (devKind === 'lab' && !labDev) || (devKind === 'self' && !selfDev);
-		// Backward move stays first, mirroring handleStatusClick: an earlier lab/self
-		// chevron with no record still opens the Move-Back confirm (the devKind guard
-		// there only runs after the backward early-return), so it must NOT be described
-		// as recording development.
-		if (currentStatusIdx !== -1 && targetIdx < currentStatusIdx) {
-			return `Move back to ${label} (asks to confirm)`;
-		}
-		// A current/forward lab/self status with no backing dev record → clicking opens
-		// the dev form (handleStatusClick's devKind guard). This includes the roll
-		// stranded AT a lab/self status with no record — the one orphan-recovery state
-		// the bare "Current status" label left unexplained (kammerz-6ih).
-		if (devRecordMissing) {
-			const kindLabel = devKind === 'lab' ? 'lab' : 'self';
-			return roll?.status === status
-				? `Record ${kindLabel} development for ${label} (current status)`
-				: `Record ${kindLabel} development to move to ${label}`;
-		}
-		if (roll?.status === status) return `Current status: ${label}`;
-		// Forward into a date-bearing status whose date isn't recorded yet → prompts.
-		const target = STATUS_DATE_TARGET[status];
-		if (target && !targetDate(target)) return `Move to ${label} (asks for a date)`;
-		return `Move to ${label}`;
-	}
-
-	function handleStatusClick(status: RollStatus) {
+	function onEditDate(kind: ActivityKind, slot: DateSlot) {
 		if (!roll) return;
-		statusNotice = '';
-		const targetIdx = statusFlow.indexOf(status);
-		// Backward move — confirm, never touch dates.
-		if (currentStatusIdx !== -1 && targetIdx < currentStatusIdx) {
-			pendingStatus = status;
-			return;
-		}
-		// Forward into a lab/self status whose dev record doesn't exist yet → open the matching
-		// dev dialog instead of advancing. Creating the record auto-syncs the status (backend),
-		// so a status is never stranded at at-lab/lab-done/developing/developed with no backing
-		// record (and no way to capture its dates). Mirrors the "Develop" menu (chooseDevPath).
-		// The clicked status rides along as `target` so the dialog can seed the date
-		// field that lands the roll there (e.g. a "Lab Done" click pre-fills Date
-		// Received — otherwise saving would stop one rung short at At Lab).
-		const devKind = devKindForStatus(status);
-		if (devKind === 'lab' && !labDev) {
-			devAutoPrompt = { kind: 'lab', target: status };
-			return;
-		}
-		if (devKind === 'self' && !selfDev) {
-			devAutoPrompt = { kind: 'self', target: status };
-			return;
-		}
-		// Forward into a date-bearing status whose date isn't recorded yet → prompt. The dev
-		// record (for lab/self targets) is guaranteed to exist here, gated by the guard above.
-		const target = STATUS_DATE_TARGET[status];
-		if (target && !targetDate(target)) {
-			datePromptStatus = status;
-			datePromptOpen = true;
-			return;
-		}
-		// Otherwise advance directly: no date target, or the date is already recorded.
-		updateStatus(status);
+		const field = ROLL_DATE_FIELD[kind]?.[slot];
+		if (!field) return;
+		const current = (roll[field] ?? null) as string | null;
+		dateEdit = {
+			field,
+			current,
+			title: `${current ? 'Edit' : 'Set'} ${activityLabel(kind)} date`
+		};
 	}
 
-	function confirmDatePrompt(date: string | null) {
-		const status = datePromptStatus;
-		datePromptOpen = false;
-		datePromptStatus = null;
-		if (status) updateStatus(status, date ?? undefined);
+	async function confirmDateEdit(date: string | null) {
+		const edit = dateEdit;
+		dateEdit = null;
+		// DateConfirm here disallows clear (allowClear defaults false), so `date` is
+		// always a value — a clear goes through the × control / onClearDate instead.
+		if (!edit || date == null) return;
+		error = '';
+		try {
+			await updateRoll(id, { [edit.field]: date } as Partial<RollInsert>);
+			await loadRollData();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
-	function cancelDatePrompt() {
-		datePromptOpen = false;
-		datePromptStatus = null;
+	// Clearing a set lifecycle date is a backward move — confirm first (ADR-0013).
+	let pendingClear = $state<{ field: RollDateField; label: string } | null>(null);
+
+	function onClearDate(kind: ActivityKind, slot: DateSlot) {
+		const field = ROLL_DATE_FIELD[kind]?.[slot];
+		if (!field) return;
+		pendingClear = { field, label: `${activityLabel(kind)} date` };
 	}
 
-	// Commit to a development path from the "Develop" chevron. Reuses the dev-dialog
-	// auto-prompt wiring: opening + saving a dev record makes getDevPath resolve to
-	// this path, the backend auto-syncs status, and the chevron bar re-renders.
-	function chooseDevPath(path: 'lab' | 'self') {
-		statusNotice = '';
+	async function confirmClearDate() {
+		const p = pendingClear;
+		pendingClear = null;
+		if (!p) return;
+		error = '';
+		try {
+			await updateRoll(id, { [p.field]: null } as Partial<RollInsert>);
+			await loadRollData();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	// Start development from the board: reuse the dev-dialog auto-prompt bridge.
+	function onChoosePath(path: 'lab' | 'self') {
+		devNotice = '';
 		devAutoPrompt = { kind: path };
+	}
+
+	// Edit an existing development record from the board (opens the dev dialog).
+	function onOpenDev() {
+		devNotice = '';
+		devAutoPrompt = { kind: labDev ? 'lab' : 'self' };
+	}
+
+	// --- Archiving ---
+	let showArchiveDialog = $state(false);
+	// A save that would clear an already-set archive date is a backward move — hold
+	// it for confirmation instead of applying it immediately.
+	let pendingArchiveClear = $state<ArchivePayload | null>(null);
+
+	async function applyArchive(payload: ArchivePayload) {
+		error = '';
+		try {
+			await updateRoll(id, payload);
+			await loadRollData();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	function handleArchiveSave(payload: ArchivePayload) {
+		showArchiveDialog = false;
+		if (roll?.date_archived && payload.date_archived == null) {
+			pendingArchiveClear = payload;
+		} else {
+			void applyArchive(payload);
+		}
+	}
+
+	// Roll-full nudge: completing Shooting records date_finished (ADR-0013).
+	async function markAsShot() {
+		error = '';
+		try {
+			await updateRoll(id, { date_finished: finishDate });
+			await loadRollData();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	const pushPullOptions = [
@@ -878,11 +718,6 @@
 		editFrameCount = roll.frame_count?.toString() ?? '';
 		editPushPull = roll.push_pull ?? '';
 		editNotes = roll.notes ?? '';
-		editDateLoaded = roll.date_loaded ?? '';
-		editDateFinished = roll.date_finished ?? '';
-		editDateScanned = roll.date_scanned ?? '';
-		editDatePostProcessed = roll.date_post_processed ?? '';
-		editDateArchived = roll.date_archived ?? '';
 		editingRoll = true;
 	}
 
@@ -904,10 +739,6 @@
 			error = 'Roll ID is required.';
 			return;
 		}
-		if (hasEditDateError) {
-			error = 'Fix the highlighted dates.';
-			return;
-		}
 		try {
 			// For fixed-lens cameras the lens Select is hidden and replaced by a
 			// read-only display of the built-in lens — persist that lens, never a
@@ -920,15 +751,10 @@
 				lens_id: lensId,
 				frame_count: editFrameCount ? parseInt(editFrameCount) : null,
 				push_pull: (editPushPull || null) as PushPull | null,
-				notes: editNotes || null,
-				date_loaded: editDateLoaded.trim() || null,
-				date_finished: editDateFinished.trim() || null,
-				date_scanned: editDateScanned.trim() || null,
-				date_post_processed: editDatePostProcessed.trim() || null,
-				date_archived: editDateArchived.trim() || null
+				notes: editNotes || null
 			});
 			editingRoll = false;
-			await loadRollData('roll-edit');
+			await loadRollData();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -973,7 +799,7 @@
 		quickSaving = true;
 		try {
 			await logShot({ rollId: roll.id, ...entry });
-			await loadRollData('shot-add');
+			await loadRollData();
 			return true;
 		} catch (err) {
 			quickError = err instanceof Error ? err.message : String(err);
@@ -994,22 +820,19 @@
 
 	// Page load: on mount and whenever the roll id changes (navigation), fetch
 	// reference catalogs and roll detail together, gating `loading` until BOTH
-	// resolve. This keeps reference data fresh on every page entry while never
-	// rendering the roll with empty dropdowns / lens lookups. Mutations bypass this
-	// and call loadRollData() directly, so they refresh only the roll's /detail.
+	// resolve. Mutations bypass this and call loadRollData() directly.
 	//
 	// Track ONLY `id` (the `void id` read), then untrack the loaders: Svelte 5
-	// tracks every reactive read in an effect's synchronous run — INCLUDING the
-	// sync prefix of an async fn it calls. loadRollData()'s prefix reads `roll`
-	// (the prevStatus snapshot) and then rewrites `roll` post-fetch, so without
-	// untrack the effect depends on a value it mutates → unbounded re-fetch loop
-	// on every roll-detail visit (kammerz-8k5).
+	// tracks every reactive read in an effect's synchronous run — including the
+	// sync prefix of an async fn it calls. loadRollData()'s prefix rewrites `roll`,
+	// so without untrack the effect would loop on every roll-detail visit (kammerz-8k5).
 	$effect(() => {
 		void id;
 		untrack(() => {
-			// Re-apply the per-roll QuickAddBar default (hidden iff archived) on every
-			// roll change, so a manual show/hide on one roll doesn't leak to the next.
+			// Re-apply per-roll UI defaults (quick-entry + board expansion follow the
+			// phase) on every roll change so a manual override doesn't leak across rolls.
 			quickAddOverride = null;
+			boardExpandedOverride = null;
 			loading = true;
 			Promise.all([loadRefData(), loadRollData()]).finally(() => {
 				loading = false;
@@ -1077,19 +900,6 @@
 							<Select label="Film Stock" bind:value={editFilmStockId} options={editFilmStockOptions} />
 							<Select label="Push/Pull" bind:value={editPushPull} options={pushPullOptions} />
 						</div>
-						<div class="space-y-2">
-							<div class="flex items-center gap-3">
-								<span class="text-xs font-semibold uppercase tracking-wider text-text-faint">Lifecycle dates</span>
-								<div class="flex-1 border-b border-border-subtle"></div>
-							</div>
-							<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-								<Input type="date" label="Loaded" class="h-[38px]" bind:value={editDateLoaded} />
-								<Input type="date" label="Finished shooting" class="h-[38px]" bind:value={editDateFinished} />
-								<Input type="date" label="Scanned" class="h-[38px]" bind:value={editDateScanned} />
-								<Input type="date" label="Post-processed" class="h-[38px]" bind:value={editDatePostProcessed} />
-								<Input type="date" label="Archived" class="h-[38px]" bind:value={editDateArchived} />
-							</div>
-						</div>
 						<Textarea label="Notes" bind:value={editNotes} placeholder="Any notes about this roll..." />
 						<div class="flex justify-end gap-2 pt-1">
 							<Button
@@ -1098,7 +908,7 @@
 									editingRoll = false;
 								}}>Cancel</Button
 							>
-							<Button variant="primary" disabled={hasEditDateError} onclick={saveEditRoll}>Save</Button>
+							<Button variant="primary" onclick={saveEditRoll}>Save</Button>
 						</div>
 					</div>
 				{:else}
@@ -1155,52 +965,43 @@
 			</div>
 		</FadeIn>
 
-		<!-- Status Control -->
-		<FadeIn delay={50}>
+		<!-- Reusable page sections, ordered by the derived phase below. -->
+
+		{#snippet boardSection()}
 			<div class="mb-6">
-				<RollStatusControl
-					{statusFlow}
-					currentStatus={roll.status}
-					{currentStatusIdx}
-					{devPath}
-					{pathLabel}
-					hintFor={statusHint}
-					onmove={handleStatusClick}
-					onchoosepath={chooseDevPath}
+				<ActivityBoard
+					{activities}
+					{phase}
+					badge={roll?.badge ?? ''}
+					expanded={boardExpanded}
+					archiveLocation={roll?.archive_location ?? null}
+					archiveNaReason={roll?.archive_na_reason ?? null}
+					onToggleExpanded={() => (boardExpandedOverride = !boardExpanded)}
+					oneditdate={onEditDate}
+					oncleardate={onClearDate}
+					onchoosepath={onChoosePath}
+					onopendev={onOpenDev}
+					oneditarchiving={() => (showArchiveDialog = true)}
 				/>
-				{#if statusNotice}<p class="mt-2 text-xs text-text-faint">{statusNotice}</p>{/if}
-				{#if autoStatusNotice}
-					<div class="mt-2">
-						<InlineNotice bind:message={autoStatusNotice} seq={autoStatusNoticeSeq} />
+				{#if devNotice}<p class="mt-2 text-xs text-text-faint">{devNotice}</p>{/if}
+			</div>
+		{/snippet}
+
+		{#snippet framesSection()}
+			<section class="mb-6">
+				{#if phase === 'shooting' && lastShot}
+					<!-- "What settings did I just use?" reference card (shooting phase only). -->
+					<div class="mb-3 rounded-lg border border-border bg-surface-raised p-4">
+						<h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-text-faint">Last shot</h3>
+						<div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+							<span class="font-mono text-text">#{lastShot.frame}</span>
+							{#if lastShot.aperture}<span class="font-mono text-text-muted">f/{lastShot.aperture}</span>{/if}
+							{#if lastShot.shutter}<span class="font-mono text-text-muted">{lastShot.shutter}s</span>{/if}
+							{#if lastShot.lensName}<span class="text-text-faint">{lastShot.lensName}</span>{/if}
+						</div>
 					</div>
 				{/if}
-			</div>
-		</FadeIn>
 
-		<!-- Lifecycle dates — inline milestone-date editing, separate from the status
-		     chevron bar above: the chevrons CHANGE status; this CORRECTS the date each
-		     reached step happened, without moving status (kammerz-2u8).
-		     Hidden while the roll Edit form is open — that form has its own "Lifecycle
-		     dates" inputs for the roll-owned dates, so showing both would duplicate the
-		     heading and controls on screen.
-		     Deliberately NOT wrapped in FadeIn — RollTimeline renders its own DateConfirm
-		     dialog, and a FadeIn transform creates a containing block that traps a
-		     fixed-positioned dialog. This matches the DevelopmentSection precedent below;
-		     both Dialog-rendering components stay outside FadeIn (see frontend-patterns.md). -->
-		{#if !editingRoll}
-			<div class="mb-6">
-				<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
-					Lifecycle dates
-					<div class="flex-1 border-b border-border-subtle"></div>
-				</h2>
-				<RollTimeline milestones={timeline} onedit={saveTimelineDate} />
-			</div>
-		{/if}
-
-		<!-- Frames — front-and-center: most info + the Quick Entry control. Placed
-		     above Development and Activity (kammerz-60f). -->
-		<FadeIn delay={100}>
-			<section class="mb-6">
 				<div class="mb-3 flex items-center justify-between">
 					<h2 class="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
 						Frames
@@ -1208,10 +1009,8 @@
 							<span class="font-mono text-[10px] normal-case tracking-normal text-text-faint">
 								{frameProgress.current}/{frameProgress.total}
 							</span>
-							<div class="flex-1 border-b border-border-subtle"></div>
-						{:else}
-							<div class="flex-1 border-b border-border-subtle"></div>
 						{/if}
+						<div class="flex-1 border-b border-border-subtle"></div>
 					</h2>
 					<div class="flex items-center gap-2">
 						<Button
@@ -1247,7 +1046,7 @@
 								size="sm"
 								variant="primary"
 								disabled={!finishDate.trim() || !!finishDateError}
-								onclick={() => updateStatus('shot', finishDate)}>Mark as Shot</Button
+								onclick={markAsShot}>Mark as Shot</Button
 							>
 							<button
 								onclick={() => {
@@ -1270,7 +1069,7 @@
 				{#snippet activityPane()}
 					<div>
 						<h3 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
-							Activity
+							Activity log
 							<div class="flex-1 border-b border-border-subtle"></div>
 						</h3>
 						<RollActivity {events} onopendev={openDevFromEvent} />
@@ -1298,28 +1097,45 @@
 					<FrameStrip frames={frameCells} onselect={handleFrameSelect} onaddextra={() => openAddShotDialog()} />
 				</div>
 			</section>
-		</FadeIn>
+		{/snippet}
 
-		<!-- DevelopmentSection: the compact Development panel + its create/edit/delete dialogs.
-		     Dialogs are also opened from chevron clicks and from journal dev-event clicks via the autoPrompt bridge.
-		     NOT wrapped in FadeIn — it renders its own Dialogs, which a FadeIn transform would trap (see frontend-patterns.md). -->
-		<div class="mb-6">
-			<DevelopmentSection
-				rollId={id}
-				{labs}
-				bind:labDev
-				bind:selfDev
-				bind:devStages
-				bind:autoPrompt={devAutoPrompt}
-				currentStatus={roll?.status ?? null}
-				defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
-				negativesDeadline={roll?.negatives_deadline ?? null}
-				onchange={() => loadRollData('dev')}
-				onpromptcancel={() => {
-					statusNotice = 'Status unchanged — no development record was saved.';
-				}}
-			/>
-		</div>
+		<!-- DevelopmentSection renders its own Dialogs, which a FadeIn transform would
+		     trap (see frontend-patterns.md) — keep it OUTSIDE FadeIn. The dialogs are
+		     also opened from the board's Start/Edit controls and journal dev clicks via
+		     the autoPrompt bridge. -->
+		{#snippet devSection()}
+			<div class="mb-6">
+				<DevelopmentSection
+					rollId={id}
+					{labs}
+					bind:labDev
+					bind:selfDev
+					bind:devStages
+					bind:autoPrompt={devAutoPrompt}
+					currentStatus={roll?.status ?? null}
+					defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
+					negativesDeadline={roll?.negatives_deadline ?? null}
+					onchange={() => loadRollData()}
+					onpromptcancel={() => {
+						devNotice = 'No development record was saved.';
+					}}
+				/>
+			</div>
+		{/snippet}
+
+		<!-- Auto phase layout (ADR-0013): the derived phase reorders the sections.
+		     Shooting/wrap-up → shots front and centre (the shooting phase adds the
+		     reference card + quick entry and collapses the board, all keyed off `phase`
+		     inside the sections); done → the board's compact summary first. -->
+		{#if phase === 'done'}
+			<FadeIn delay={50}>{@render boardSection()}</FadeIn>
+			<FadeIn delay={100}>{@render framesSection()}</FadeIn>
+			{@render devSection()}
+		{:else}
+			<FadeIn delay={50}>{@render framesSection()}</FadeIn>
+			<FadeIn delay={100}>{@render boardSection()}</FadeIn>
+			{@render devSection()}
+		{/if}
 	</div>
 {/if}
 
@@ -1463,30 +1279,63 @@
 	/>
 {/if}
 
-<!-- Backward Status Move Confirmation -->
-{#if pendingStatus}
-	<ConfirmDialog
+<!-- Board: set/change a lifecycle date -->
+{#if dateEdit}
+	<DateConfirm
 		open={true}
-		title="Move Status Back"
-		message={`Move status back to ${statusConfig[pendingStatus].label}? This will revert progress.`}
-		confirmLabel="Move Back"
-		variant="primary"
-		onconfirm={() => {
-			updateStatus(pendingStatus!);
-			pendingStatus = null;
-		}}
+		title={dateEdit.title}
+		value={dateEdit.current ?? todayLocal()}
+		confirmLabel="Save"
+		onconfirm={confirmDateEdit}
 		oncancel={() => {
-			pendingStatus = null;
+			dateEdit = null;
 		}}
 	/>
 {/if}
 
-<!-- Forward Status Date Prompt -->
-<DateConfirm
-	bind:open={datePromptOpen}
-	title={`Date for "${datePromptLabel}"`}
-	value={todayLocal()}
-	confirmLabel="Confirm"
-	onconfirm={confirmDatePrompt}
-	oncancel={cancelDatePrompt}
+<!-- Board: confirm clearing a set lifecycle date (backward move) -->
+{#if pendingClear}
+	<ConfirmDialog
+		open={true}
+		title="Clear date"
+		message={`Clear the ${pendingClear.label}? This moves the roll back.`}
+		confirmLabel="Clear"
+		variant="primary"
+		onconfirm={confirmClearDate}
+		oncancel={() => {
+			pendingClear = null;
+		}}
+	/>
+{/if}
+
+<!-- Archiving editor -->
+<ArchiveDialog
+	open={showArchiveDialog}
+	dateArchived={roll?.date_archived ?? null}
+	location={roll?.archive_location ?? null}
+	na={roll?.archive_na ?? false}
+	reason={roll?.archive_na_reason ?? null}
+	onsave={handleArchiveSave}
+	onclose={() => {
+		showArchiveDialog = false;
+	}}
 />
+
+<!-- Confirm clearing a set archive date (backward move) -->
+{#if pendingArchiveClear}
+	<ConfirmDialog
+		open={true}
+		title="Remove archived date"
+		message="Remove the archived date? This moves the roll back."
+		confirmLabel="Remove"
+		variant="primary"
+		onconfirm={() => {
+			const p = pendingArchiveClear!;
+			pendingArchiveClear = null;
+			void applyArchive(p);
+		}}
+		oncancel={() => {
+			pendingArchiveClear = null;
+		}}
+	/>
+{/if}
