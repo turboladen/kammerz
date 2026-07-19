@@ -358,7 +358,7 @@ test('shots table view lists fields and opens the view dialog (kammerz-4she)', a
 		await expect(page.getByRole('cell', { name: 'Corlieu Falls', exact: true })).toBeVisible();
 
 		// The Frame-cell button is the row's control; clicking it opens the view dialog.
-		await page.getByRole('button', { name: 'View frame 1' }).click();
+		await page.getByRole('button', { name: 'View frame 1', exact: true }).click();
 		const dialog = page.getByRole('dialog');
 		await expect(dialog.getByRole('heading', { name: 'Shot 1', exact: true })).toBeVisible();
 	} finally {

@@ -36,9 +36,11 @@ export function formatShotRow(shot: Shot): ShotRowDisplay {
 }
 
 /**
- * The lens display name(s) for a shot, mirroring the print page's resolution:
- * the shot's own per-shot lens ids (joined with ", ") take priority; otherwise the
- * roll's default lens; otherwise empty. Ids absent from `lenses` are skipped.
+ * The lens display name(s) for a shot: the shot's own per-shot lens ids (joined
+ * with ", ") take priority; otherwise the roll's default lens; otherwise empty.
+ * Ids absent from `lenses` are skipped — and unlike the print page's
+ * `shotLensDisplay`, an all-unresolvable id list falls through to the roll
+ * default rather than returning '' (more helpful; near-impossible under FKs).
  */
 export function resolveShotLensName(
 	shotId: number,
