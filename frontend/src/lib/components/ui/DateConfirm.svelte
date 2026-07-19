@@ -1,9 +1,9 @@
 <script lang="ts">
-	// Small date-pick dialog used for both inline Lifecycle-dates edits and the
-	// confirm-on-transition prompt. Seeds an editable date (default today from the
-	// caller), Confirm commits it, Cancel aborts. Inline edits also offer Clear
-	// (commit null). There is no "Skip" — callers that want a blank date clear it
-	// from the Lifecycle dates section afterward.
+	// Small, generic date-pick dialog. Seeds an editable date (default today from
+	// the caller), Confirm commits it, Cancel aborts; `allowClear` adds a Clear
+	// button (commit null). Where the date can be corrected later is a CALLER
+	// concern — pass `hint` to name the right surface (e.g. the roll page's
+	// activity board); the default stays feature-neutral.
 	import Dialog from './Dialog.svelte';
 	import Input from './Input.svelte';
 	import Button from './Button.svelte';
@@ -17,6 +17,8 @@
 		confirmLabel?: string;
 		/** Show a Clear button (commits null) — used for inline edits, not transitions. */
 		allowClear?: boolean;
+		/** Helper line shown when there's no Clear button; callers name their own edit surface. */
+		hint?: string;
 		onconfirm: (date: string | null) => void;
 		oncancel: () => void;
 	}
@@ -27,6 +29,7 @@
 		value = '',
 		confirmLabel = 'Confirm',
 		allowClear = false,
+		hint = 'Pick the date this happened — you can change or clear it later.',
 		onconfirm,
 		oncancel
 	}: Props = $props();
@@ -54,12 +57,10 @@
 	<div class="space-y-4">
 		<Input type="date" label="Date" class="h-[38px]" bind:value={draft} />
 		{#if !allowClear}
-			<!-- Transition prompt (no Clear button): surface the otherwise-invisible
-			     escape hatch — an undated milestone can still be edited or cleared later
-			     from the Lifecycle dates section. (kammerz-cb7) -->
-			<p class="text-xs text-text-muted">
-				Pick the date this happened — you can change or clear it later from Lifecycle dates.
-			</p>
+			<!-- No-Clear-button mode: surface the otherwise-invisible escape hatch. The
+			     wording is caller-supplied via `hint` so a shared ui/ component never
+			     hardcodes one page's section names. (kammerz-cb7) -->
+			<p class="text-xs text-text-muted">{hint}</p>
 		{/if}
 		<div class="flex justify-end gap-2">
 			{#if allowClear}

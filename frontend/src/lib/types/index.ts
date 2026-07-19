@@ -153,6 +153,14 @@ export interface Roll {
 	date_scanned: string | null;
 	date_post_processed: string | null;
 	date_archived: string | null;
+	// Activity-lifecycle columns (ADR-0013). Optional here so create/update payloads
+	// (RollInsert / Partial<RollInsert>) that predate them still typecheck; the read
+	// view (RollWithDetails) always carries them from the backend.
+	scan_started?: string | null;
+	post_processing_started?: string | null;
+	archive_location?: string | null;
+	archive_na?: boolean;
+	archive_na_reason?: string | null;
 	push_pull: PushPull | null;
 	notes: string | null;
 	created_at: string;
@@ -161,8 +169,34 @@ export interface Roll {
 
 export type RollInsert = Omit<Roll, 'id' | 'created_at' | 'updated_at'>;
 
-// Roll with joined data for display
-export interface RollWithDetails extends Roll {
+// --- Activity lifecycle (ADR-0013) ---
+
+export type ActivityKind = 'shooting' | 'development' | 'scanning' | 'post_processing' | 'archiving';
+
+export type ActivityState = 'not_started' | 'in_progress' | 'done' | 'na';
+
+/** One activity's server-derived state plus the dates that drive it (for the board). */
+export interface RollActivityItem {
+	kind: ActivityKind;
+	state: ActivityState;
+	start: string | null;
+	completion: string | null;
+}
+
+/**
+ * The server-derived activity view flattened onto every roll response (ADR-0013):
+ * the five activities in canonical order, a compound badge, the earliest-unresolved
+ * scalar for grouping, and a Done flag. The frontend never re-derives these.
+ */
+export interface RollActivityView {
+	activities: RollActivityItem[];
+	badge: string;
+	group_key: number;
+	done: boolean;
+}
+
+// Roll with joined data for display + the derived activity view
+export interface RollWithDetails extends Roll, RollActivityView {
 	camera_brand: string | null;
 	camera_model: string | null;
 	film_stock_brand: string | null;
