@@ -4,6 +4,7 @@
 	// the no-negatives case), or Not yet. Emits a single normalized payload; the page
 	// decides whether clearing a previously-set archive date needs a backward-move
 	// confirmation. Wires onclose→reset per the form-dialog convention.
+	import { untrack } from 'svelte';
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
@@ -30,12 +31,16 @@
 	let draftReason = $state('');
 
 	// Seed the form from the roll's current archive state each time the dialog opens.
+	// The seed reads are untracked so this effect depends ONLY on `open` — otherwise
+	// a prop update while the dialog is showing would re-seed and clobber the draft.
 	$effect(() => {
 		if (open) {
-			choice = dateArchived ? 'archived' : na ? 'na' : 'not_yet';
-			draftDate = dateArchived ?? todayLocal();
-			draftLocation = location ?? '';
-			draftReason = reason ?? '';
+			untrack(() => {
+				choice = dateArchived ? 'archived' : na ? 'na' : 'not_yet';
+				draftDate = dateArchived ?? todayLocal();
+				draftLocation = location ?? '';
+				draftReason = reason ?? '';
+			});
 		}
 	});
 

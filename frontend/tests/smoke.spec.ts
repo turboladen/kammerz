@@ -152,32 +152,34 @@ test('roll detail shows the activity board, quick-add, and activity journal (kam
 	});
 	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
 	const id: number = await created.json();
+	// try/finally so a failing assertion can't leak the roll into the shared DB.
+	try {
+		await page.goto(`${BASE}/rolls/${id}`);
+		await page.waitForLoadState('networkidle');
 
-	await page.goto(`${BASE}/rolls/${id}`);
-	await page.waitForLoadState('networkidle');
+		// The board renders a ledger-line "Activity" header. A fresh loaded roll is in
+		// the shooting phase, so the board starts collapsed — showing the derived badge
+		// ("Loaded") and a "Show details" affordance.
+		await expect(page.getByRole('heading', { name: 'Activity', exact: true })).toBeVisible();
+		await expect(page.getByText('Show details')).toBeVisible();
 
-	// The board renders a ledger-line "Activity" header. A fresh loaded roll is in
-	// the shooting phase, so the board starts collapsed — showing the derived badge
-	// ("Loaded") and a "Show details" affordance.
-	await expect(page.getByRole('heading', { name: 'Activity', exact: true })).toBeVisible();
-	await expect(page.getByText('Show details')).toBeVisible();
+		// Expanding surfaces the per-activity rows. Assert labels unique to the board
+		// (Development also names the DevelopmentSection heading below, so skip it here).
+		await page.getByText('Show details').click();
+		await expect(page.getByText('Shooting', { exact: true })).toBeVisible();
+		await expect(page.getByText('Scanning', { exact: true })).toBeVisible();
+		await expect(page.getByText('Post-processing', { exact: true })).toBeVisible();
+		await expect(page.getByText('Archiving', { exact: true })).toBeVisible();
 
-	// Expanding surfaces the per-activity rows. Assert labels unique to the board
-	// (Development also names the DevelopmentSection heading below, so skip it here).
-	await page.getByText('Show details').click();
-	await expect(page.getByText('Shooting', { exact: true })).toBeVisible();
-	await expect(page.getByText('Scanning', { exact: true })).toBeVisible();
-	await expect(page.getByText('Post-processing', { exact: true })).toBeVisible();
-	await expect(page.getByText('Archiving', { exact: true })).toBeVisible();
+		// Activity journal shows the founding "Roll loaded" entry (RollActivity.svelte
+		// renders it as a <span class="text-xs text-text-muted">Roll loaded</span>).
+		await expect(page.getByText('Roll loaded')).toBeVisible();
 
-	// Activity journal shows the founding "Roll loaded" entry (RollActivity.svelte
-	// renders it as a <span class="text-xs text-text-muted">Roll loaded</span>).
-	await expect(page.getByText('Roll loaded')).toBeVisible();
-
-	// QuickAddBar is present in the shooting phase: a "Save & Next" primary button.
-	await expect(page.getByRole('button', { name: /Save & Next/i })).toBeVisible();
-
-	await page.request.delete(`${BASE}/api/rolls/${id}`);
+		// QuickAddBar is present in the shooting phase: a "Save & Next" primary button.
+		await expect(page.getByRole('button', { name: /Save & Next/i })).toBeVisible();
+	} finally {
+		await page.request.delete(`${BASE}/api/rolls/${id}`);
+	}
 });
 
 /**
@@ -192,27 +194,31 @@ test('activity board sets a lifecycle date and it persists (kammerz-64ga)', asyn
 	});
 	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
 	const id: number = await created.json();
+	// try/finally so a failing assertion can't leak the roll into the shared DB.
+	try {
+		await page.goto(`${BASE}/rolls/${id}`);
+		await page.waitForLoadState('networkidle');
 
-	await page.goto(`${BASE}/rolls/${id}`);
-	await page.waitForLoadState('networkidle');
+		// Expand the board (collapsed by default in the shooting phase), then open the
+		// Shooting "Finished" date editor and save (DateConfirm seeds today). The
+		// accessible name carries the activity ("Set Shooting finished date") because
+		// caption-only names collide across activities sharing a caption.
+		await page.getByText('Show details').click();
+		await page.getByRole('button', { name: 'Set Shooting finished date' }).click();
+		const dialog = page.getByRole('dialog');
+		await expect(dialog).toBeVisible();
+		await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+		await expect(dialog).toBeHidden();
+		await page.waitForLoadState('networkidle');
 
-	// Expand the board (collapsed by default in the shooting phase), then open the
-	// Shooting "Finished" date editor and save (DateConfirm seeds today).
-	await page.getByText('Show details').click();
-	await page.getByRole('button', { name: 'Set Finished date' }).click();
-	const dialog = page.getByRole('dialog');
-	await expect(dialog).toBeVisible();
-	await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-	await expect(dialog).toBeHidden();
-	await page.waitForLoadState('networkidle');
-
-	// The date persisted server-side (date_finished is now set).
-	const roll = await (await page.request.get(`${BASE}/api/rolls/${id}`)).json();
-	expect(roll.date_finished, 'Shooting completion date must persist').toBeTruthy();
-	// And the roll advanced past shooting — the derived badge is no longer "Loaded".
-	expect(roll.badge).not.toBe('Loaded');
-
-	await page.request.delete(`${BASE}/api/rolls/${id}`);
+		// The date persisted server-side (date_finished is now set).
+		const roll = await (await page.request.get(`${BASE}/api/rolls/${id}`)).json();
+		expect(roll.date_finished, 'Shooting completion date must persist').toBeTruthy();
+		// And the roll advanced past shooting — the derived badge is no longer "Loaded".
+		expect(roll.badge).not.toBe('Loaded');
+	} finally {
+		await page.request.delete(`${BASE}/api/rolls/${id}`);
+	}
 });
 
 /**

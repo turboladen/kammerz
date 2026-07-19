@@ -68,6 +68,25 @@ export type RollDateField =
 /** A board date slot within a row. */
 export type DateSlot = 'start' | 'completion';
 
+/** The activities whose start/completion dates live on the roll row itself. */
+export type DatedActivityKind = 'shooting' | 'scanning' | 'post_processing';
+
+/**
+ * Per-slot captions for the dated activities — the single source for both the
+ * board's row captions and the accessible names / dialog titles built from them,
+ * so a slot can never render under one label and announce another.
+ */
+export const SLOT_CAPTIONS: Record<DatedActivityKind, Record<DateSlot, string>> = {
+	shooting: { start: 'Loaded', completion: 'Finished' },
+	scanning: { start: 'Started', completion: 'Scanned' },
+	post_processing: { start: 'Started', completion: 'Done' }
+};
+
+/** Narrow an activity kind to the dated (roll-row date slots) subset. */
+export function isDatedKind(kind: ActivityKind): kind is DatedActivityKind {
+	return kind in SLOT_CAPTIONS;
+}
+
 /**
  * Which roll column each activity's start/completion date writes to. Development is
  * intentionally absent — its dates live on the lab/self dev record and are edited

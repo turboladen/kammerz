@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { rollPhase, activityLabel, stateLabel, ROLL_DATE_FIELD, lastShotSummary } from './activity-board';
+import {
+	rollPhase,
+	activityLabel,
+	stateLabel,
+	ROLL_DATE_FIELD,
+	SLOT_CAPTIONS,
+	isDatedKind,
+	lastShotSummary
+} from './activity-board';
 import type { Lens, Shot } from '$lib/types';
 
 function shot(overrides: Partial<Shot>): Shot {
@@ -129,5 +137,26 @@ describe('lastShotSummary', () => {
 	it('leaves lensName null when the mapped lens id is not in the catalog', () => {
 		const shots = [shot({ id: 10, frame_number: '3' })];
 		expect(lastShotSummary(shots, { 10: [999] }, [lens({ id: 7 })])?.lensName).toBeNull();
+	});
+});
+
+describe('SLOT_CAPTIONS / isDatedKind', () => {
+	it('classifies exactly the roll-owned dated activities', () => {
+		expect(isDatedKind('shooting')).toBe(true);
+		expect(isDatedKind('scanning')).toBe(true);
+		expect(isDatedKind('post_processing')).toBe(true);
+		expect(isDatedKind('development')).toBe(false);
+		expect(isDatedKind('archiving')).toBe(false);
+	});
+
+	it('captions every slot of every dated activity, mirroring ROLL_DATE_FIELD', () => {
+		expect(SLOT_CAPTIONS.shooting).toEqual({ start: 'Loaded', completion: 'Finished' });
+		expect(SLOT_CAPTIONS.scanning).toEqual({ start: 'Started', completion: 'Scanned' });
+		expect(SLOT_CAPTIONS.post_processing).toEqual({ start: 'Started', completion: 'Done' });
+		// Every dated kind with a caption must have matching writable columns and
+		// vice versa (archiving is date-mapped but dialog-edited, so not captioned).
+		for (const kind of ['shooting', 'scanning', 'post_processing'] as const) {
+			expect(Object.keys(SLOT_CAPTIONS[kind]).sort()).toEqual(Object.keys(ROLL_DATE_FIELD[kind] ?? {}).sort());
+		}
 	});
 });

@@ -47,8 +47,9 @@
 		rollPhase,
 		lastShotSummary,
 		activityLabel,
+		isDatedKind,
 		ROLL_DATE_FIELD,
-		type RollPhase,
+		SLOT_CAPTIONS,
 		type DateSlot,
 		type RollDateField,
 		type ArchivePayload
@@ -162,7 +163,7 @@
 	// The server-derived activity view drives every lifecycle display. Never re-derive
 	// from dates (ADR-0013) — read the backend's activities/badge/group_key/done.
 	const activities = $derived(roll?.activities ?? []);
-	const phase = $derived<RollPhase>(roll ? rollPhase(roll) : 'shooting');
+	const phase = $derived(roll ? rollPhase(roll) : 'shooting');
 	const shootingActivity = $derived(activities.find((a) => a.kind === 'shooting') ?? null);
 
 	// Board expand/collapse: collapsed by default in the shooting phase (the tail
@@ -600,6 +601,18 @@
 
 	// --- Activity board handlers ---
 
+	// Shared PUT-then-reload for every board/nudge roll write. One copy of the
+	// error-normalization + reload ordering so the flow can't drift per handler.
+	async function patchRoll(patch: Partial<RollInsert>) {
+		error = '';
+		try {
+			await updateRoll(id, patch);
+			await loadRollData();
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+		}
+	}
+
 	// Editing (set/change) a roll-owned lifecycle date via DateConfirm.
 	let dateEdit = $state<{ field: RollDateField; current: string | null; title: string } | null>(null);
 
@@ -608,10 +621,14 @@
 		const field = ROLL_DATE_FIELD[kind]?.[slot];
 		if (!field) return;
 		const current = (roll[field] ?? null) as string | null;
+		// Title names the exact slot ("Set Shooting finished date") — the kind alone
+		// is ambiguous between an activity's two slots, and nothing else in the
+		// dialog says which column is being written.
+		const caption = isDatedKind(kind) ? SLOT_CAPTIONS[kind][slot].toLowerCase() + ' ' : '';
 		dateEdit = {
 			field,
 			current,
-			title: `${current ? 'Edit' : 'Set'} ${activityLabel(kind)} date`
+			title: `${current ? 'Edit' : 'Set'} ${activityLabel(kind)} ${caption}date`
 		};
 	}
 
@@ -621,13 +638,7 @@
 		// DateConfirm here disallows clear (allowClear defaults false), so `date` is
 		// always a value — a clear goes through the × control / onClearDate instead.
 		if (!edit || date == null) return;
-		error = '';
-		try {
-			await updateRoll(id, { [edit.field]: date } as Partial<RollInsert>);
-			await loadRollData();
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
-		}
+		await patchRoll({ [edit.field]: date } as Partial<RollInsert>);
 	}
 
 	// Clearing a set lifecycle date is a backward move — confirm first (ADR-0013).
@@ -643,25 +654,15 @@
 		const p = pendingClear;
 		pendingClear = null;
 		if (!p) return;
-		error = '';
-		try {
-			await updateRoll(id, { [p.field]: null } as Partial<RollInsert>);
-			await loadRollData();
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
-		}
+		await patchRoll({ [p.field]: null } as Partial<RollInsert>);
 	}
 
-	// Start development from the board: reuse the dev-dialog auto-prompt bridge.
-	function onChoosePath(path: 'lab' | 'self') {
+	// Open the dev dialog via the auto-prompt bridge. Single entry point so every
+	// opener (board Start buttons, board Edit, journal event click) clears a stale
+	// "No development record was saved" notice before the dialog shows.
+	function openDev(kind: 'lab' | 'self') {
 		devNotice = '';
-		devAutoPrompt = { kind: path };
-	}
-
-	// Edit an existing development record from the board (opens the dev dialog).
-	function onOpenDev() {
-		devNotice = '';
-		devAutoPrompt = { kind: labDev ? 'lab' : 'self' };
+		devAutoPrompt = { kind };
 	}
 
 	// --- Archiving ---
@@ -670,34 +671,18 @@
 	// it for confirmation instead of applying it immediately.
 	let pendingArchiveClear = $state<ArchivePayload | null>(null);
 
-	async function applyArchive(payload: ArchivePayload) {
-		error = '';
-		try {
-			await updateRoll(id, payload);
-			await loadRollData();
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
-		}
-	}
-
 	function handleArchiveSave(payload: ArchivePayload) {
 		showArchiveDialog = false;
 		if (roll?.date_archived && payload.date_archived == null) {
 			pendingArchiveClear = payload;
 		} else {
-			void applyArchive(payload);
+			void patchRoll(payload);
 		}
 	}
 
 	// Roll-full nudge: completing Shooting records date_finished (ADR-0013).
 	async function markAsShot() {
-		error = '';
-		try {
-			await updateRoll(id, { date_finished: finishDate });
-			await loadRollData();
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
-		}
+		await patchRoll({ date_finished: finishDate });
 	}
 
 	const pushPullOptions = [
@@ -780,7 +765,7 @@
 	// Open the dev dialog from an activity-journal event click. Reuses the autoPrompt
 	// bridge: DevelopmentSection seeds its form from the existing record when present.
 	function openDevFromEvent(refKind: 'lab_dev' | 'self_dev') {
-		devAutoPrompt = { kind: refKind === 'lab_dev' ? 'lab' : 'self' };
+		openDev(refKind === 'lab_dev' ? 'lab' : 'self');
 	}
 
 	// QuickAddBar → logShot → reload
@@ -968,23 +953,27 @@
 		<!-- Reusable page sections, ordered by the derived phase below. -->
 
 		{#snippet boardSection()}
-			<div class="mb-6">
-				<ActivityBoard
-					{activities}
-					{phase}
-					badge={roll?.badge ?? ''}
-					expanded={boardExpanded}
-					archiveLocation={roll?.archive_location ?? null}
-					archiveNaReason={roll?.archive_na_reason ?? null}
-					onToggleExpanded={() => (boardExpandedOverride = !boardExpanded)}
-					oneditdate={onEditDate}
-					oncleardate={onClearDate}
-					onchoosepath={onChoosePath}
-					onopendev={onOpenDev}
-					oneditarchiving={() => (showArchiveDialog = true)}
-				/>
-				{#if devNotice}<p class="mt-2 text-xs text-text-faint">{devNotice}</p>{/if}
-			</div>
+			<!-- Hidden while the roll Edit form is open (the guard the old Lifecycle-dates
+			     section had): a board save reloads the roll under the unsaved edit form,
+			     leaving the form holding pre-mutation values. -->
+			{#if !editingRoll}
+				<div class="mb-6">
+					<ActivityBoard
+						{activities}
+						badge={roll?.badge ?? ''}
+						expanded={boardExpanded}
+						archiveLocation={roll?.archive_location ?? null}
+						archiveNaReason={roll?.archive_na_reason ?? null}
+						onToggleExpanded={() => (boardExpandedOverride = !boardExpanded)}
+						oneditdate={onEditDate}
+						oncleardate={onClearDate}
+						onchoosepath={openDev}
+						onopendev={() => openDev(labDev ? 'lab' : 'self')}
+						oneditarchiving={() => (showArchiveDialog = true)}
+					/>
+					{#if devNotice}<p class="mt-2 text-xs text-text-faint">{devNotice}</p>{/if}
+				</div>
+			{/if}
 		{/snippet}
 
 		{#snippet framesSection()}
@@ -1126,16 +1115,19 @@
 		<!-- Auto phase layout (ADR-0013): the derived phase reorders the sections.
 		     Shooting/wrap-up → shots front and centre (the shooting phase adds the
 		     reference card + quick entry and collapses the board, all keyed off `phase`
-		     inside the sections); done → the board's compact summary first. -->
+		     inside the sections); done → the board leads, fully expanded and still
+		     fully editable — only the page order condenses.
+		     devSection is hoisted BELOW the branch so crossing the done boundary never
+		     remounts DevelopmentSection (which would drop its dialog state and replay
+		     its entrance) — only board/frames swap. -->
 		{#if phase === 'done'}
 			<FadeIn delay={50}>{@render boardSection()}</FadeIn>
 			<FadeIn delay={100}>{@render framesSection()}</FadeIn>
-			{@render devSection()}
 		{:else}
 			<FadeIn delay={50}>{@render framesSection()}</FadeIn>
 			<FadeIn delay={100}>{@render boardSection()}</FadeIn>
-			{@render devSection()}
 		{/if}
+		{@render devSection()}
 	</div>
 {/if}
 
@@ -1298,7 +1290,7 @@
 	<ConfirmDialog
 		open={true}
 		title="Clear date"
-		message={`Clear the ${pendingClear.label}? This moves the roll back.`}
+		message={`Clear the ${pendingClear.label}? This may move the roll back.`}
 		confirmLabel="Clear"
 		variant="primary"
 		onconfirm={confirmClearDate}
@@ -1326,13 +1318,13 @@
 	<ConfirmDialog
 		open={true}
 		title="Remove archived date"
-		message="Remove the archived date? This moves the roll back."
+		message="Remove the archived date? This may move the roll back."
 		confirmLabel="Remove"
 		variant="primary"
 		onconfirm={() => {
 			const p = pendingArchiveClear!;
 			pendingArchiveClear = null;
-			void applyArchive(p);
+			void patchRoll(p);
 		}}
 		oncancel={() => {
 			pendingArchiveClear = null;

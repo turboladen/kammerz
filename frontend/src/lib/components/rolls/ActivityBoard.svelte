@@ -7,12 +7,11 @@
 	// inside FadeIn.
 	import { Pencil, X, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import { activityLabel, stateLabel, type RollPhase, type DateSlot } from '$lib/utils/activity-board';
+	import { activityLabel, isDatedKind, SLOT_CAPTIONS, stateLabel, type DateSlot } from '$lib/utils/activity-board';
 	import type { ActivityKind, ActivityState, RollActivityItem } from '$lib/types';
 
 	interface Props {
 		activities: RollActivityItem[];
-		phase: RollPhase;
 		/** Compound badge string for the collapsed summary. */
 		badge: string;
 		expanded: boolean;
@@ -33,7 +32,6 @@
 
 	let {
 		activities,
-		phase,
 		badge,
 		expanded,
 		archiveLocation,
@@ -61,12 +59,15 @@
 </script>
 
 {#snippet dateControl(kind: ActivityKind, slot: DateSlot, date: string | null, label: string)}
+	<!-- Accessible names carry the activity too ("Set Scanning started date"):
+	     scanning and post-processing share the 'Started' caption, so caption-only
+	     names would collide for screen readers and role-based test locators. -->
 	<div class="flex items-center gap-1">
 		<button
 			type="button"
 			onclick={() => oneditdate(kind, slot)}
 			class="group flex items-center gap-1.5 rounded px-1 py-0.5 transition-colors hover:bg-surface-overlay"
-			aria-label={date ? `Edit ${label} date` : `Set ${label} date`}
+			aria-label={`${date ? 'Edit' : 'Set'} ${activityLabel(kind)} ${label.toLowerCase()} date`}
 		>
 			<span class="font-mono text-xs {date ? 'text-text' : 'text-text-faint'}">{date ?? 'Set date'}</span>
 			<Pencil
@@ -80,7 +81,7 @@
 				type="button"
 				onclick={() => oncleardate(kind, slot)}
 				class="rounded p-0.5 text-text-faint transition-colors hover:bg-red-500/15 hover:text-red-400"
-				aria-label={`Clear ${label} date`}
+				aria-label={`Clear ${activityLabel(kind)} ${label.toLowerCase()} date`}
 			>
 				<X size={12} strokeWidth={2} aria-hidden="true" />
 			</button>
@@ -118,6 +119,7 @@
 		<button
 			type="button"
 			onclick={onToggleExpanded}
+			aria-expanded={expanded}
 			class="flex w-full items-center justify-between rounded-lg border border-border bg-surface-raised px-4 py-2.5 text-left transition-colors hover:border-accent/40"
 		>
 			<span class="text-sm text-text-muted">{badge}</span>
@@ -135,15 +137,9 @@
 						{stateLabel(a.kind, a.state)}
 					</span>
 					<div class="flex flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-1">
-						{#if a.kind === 'shooting'}
-							{@render datedSlot('shooting', 'start', a.start, 'Loaded')}
-							{@render datedSlot('shooting', 'completion', a.completion, 'Finished')}
-						{:else if a.kind === 'scanning'}
-							{@render datedSlot('scanning', 'start', a.start, 'Started')}
-							{@render datedSlot('scanning', 'completion', a.completion, 'Scanned')}
-						{:else if a.kind === 'post_processing'}
-							{@render datedSlot('post_processing', 'start', a.start, 'Started')}
-							{@render datedSlot('post_processing', 'completion', a.completion, 'Done')}
+						{#if isDatedKind(a.kind)}
+							{@render datedSlot(a.kind, 'start', a.start, SLOT_CAPTIONS[a.kind].start)}
+							{@render datedSlot(a.kind, 'completion', a.completion, SLOT_CAPTIONS[a.kind].completion)}
 						{:else if a.kind === 'development'}
 							{#if a.state === 'not_started'}
 								<span class="text-[10px] font-medium uppercase tracking-wider text-text-faint">Start</span>

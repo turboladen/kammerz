@@ -54,11 +54,11 @@
 	<div class="space-y-4">
 		<Input type="date" label="Date" class="h-[38px]" bind:value={draft} />
 		{#if !allowClear}
-			<!-- Transition prompt (no Clear button): surface the otherwise-invisible
-			     escape hatch — an undated milestone can still be edited or cleared later
-			     from the Lifecycle dates section. (kammerz-cb7) -->
+			<!-- No-Clear-button mode: surface the otherwise-invisible escape hatch — the
+			     date can still be changed or cleared later from the activity board (the
+			     Lifecycle-dates section this hint used to name is gone). (kammerz-cb7) -->
 			<p class="text-xs text-text-muted">
-				Pick the date this happened — you can change or clear it later from Lifecycle dates.
+				Pick the date this happened — you can change or clear it later from the activity board.
 			</p>
 		{/if}
 		<div class="flex justify-end gap-2">
