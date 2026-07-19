@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Shot } from '$lib/types';
-	import { formatShotRow } from '$lib/utils/shot-table';
+	import { formatShotRow, type ShotRowDisplay } from '$lib/utils/shot-table';
 
 	interface Props {
 		/** Shots in FrameStrip reading order (roll-detail's `orderedShots`). */
@@ -12,6 +12,19 @@
 	}
 
 	let { shots, lensNames, onselect, onaddextra }: Props = $props();
+
+	// One definition per column drives BOTH the header row and the body cells, so
+	// they can never fall out of lockstep (a hand-maintained pair silently shifts
+	// every value under the wrong header when one side is edited).
+	const COLUMNS: { label: string; cls: string; value: (row: ShotRowDisplay, shot: Shot) => string }[] = [
+		{ label: 'Aperture', cls: 'whitespace-nowrap', value: (r) => r.aperture },
+		{ label: 'Shutter', cls: 'whitespace-nowrap', value: (r) => r.shutter },
+		{ label: 'Date', cls: 'whitespace-nowrap', value: (r) => r.date },
+		{ label: 'Time', cls: 'whitespace-nowrap', value: (r) => r.time },
+		{ label: 'Location', cls: '', value: (r) => r.location },
+		{ label: 'Lens', cls: '', value: (_r, shot) => lensNames[shot.id] ?? '' },
+		{ label: 'Notes', cls: 'whitespace-pre-wrap break-words', value: (r) => r.notes }
+	];
 </script>
 
 {#if shots.length === 0}
@@ -26,43 +39,33 @@
 			<thead>
 				<tr class="border-b border-border text-left text-text-faint">
 					<th class="py-2 pr-3 pl-3 font-medium">#</th>
-					<th class="py-2 pr-3 font-medium">f/</th>
-					<th class="py-2 pr-3 font-medium">Shutter</th>
-					<th class="py-2 pr-3 font-medium">Date</th>
-					<th class="py-2 pr-3 font-medium">Time</th>
-					<th class="py-2 pr-3 font-medium">Location</th>
-					<th class="py-2 pr-3 font-medium">Lens</th>
-					<th class="py-2 pr-3 font-medium">Notes</th>
+					{#each COLUMNS as col (col.label)}
+						<th class="py-2 pr-3 font-medium">{col.label}</th>
+					{/each}
 				</tr>
 			</thead>
 			<tbody>
 				{#each shots as shot (shot.id)}
 					{@const row = formatShotRow(shot)}
-					<!-- Row click is a pointer-only convenience; the Frame-cell button is the
-					     sole keyboard/SR control. Both call the same idempotent onselect. -->
+					<!-- Rows are deliberately NOT click targets: the table exists for
+					     zero-click reading and text selection (transcribing metadata), and a
+					     whole-row onclick would open the dialog on any select/copy attempt.
+					     The Frame-cell button is the sole open affordance. -->
 					<tr
-						class="cursor-pointer border-b border-border-subtle align-top transition-colors last:border-b-0 hover:bg-surface-overlay"
-						onclick={() => onselect(shot)}
+						class="border-b border-border-subtle align-top transition-colors last:border-b-0 hover:bg-surface-overlay"
 					>
 						<td class="py-2 pr-3 pl-3">
 							<button
 								class="rounded font-medium text-accent transition-colors hover:text-accent-hover focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/50"
 								aria-label="View frame {row.frame}"
-								onclick={(e) => {
-									e.stopPropagation();
-									onselect(shot);
-								}}
+								onclick={() => onselect(shot)}
 							>
 								{row.frame}
 							</button>
 						</td>
-						<td class="py-2 pr-3 whitespace-nowrap text-text-muted">{row.aperture}</td>
-						<td class="py-2 pr-3 whitespace-nowrap text-text-muted">{row.shutter}</td>
-						<td class="py-2 pr-3 whitespace-nowrap text-text-muted">{row.date}</td>
-						<td class="py-2 pr-3 whitespace-nowrap text-text-muted">{row.time}</td>
-						<td class="py-2 pr-3 text-text-muted">{row.location}</td>
-						<td class="py-2 pr-3 text-text-muted">{lensNames[shot.id] ?? ''}</td>
-						<td class="py-2 pr-3 whitespace-pre-wrap break-words text-text-muted">{row.notes}</td>
+						{#each COLUMNS as col (col.label)}
+							<td class="py-2 pr-3 text-text-muted {col.cls}">{col.value(row, shot)}</td>
+						{/each}
 					</tr>
 				{/each}
 			</tbody>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Shot } from '$lib/types';
+	import { formatShotRow } from '$lib/utils/shot-table';
 
 	interface FrameCell {
 		frameNumber: string;
@@ -11,9 +12,30 @@
 		frames: FrameCell[];
 		onselect: (frameNumber: string, shot: Shot | null) => void;
 		onaddextra: () => void;
+		/** Action clause for filled-frame labels ("click to view"). Pass null on
+		 * pages where clicking a filled frame does nothing (quick-entry), so the
+		 * label never advertises an affordance the page doesn't have. */
+		filledAction?: string | null;
 	}
 
-	let { frames, onselect, onaddextra }: Props = $props();
+	let { frames, onselect, onaddextra, filledAction = 'view' }: Props = $props();
+
+	// Filled-frame hint strings built from the shared formatShotRow convention
+	// (f/ prefix, s suffix) so the strip's tooltip/accessible name can't drift
+	// from what the table and view dialog render for the same shot.
+	function filledParts(shot: Shot, sep: string): string {
+		const row = formatShotRow(shot);
+		return [row.date, row.aperture, row.shutter, row.time].filter(Boolean).join(sep);
+	}
+	function filledTitle(cell: FrameCell): string {
+		const parts = filledParts(cell.shot!, ' · ');
+		return `Frame ${cell.frameNumber}${parts ? ' · ' + parts : ''}`;
+	}
+	function filledLabel(cell: FrameCell): string {
+		const parts = filledParts(cell.shot!, ', ');
+		const action = filledAction ? ` — click to ${filledAction}` : '';
+		return `Frame ${cell.frameNumber}${parts ? ', ' + parts : ''}${action}`;
+	}
 </script>
 
 <!-- Outer wrapper: the "film strip" surface with sprocket rails top & bottom -->
@@ -29,12 +51,12 @@
 					<button
 						onclick={() => onselect(cell.frameNumber, cell.shot)}
 						title={cell.shot
-							? `Frame ${cell.frameNumber}${cell.shot.date ? ' · ' + cell.shot.date : ''}${cell.shot.aperture ? ' · f/' + cell.shot.aperture : ''}${cell.shot.shutter_speed ? ' · ' + cell.shot.shutter_speed + 's' : ''}${cell.shot.time ? ' · ' + cell.shot.time : ''}`
+							? filledTitle(cell)
 							: cell.isNext
 								? `Frame ${cell.frameNumber} — next open frame`
 								: `Frame ${cell.frameNumber} — open`}
 						aria-label={cell.shot
-							? `Frame ${cell.frameNumber}${cell.shot.date ? ', ' + cell.shot.date : ''}${cell.shot.aperture ? ', f/' + cell.shot.aperture : ''}${cell.shot.shutter_speed ? ', ' + cell.shot.shutter_speed + 's' : ''}${cell.shot.time ? ', ' + cell.shot.time : ''} — click to view`
+							? filledLabel(cell)
 							: cell.isNext
 								? `Frame ${cell.frameNumber}, next open frame — click to add`
 								: `Frame ${cell.frameNumber}, open — click to add`}

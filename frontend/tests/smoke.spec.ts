@@ -349,8 +349,9 @@ test('shots table view lists fields and opens the view dialog (kammerz-4she)', a
 		await page.goto(`${BASE}/rolls/${rollId}`);
 		await page.waitForLoadState('networkidle');
 
-		// A fresh loaded roll is in the shooting phase → strip by default. Switch to Table.
-		await page.getByRole('button', { name: 'Table', exact: true }).click();
+		// A fresh loaded roll is in the shooting phase → strip by default. Switch to
+		// Table via the segmented control (a radiogroup — exactly-one-of semantics).
+		await page.getByRole('radio', { name: 'Table', exact: true }).click();
 
 		// The table renders the decorated fields (f/ prefix, s suffix) and the location.
 		await expect(page.getByRole('cell', { name: 'f/5.6', exact: true })).toBeVisible();

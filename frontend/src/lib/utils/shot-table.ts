@@ -23,6 +23,10 @@ export interface ShotRowDisplay {
  * shutter, and plain text for the rest. A null field renders as an empty string
  * (never a bare "f/" or "s"), so the caller decides how to show absence.
  */
+// Keep this LOSSLESS: the table cells, the read-only view dialog, the FrameStrip
+// hint strings, and the last-shot reference card all render from it. Compaction
+// (truncating notes, abbreviating location) belongs at the render site that
+// needs it — baked in here it would silently degrade every other consumer.
 export function formatShotRow(shot: Shot): ShotRowDisplay {
 	return {
 		frame: shot.frame_number,

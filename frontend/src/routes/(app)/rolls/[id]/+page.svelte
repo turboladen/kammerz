@@ -313,8 +313,23 @@
 	// edit form is populated in parallel (populateShotForm) so switching to Edit is instant.
 	const editingShot = $derived(editingShotId == null ? null : (shots.find((s) => s.id === editingShotId) ?? null));
 	const editingShotRow = $derived(editingShot ? formatShotRow(editingShot) : null);
+
+	// The view shows the EFFECTIVE lens (per-shot, else roll default). When it's the
+	// inherited default, say so — the edit form's Lens dropdown deliberately shows
+	// only the per-shot override ('No lens' when inheriting), and without the
+	// annotation view→Edit reads like the lens was cleared.
+	const viewLensLabel = $derived.by(() => {
+		if (!editingShot) return '';
+		const name = shotLensNames[editingShot.id] ?? '';
+		if (!name) return '';
+		const hasOwn = (shotLensMap[editingShot.id]?.length ?? 0) > 0;
+		return hasOwn ? name : `${name} (roll default)`;
+	});
 	// True only while an existing shot is shown read-only (never in add mode).
-	const isShotView = $derived(editingShotId != null && shotDialogMode === 'view');
+	// Row presence is part of the guard: if the viewed shot vanishes from `shots`
+	// (concurrent delete), the title/arrows/body must all agree instead of the body
+	// silently falling through to the edit form under a view-mode header.
+	const isShotView = $derived(editingShotId != null && shotDialogMode === 'view' && editingShotRow != null);
 	const currentShotIdx = $derived(editingShotId == null ? -1 : orderedShots.findIndex((s) => s.id === editingShotId));
 	const hasPrevShot = $derived(currentShotIdx > 0);
 	const hasNextShot = $derived(currentShotIdx >= 0 && currentShotIdx < orderedShots.length - 1);
@@ -498,6 +513,21 @@
 		showShotDialog = true;
 	}
 
+	// Single teardown for every way the shot dialog closes — the mode reset had
+	// already drifted across hand-inlined copies of this block.
+	function closeShotDialog() {
+		showShotDialog = false;
+		resetShotForm();
+		shotDialogMode = 'view';
+	}
+
+	// Close the dialog, then arm the (ConfirmDialog-gated) delete for its shot.
+	function startDeleteShot() {
+		const sid = editingShotId;
+		closeShotDialog();
+		deletingShotId = sid;
+	}
+
 	// Navigate to an adjacent shot, saving the current one's edits first if the
 	// form is dirty (kammerz-11o3). The target is captured by POSITION before the
 	// save/reload (that's the shot the user saw next to the arrow), then re-looked
@@ -593,8 +623,7 @@
 					lens_ids: lensIds
 				});
 			}
-			showShotDialog = false;
-			resetShotForm();
+			closeShotDialog();
 			await loadRollData();
 		} catch (err) {
 			shotError = err instanceof Error ? err.message : String(err);
@@ -1069,8 +1098,8 @@
 						<h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-text-faint">Last shot</h3>
 						<div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
 							<span class="font-mono text-text">#{lastShot.frame}</span>
-							{#if lastShot.aperture}<span class="font-mono text-text-muted">f/{lastShot.aperture}</span>{/if}
-							{#if lastShot.shutter}<span class="font-mono text-text-muted">{lastShot.shutter}s</span>{/if}
+							{#if lastShot.aperture}<span class="font-mono text-text-muted">{lastShot.aperture}</span>{/if}
+							{#if lastShot.shutter}<span class="font-mono text-text-muted">{lastShot.shutter}</span>{/if}
 							{#if lastShot.lensName}<span class="text-text-faint">{lastShot.lensName}</span>{/if}
 						</div>
 					</div>
@@ -1088,30 +1117,28 @@
 					</h2>
 					<div class="flex items-center gap-2">
 						<!-- Strip ↔ table toggle: the strip for logging/progress, the table for
-						     zero-click reading. Segmented control, accent marks the active view. -->
+						     zero-click reading. Exactly-one-of, so a radiogroup (not aria-pressed
+						     toggles, which read as independently pressable); one {#each} keeps the
+						     two options' styling in lockstep. -->
 						<div
 							class="inline-flex overflow-hidden rounded-lg border border-border"
-							role="group"
+							role="radiogroup"
 							aria-label="Frames view"
 						>
-							<button
-								class="px-2.5 py-1 text-xs font-medium transition-colors {shotView === 'strip'
-									? 'bg-accent text-surface'
-									: 'text-text-muted hover:bg-surface-overlay hover:text-text'}"
-								aria-pressed={shotView === 'strip'}
-								onclick={() => (shotViewOverride = 'strip')}
-							>
-								Strip
-							</button>
-							<button
-								class="border-l border-border px-2.5 py-1 text-xs font-medium transition-colors {shotView === 'table'
-									? 'bg-accent text-surface'
-									: 'text-text-muted hover:bg-surface-overlay hover:text-text'}"
-								aria-pressed={shotView === 'table'}
-								onclick={() => (shotViewOverride = 'table')}
-							>
-								Table
-							</button>
+							{#each [{ value: 'strip', label: 'Strip' }, { value: 'table', label: 'Table' }] as const as opt (opt.value)}
+								<button
+									type="button"
+									role="radio"
+									aria-checked={shotView === opt.value}
+									class="px-2.5 py-1 text-xs font-medium transition-colors not-first:border-l not-first:border-border {shotView ===
+									opt.value
+										? 'bg-accent text-surface'
+										: 'text-text-muted hover:bg-surface-overlay hover:text-text'}"
+									onclick={() => (shotViewOverride = opt.value)}
+								>
+									{opt.label}
+								</button>
+							{/each}
 						</div>
 						<Button
 							size="sm"
@@ -1258,11 +1285,7 @@
 	<Dialog
 		open={true}
 		title={isShotView ? `Shot ${editingShotRow?.frame ?? ''}` : editingShotId ? 'Edit Shot' : 'Add Shot'}
-		onclose={() => {
-			showShotDialog = false;
-			resetShotForm();
-			shotDialogMode = 'view';
-		}}
+		onclose={closeShotDialog}
 	>
 		<div class="space-y-4">
 			{#if editingShotId}
@@ -1308,7 +1331,7 @@
 					{@render viewField('Date', editingShotRow.date)}
 					{@render viewField('Time', editingShotRow.time)}
 					{@render viewField('Location', editingShotRow.location, false)}
-					{@render viewField('Lens', editingShot ? (shotLensNames[editingShot.id] ?? '') : '', false)}
+					{@render viewField('Lens', viewLensLabel, false)}
 					<div class="col-span-2 sm:col-span-3">
 						<dt class="mb-0.5 text-xs font-medium text-text-faint">Notes</dt>
 						<dd
@@ -1319,26 +1342,13 @@
 					</div>
 				</dl>
 				<div class="flex items-center justify-between gap-2 pt-2">
-					<Button
-						variant="danger"
-						onclick={() => {
-							const sid = editingShotId;
-							showShotDialog = false;
-							resetShotForm();
-							shotDialogMode = 'view';
-							deletingShotId = sid;
-						}}>Delete</Button
-					>
+					<Button variant="danger" onclick={startDeleteShot}>Delete</Button>
 					<div class="flex gap-2">
-						<Button
-							variant="ghost"
-							onclick={() => {
-								showShotDialog = false;
-								resetShotForm();
-								shotDialogMode = 'view';
-							}}>Close</Button
-						>
-						<Button variant="primary" onclick={() => (shotDialogMode = 'edit')}>Edit</Button>
+						<Button variant="ghost" onclick={closeShotDialog}>Close</Button>
+						<!-- Re-open through openShotEdit so the form and dirty baseline re-seed
+						     from the LIVE shot — a bare mode flip would edit the values seeded
+						     when the view opened, stale if the roll refreshed since. -->
+						<Button variant="primary" onclick={() => editingShot && openShotEdit(editingShot)}>Edit</Button>
 					</div>
 				</div>
 			{:else}
@@ -1388,24 +1398,19 @@
 				{/if}
 				<div class="flex items-center justify-between gap-2 pt-2">
 					{#if editingShotId}
-						<Button
-							variant="danger"
-							onclick={() => {
-								const sid = editingShotId;
-								showShotDialog = false;
-								resetShotForm();
-								deletingShotId = sid;
-							}}>Delete</Button
-						>
+						<Button variant="danger" onclick={startDeleteShot}>Delete</Button>
 					{:else}
 						<span></span>
 					{/if}
 					<div class="flex gap-2">
+						<!-- Edit mode is reached FROM the read-only view, so Cancel returns
+						     there (discarding edits by re-seeding from the live shot) instead
+						     of closing the whole dialog; add mode just closes. -->
 						<Button
 							variant="ghost"
 							onclick={() => {
-								showShotDialog = false;
-								resetShotForm();
+								if (editingShot) openShotView(editingShot);
+								else closeShotDialog();
 							}}>Cancel</Button
 						>
 						{#if !editingShotId}
