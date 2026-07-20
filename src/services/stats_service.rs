@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use sea_orm::*;
 use serde::Serialize;
 
-use crate::activity::{ActivitySignals, legacy_status};
+use crate::activity::{ActivitySignals, derive, phase_label};
 
 pub struct StatsService;
 
-/// Per-roll activity-derivation signals for the `rolls_by_status` distribution.
+/// Per-roll activity-derivation signals for the `rolls_by_phase` distribution.
 #[derive(Debug, FromQueryResult)]
 struct StatusSignalRow {
     date_finished: Option<String>,
@@ -58,7 +58,7 @@ pub struct CatalogStats {
     pub top_cameras: Vec<RankedItem>,
     pub top_lenses: Vec<RankedItem>,
     pub rolls_by_format: Vec<RankedItem>,
-    pub rolls_by_status: Vec<RankedItem>,
+    pub rolls_by_phase: Vec<RankedItem>,
     pub rolls_by_mount: Vec<RankedItem>,
 }
 
@@ -216,10 +216,10 @@ impl StatsService {
         .all(db)
         .await?;
 
-        // --- Rolls by status ---
-        // There is no stored status (ADR-0013): derive each roll's compat status
-        // from its activity signals and tally in Rust, preserving the endpoint's
-        // shape (RankedItem, ordered by count desc).
+        // --- Rolls by phase ---
+        // There is no stored status (ADR-0013): derive each roll's activity view
+        // from its signals and tally by lifecycle phase (the earliest-unresolved
+        // `group_key`, 0..=5), ordered by count desc.
         let status_rows = StatusSignalRow::find_by_statement(Statement::from_string(
             backend,
             "SELECT r.date_finished, r.date_scanned, r.date_post_processed, \
@@ -237,7 +237,7 @@ impl StatsService {
         .all(db)
         .await?;
 
-        let mut status_counts: HashMap<String, i64> = HashMap::new();
+        let mut phase_counts: HashMap<i32, i64> = HashMap::new();
         for row in status_rows {
             let is_lab_dev = row.lab_dev_id.is_some();
             let sig = ActivitySignals {
@@ -259,14 +259,17 @@ impl StatsService {
                 date_archived: row.date_archived,
                 archive_na: row.archive_na,
             };
-            *status_counts.entry(legacy_status(&sig)).or_insert(0) += 1;
+            *phase_counts.entry(derive(&sig).group_key).or_insert(0) += 1;
         }
-        let mut rolls_by_status: Vec<RankedItem> = status_counts
+        let mut rolls_by_phase: Vec<RankedItem> = phase_counts
             .into_iter()
-            .map(|(label, count)| RankedItem { label, count })
+            .map(|(group_key, count)| RankedItem {
+                label: phase_label(group_key).to_string(),
+                count,
+            })
             .collect();
         // Count desc, then label asc for a deterministic order.
-        rolls_by_status.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.label.cmp(&b.label)));
+        rolls_by_phase.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.label.cmp(&b.label)));
 
         // --- Rolls by lens mount ---
         let rolls_by_mount = RankedItem::find_by_statement(Statement::from_string(
@@ -295,7 +298,7 @@ impl StatsService {
             top_cameras,
             top_lenses,
             rolls_by_format,
-            rolls_by_status,
+            rolls_by_phase,
             rolls_by_mount,
         })
     }

@@ -24,15 +24,57 @@ async fn create_shot_roll(app: &axum::Router, roll_id: &str) -> i32 {
     create_roll_at_status(app, roll_id, "shot").await
 }
 
-/// Fetch a roll's current status string.
+/// Reconstruct the roll's legacy lifecycle label from its DERIVED activity view
+/// plus its dev records (ADR-0013 — there is no stored status). The derived view
+/// alone cannot tell at-lab from developing, or lab-done from developed: each pair
+/// collapses to the same `group_key`/`badge` (development in-progress vs done). So
+/// this reads the roll's `/detail` to see which dev RECORD exists and uses that
+/// for the lab-vs-self distinction — the discrimination the old stored status
+/// carried now lives on the record, which is exactly what these tests must assert.
 async fn roll_status(app: &axum::Router, roll_pk: i32) -> String {
     let res = app
         .clone()
-        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
+        .oneshot(get(&format!("/api/rolls/{roll_pk}/detail")))
         .await
         .unwrap();
-    let roll: Value = json_body(res).await;
-    roll["status"].as_str().unwrap().to_string()
+    let detail: Value = json_body(res).await;
+    let roll = &detail["roll"];
+    let group_key = roll["group_key"].as_i64().unwrap();
+    let shot_count = roll["shot_count"].as_i64().unwrap_or(0);
+    let has_lab = !detail["lab_dev"].is_null();
+    let has_self = !detail["self_dev"].is_null();
+    match group_key {
+        0 => {
+            if shot_count > 0 {
+                "shooting"
+            } else {
+                "loaded"
+            }
+        }
+        // Development is the earliest unresolved activity: not-started (no record) =
+        // shot; in-progress = at-lab/developing per the record kind.
+        1 => {
+            if has_lab {
+                "at-lab"
+            } else if has_self {
+                "developing"
+            } else {
+                "shot"
+            }
+        }
+        // Development done, waiting to scan: lab-done vs developed per record kind.
+        2 => {
+            if has_self {
+                "developed"
+            } else {
+                "lab-done"
+            }
+        }
+        3 => "scanned",
+        4 => "post-processed",
+        _ => "archived",
+    }
+    .to_string()
 }
 
 /// Create a roll whose recorded dates derive to `status` (ADR-0013 — there is no
@@ -125,13 +167,7 @@ async fn create_self_dev_with_stages_and_lists() {
     assert_eq!(stages[1]["stage_name"], "Fix");
 
     // Roll derives to developing from the newly-created self dev record.
-    let res = app
-        .clone()
-        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
-        .await
-        .unwrap();
-    let roll: Value = json_body(res).await;
-    assert_eq!(roll["status"], "developing");
+    assert_eq!(roll_status(&app, roll_pk).await, "developing");
 
     // list_all_self_developments includes our record with its merged stages.
     let res = app
@@ -234,12 +270,11 @@ async fn create_lab_dev_advances_status() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);
 
-    let res = app
-        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
-        .await
-        .unwrap();
-    let roll: Value = json_body(res).await;
-    assert_eq!(roll["status"], "at-lab", "lab dev advances roll to at-lab");
+    assert_eq!(
+        roll_status(&app, roll_pk).await,
+        "at-lab",
+        "lab dev advances roll to at-lab"
+    );
 }
 
 // kammerz-afc: an imported roll orphaned at at-lab (no lab dev record). Clicking
@@ -261,13 +296,9 @@ async fn create_lab_dev_with_received_date_advances_orphan_at_lab_to_lab_done() 
         .unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);
 
-    let res = app
-        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
-        .await
-        .unwrap();
-    let roll: Value = json_body(res).await;
     assert_eq!(
-        roll["status"], "lab-done",
+        roll_status(&app, roll_pk).await,
+        "lab-done",
         "lab dev with received date lands an orphaned at-lab roll at lab-done in one action"
     );
 }
@@ -289,13 +320,9 @@ async fn create_self_dev_with_processed_date_advances_orphan_developing_to_devel
         .unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);
 
-    let res = app
-        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
-        .await
-        .unwrap();
-    let roll: Value = json_body(res).await;
     assert_eq!(
-        roll["status"], "developed",
+        roll_status(&app, roll_pk).await,
+        "developed",
         "self dev with processed date lands an orphaned developing roll at developed in one action"
     );
 }
@@ -318,13 +345,9 @@ async fn create_self_dev_without_processed_date_stops_at_developing() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);
 
-    let res = app
-        .oneshot(get(&format!("/api/rolls/{roll_pk}")))
-        .await
-        .unwrap();
-    let roll: Value = json_body(res).await;
     assert_eq!(
-        roll["status"], "developing",
+        roll_status(&app, roll_pk).await,
+        "developing",
         "self dev without a processed date advances only to developing"
     );
 }

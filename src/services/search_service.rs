@@ -4,7 +4,7 @@ use serde::Serialize;
 use ::entity::camera::CameraFormat;
 use ::entity::film_stock::{FilmFormat, FilmStockType};
 
-use crate::activity::{ActivitySignals, legacy_status};
+use crate::activity::{ActivitySignals, derive};
 
 pub struct SearchService;
 
@@ -41,13 +41,15 @@ pub struct FilmStockSearchResult {
     pub match_snippet: String,
 }
 
-/// A roll search hit. `status` is the compat legacy status, derived in Rust from
-/// the roll's dates (ADR-0013) — there is no stored status column to select.
+/// A roll search hit. `badge` + `group_key` are the server-derived activity
+/// summary (ADR-0013) — there is no stored status column to select — so the
+/// search UI renders the same phase Badge as every other roll list.
 #[derive(Debug, Serialize)]
 pub struct RollSearchResult {
     pub id: i32,
     pub roll_id: String,
-    pub status: String,
+    pub badge: String,
+    pub group_key: i32,
     pub camera_brand: Option<String>,
     pub camera_model: Option<String>,
     pub film_stock_brand: Option<String>,
@@ -102,10 +104,12 @@ impl From<RollSearchRow> for RollSearchResult {
             date_archived: row.date_archived,
             archive_na: row.archive_na,
         };
+        let activity = derive(&sig);
         RollSearchResult {
             id: row.id,
             roll_id: row.roll_id,
-            status: legacy_status(&sig),
+            badge: activity.badge,
+            group_key: activity.group_key,
             camera_brand: row.camera_brand,
             camera_model: row.camera_model,
             film_stock_brand: row.film_stock_brand,

@@ -172,14 +172,14 @@ async fn mark_picked_up_sets_date_logs_event_and_keeps_status() {
     let app = open_app().await;
     let (roll_pk, lab_dev_id) = lab_developed_roll(&app).await;
 
-    let status_before = {
+    let badge_before = {
         let res = app
             .clone()
             .oneshot(get(&format!("/api/rolls/{roll_pk}")))
             .await
             .unwrap();
         let r: Value = json_body(res).await;
-        r["status"].as_str().unwrap().to_string()
+        r["badge"].as_str().unwrap().to_string()
     };
 
     let res = app
@@ -199,8 +199,8 @@ async fn mark_picked_up_sets_date_logs_event_and_keeps_status() {
         .unwrap();
     let detail: Value = json_body(res).await;
     assert_eq!(detail["lab_dev"]["date_negatives_picked_up"], "2026-07-10");
-    // Status untouched by a pickup edit.
-    assert_eq!(detail["roll"]["status"], status_before);
+    // Lifecycle untouched by a pickup edit (the derived badge is unchanged).
+    assert_eq!(detail["roll"]["badge"], badge_before);
     // Journal recorded the specialized event.
     let types: Vec<&str> = detail["events"]
         .as_array()

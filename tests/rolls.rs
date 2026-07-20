@@ -230,7 +230,10 @@ async fn update_roll_applies_partial_patch() {
 
     let res = app.oneshot(get(&format!("/api/rolls/{id}"))).await.unwrap();
     let roll: Value = json_body(res).await;
-    assert_eq!(roll["status"], "shot");
+    // Lifecycle is derived (ADR-0013): a recorded date_finished with no dev record
+    // marks shooting done → group_key 1, badge "To develop".
+    assert_eq!(roll["group_key"], 1);
+    assert_eq!(roll["badge"], "To develop");
     assert_eq!(roll["date_finished"], "2026-05-15");
     assert_eq!(roll["notes"], "windy day");
     assert_eq!(
@@ -282,12 +285,14 @@ async fn update_roll_sets_and_clears_all_lifecycle_dates() {
     assert_eq!(roll["date_scanned"], "2021-12-20");
     assert_eq!(roll["date_post_processed"], "2021-12-22");
     assert_eq!(roll["date_archived"], "2022-01-05");
-    // Status is now derived from these dates (ADR-0013): with date_archived set the
-    // compat status is "archived" — the Edit form no longer sends a status field.
+    // Lifecycle is derived from these dates (ADR-0013): with date_archived set the
+    // roll is Done (group_key 5, badge "Done") — the Edit form sends no status field.
     assert_eq!(
-        roll["status"], "archived",
-        "the compat status derives from the recorded dates"
+        roll["done"], true,
+        "a recorded archive date resolves the roll"
     );
+    assert_eq!(roll["group_key"], 5);
+    assert_eq!(roll["badge"], "Done");
 
     // Clearing one date with an explicit null persists as null and leaves siblings intact.
     let clear = json!({ "date_scanned": null });

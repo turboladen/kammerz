@@ -1,8 +1,8 @@
 mod common;
 
 use axum::http::StatusCode;
-use common::{get, json_body, open_app, open_app_with_db};
-use serde_json::Value;
+use common::{get, json_body, open_app, open_app_with_db, post_json};
+use serde_json::{Value, json};
 use tower::ServiceExt;
 
 #[tokio::test]
@@ -12,6 +12,51 @@ async fn stats_returns_200() {
     assert_eq!(res.status(), StatusCode::OK);
     let stats: Value = json_body(res).await;
     assert!(stats.is_object(), "stats deserializes into an object");
+}
+
+// ADR-0013: the roll distribution is bucketed by derived lifecycle phase, not by
+// a stored status — the endpoint emits `rolls_by_phase` (phase-label + count) and
+// no longer `rolls_by_status`.
+#[tokio::test]
+async fn stats_rolls_by_phase_replaces_rolls_by_status() {
+    let app = open_app().await;
+
+    // A fresh roll lands in the Shooting phase (group_key 0).
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/rolls", &json!({ "roll_id": "PHASE-STAT" })))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let res = app.oneshot(get("/api/stats")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let stats: Value = json_body(res).await;
+
+    assert!(
+        stats["rolls_by_status"].is_null(),
+        "rolls_by_status is retired"
+    );
+    let phases = stats["rolls_by_phase"]
+        .as_array()
+        .expect("rolls_by_phase is an array");
+    assert!(!phases.is_empty(), "at least the fresh roll is counted");
+    let known = [
+        "Shooting",
+        "Development",
+        "Scanning",
+        "Post-processing",
+        "Archiving",
+        "Done",
+    ];
+    for item in phases {
+        let label = item["label"].as_str().unwrap();
+        assert!(known.contains(&label), "unexpected phase label: {label}");
+    }
+    assert!(
+        phases.iter().any(|p| p["label"] == "Shooting"),
+        "the fresh roll is bucketed under Shooting"
+    );
 }
 
 /// Regression (kammerz-4jn) + defense-in-depth: the API now rejects partial dates

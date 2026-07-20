@@ -78,7 +78,10 @@ async fn import_roll_persists_roll_shots_and_lens_links() {
     let detail: Value = json_body(res).await;
 
     assert_eq!(detail["roll"]["roll_id"], "IMPORT-001");
-    assert_eq!(detail["roll"]["status"], "shot");
+    // The imported `status: "shot"` backfilled date_finished; the lifecycle is then
+    // derived (ADR-0013) — finished shooting, no dev → group_key 1, badge "To develop".
+    assert_eq!(detail["roll"]["group_key"], 1);
+    assert_eq!(detail["roll"]["badge"], "To develop");
     assert_eq!(detail["roll"]["frame_count"].as_i64(), Some(36));
     assert_eq!(detail["roll"]["date_loaded"], "2026-04-01");
 

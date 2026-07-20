@@ -4,20 +4,14 @@
 //! **scanning**, **post-processing**, **archiving** — whose states are derived
 //! purely from date presence. There is no stored status. This module is the
 //! single source of truth for that derivation: the backend computes per-activity
-//! states, a compound badge, a group/sort key, a `done` flag, AND a *compat*
-//! legacy `status` string here, and every consumer (roll list/detail, search,
-//! stats, development lists) runs its rows through [`derive`]. The frontend never
-//! re-derives.
+//! states, a compound badge, a group/sort key, and a `done` flag here, and every
+//! consumer (roll list/detail, search, stats, development lists) runs its rows
+//! through [`derive`]. The frontend never re-derives.
 //!
 //! Pure and DB-free so it is exhaustively unit-testable and reused across the
-//! request handlers without a database round-trip.
-//!
-//! The compat `status` is a transitional shim (kammerz-1ezf tracks its removal
-//! once the remaining frontend consumers move to the activity fields): it lets
-//! the existing frontend keep reading `roll.status` unchanged while the new
-//! `activities`/`badge`/`group_key` fields ride alongside for the activity-board
-//! UI (kammerz-64ga/4she). It is derived fresh from data on every read, so unlike
-//! the retired stored enum it can never drift from the dates that justify it.
+//! request handlers without a database round-trip. This module's unit tests are
+//! the single home for the derivation's coverage (there is no fixture cross-check
+//! and no compat status string anymore — kammerz-1ezf retired both).
 
 use serde::Serialize;
 
@@ -29,6 +23,28 @@ pub const ACTIVITY_KINDS: [&str; 5] = [
     "post_processing",
     "archiving",
 ];
+
+/// Canonical lifecycle-phase labels, indexed by `group_key` (0..=4 = the earliest
+/// unresolved activity; 5 = Done). Used by the stats `rolls_by_phase` tally; the
+/// frontend's `PHASE_META` labels (phase.ts) MUST match these strings so the stats
+/// panel can color each bar by phase (kammerz-1ezf).
+pub const PHASE_LABELS: [&str; 6] = [
+    "Shooting",
+    "Development",
+    "Scanning",
+    "Post-processing",
+    "Archiving",
+    "Done",
+];
+
+/// The phase label for a `group_key`. Out-of-range keys clamp to "Done" (the
+/// group_key domain is 0..=5, so this is unreachable in practice).
+pub fn phase_label(group_key: i32) -> &'static str {
+    PHASE_LABELS
+        .get(group_key as usize)
+        .copied()
+        .unwrap_or("Done")
+}
 
 /// One activity's derived state, with the dates that drive it (for the board UI).
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -54,8 +70,6 @@ pub struct RollActivity {
     pub group_key: i32,
     /// True when all five activities are resolved (archiving N/A counts as resolved).
     pub done: bool,
-    /// Compat legacy status string (kammerz-1ezf). Derived from the same signals.
-    pub status: String,
 }
 
 /// Raw per-roll date/record signals fed to [`derive`]. Callers populate this from
@@ -156,14 +170,12 @@ pub fn derive(sig: &ActivitySignals) -> RollActivity {
     let done = group_key == 5;
 
     let badge = badge_for(&activities, done, group_key);
-    let status = legacy_status(sig);
 
     RollActivity {
         activities,
         badge,
         group_key,
         done,
-        status,
     }
 }
 
@@ -215,38 +227,6 @@ fn badge_for(activities: &[Activity], done: bool, group_key: i32) -> String {
     }
 }
 
-/// The compat legacy status string (highest applicable milestone wins). This
-/// reproduces the semantics the retired `auto_sync`/`sync_*` machinery computed,
-/// so every current frontend consumer keeps rendering unchanged. Rolls whose old
-/// *stored* status had drifted from their data now render the data-consistent
-/// value by design (ADR-0013).
-///
-/// `pub` so consumers that need only the compat status (search, stats, dev
-/// lists) skip [`derive`]'s full activity build (a 5-element `Vec` + badge).
-pub fn legacy_status(sig: &ActivitySignals) -> String {
-    if sig.date_archived.is_some() {
-        "archived"
-    } else if sig.date_post_processed.is_some() {
-        "post-processed"
-    } else if sig.date_scanned.is_some() {
-        "scanned"
-    } else if sig.has_dev {
-        match (sig.is_lab_dev, sig.dev_completion.is_some()) {
-            (true, true) => "lab-done",
-            (true, false) => "at-lab",
-            (false, true) => "developed",
-            (false, false) => "developing",
-        }
-    } else if sig.date_finished.is_some() {
-        "shot"
-    } else if sig.shot_count > 0 {
-        "shooting"
-    } else {
-        "loaded"
-    }
-    .to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,45 +235,53 @@ mod tests {
         ra.activities.iter().find(|a| a.kind == kind).unwrap().state
     }
 
-    // --- compat legacy status, all ten values ---
+    // --- derivation across the lifecycle (group_key / badge / activity states) ---
+    // These walk the milestones the retired compat `status` used to name, now
+    // expressed purely in activity terms. Note the intended collapse: lab vs self
+    // is NOT visible in the derived view (both develop → group_key 1 badge
+    // "Developing"; both complete → group_key 2 badge "To scan") — the lab/self
+    // distinction lives on the dev record, not the lifecycle position (ADR-0013).
 
     #[test]
-    fn status_loaded_when_empty() {
+    fn empty_roll_is_loaded() {
         let ra = derive(&ActivitySignals::default());
-        assert_eq!(ra.status, "loaded");
         assert_eq!(ra.group_key, 0);
+        assert_eq!(ra.badge, "Loaded");
+        assert_eq!(state(&ra, "shooting"), "not_started");
     }
 
     #[test]
-    fn status_loaded_with_date_loaded_only() {
+    fn date_loaded_only_starts_shooting() {
         let ra = derive(&ActivitySignals {
             date_loaded: Some("2026-01-01".into()),
             ..Default::default()
         });
-        assert_eq!(ra.status, "loaded");
-        // Shooting has started (loaded) but no shots yet.
+        // Loaded (shooting started, no shots yet) — shooting is in progress.
         assert_eq!(state(&ra, "shooting"), "in_progress");
+        assert_eq!(ra.group_key, 0);
+        assert_eq!(ra.badge, "Shooting");
     }
 
     #[test]
-    fn status_shooting_with_shots() {
+    fn shots_keep_shooting_in_progress() {
         let ra = derive(&ActivitySignals {
             shot_count: 3,
             date_loaded: Some("2026-01-01".into()),
             ..Default::default()
         });
-        assert_eq!(ra.status, "shooting");
+        assert_eq!(state(&ra, "shooting"), "in_progress");
+        assert_eq!(ra.group_key, 0);
+        assert_eq!(ra.badge, "Shooting");
     }
 
     #[test]
-    fn status_shot_when_finished_no_dev() {
+    fn finished_shooting_no_dev_waits_to_develop() {
         let ra = derive(&ActivitySignals {
             shot_count: 36,
             date_loaded: Some("2026-01-01".into()),
             date_finished: Some("2026-01-05".into()),
             ..Default::default()
         });
-        assert_eq!(ra.status, "shot");
         assert_eq!(state(&ra, "shooting"), "done");
         assert_eq!(state(&ra, "development"), "not_started");
         assert_eq!(ra.group_key, 1);
@@ -301,49 +289,55 @@ mod tests {
     }
 
     #[test]
-    fn status_at_lab_and_lab_done() {
-        let at_lab = derive(&ActivitySignals {
-            has_dev: true,
-            is_lab_dev: true,
-            ..Default::default()
-        });
-        assert_eq!(at_lab.status, "at-lab");
-        assert_eq!(state(&at_lab, "shooting"), "done"); // implicit: dev exists
-        assert_eq!(state(&at_lab, "development"), "in_progress");
-
-        let lab_done = derive(&ActivitySignals {
-            has_dev: true,
-            is_lab_dev: true,
-            dev_completion: Some("2026-01-10".into()),
-            ..Default::default()
-        });
-        assert_eq!(lab_done.status, "lab-done");
-        assert_eq!(state(&lab_done, "development"), "done");
-        assert_eq!(lab_done.badge, "To scan");
-    }
-
-    #[test]
-    fn status_developing_and_developed() {
+    fn dev_record_in_progress_then_done_lab() {
         let developing = derive(&ActivitySignals {
             has_dev: true,
-            is_lab_dev: false,
+            is_lab_dev: true,
             ..Default::default()
         });
-        assert_eq!(developing.status, "developing");
+        assert_eq!(state(&developing, "shooting"), "done"); // implicit: dev exists
+        assert_eq!(state(&developing, "development"), "in_progress");
+        assert_eq!(developing.group_key, 1);
+        assert_eq!(developing.badge, "Developing");
 
         let developed = derive(&ActivitySignals {
             has_dev: true,
+            is_lab_dev: true,
+            dev_completion: Some("2026-01-10".into()),
+            ..Default::default()
+        });
+        assert_eq!(state(&developed, "development"), "done");
+        assert_eq!(developed.group_key, 2);
+        assert_eq!(developed.badge, "To scan");
+    }
+
+    #[test]
+    fn self_dev_derives_same_view_as_lab() {
+        // The collapse, asserted directly: a self dev derives the SAME group_key /
+        // badge / development state as a lab dev at the same completion. The
+        // lab-vs-self distinction is only on the dev record.
+        let self_developing = derive(&ActivitySignals {
+            has_dev: true,
+            is_lab_dev: false,
+            ..Default::default()
+        });
+        assert_eq!(state(&self_developing, "development"), "in_progress");
+        assert_eq!(self_developing.group_key, 1);
+        assert_eq!(self_developing.badge, "Developing");
+
+        let self_developed = derive(&ActivitySignals {
+            has_dev: true,
             is_lab_dev: false,
             dev_completion: Some("2026-01-10".into()),
             ..Default::default()
         });
-        assert_eq!(developed.status, "developed");
+        assert_eq!(state(&self_developed, "development"), "done");
+        assert_eq!(self_developed.group_key, 2);
+        assert_eq!(self_developed.badge, "To scan");
     }
 
     #[test]
-    fn status_scanned_requires_recorded_date() {
-        // A `scanned` roll must actually carry date_scanned — a date-less roll
-        // degrades (see status_shot_...). Here the date is present.
+    fn scanned_marks_scanning_done() {
         let ra = derive(&ActivitySignals {
             has_dev: true,
             is_lab_dev: true,
@@ -351,12 +345,13 @@ mod tests {
             date_scanned: Some("2026-01-12".into()),
             ..Default::default()
         });
-        assert_eq!(ra.status, "scanned");
         assert_eq!(state(&ra, "scanning"), "done");
+        assert_eq!(ra.group_key, 3);
+        assert_eq!(ra.badge, "To edit");
     }
 
     #[test]
-    fn status_scanned_undecided_path_no_dev() {
+    fn scanned_no_dev_implicitly_completes_development() {
         // Scanned with no dev record (the retired "undecided" path): development
         // is implicitly done via the later scan date.
         let ra = derive(&ActivitySignals {
@@ -365,19 +360,22 @@ mod tests {
             date_scanned: Some("2026-01-12".into()),
             ..Default::default()
         });
-        assert_eq!(ra.status, "scanned");
         assert_eq!(state(&ra, "development"), "done");
         assert_eq!(state(&ra, "shooting"), "done");
+        assert_eq!(state(&ra, "scanning"), "done");
+        assert_eq!(ra.group_key, 3);
     }
 
     #[test]
-    fn status_post_processed_and_archived() {
+    fn post_processed_then_archived() {
         let pp = derive(&ActivitySignals {
             date_scanned: Some("2026-01-12".into()),
             date_post_processed: Some("2026-01-14".into()),
             ..Default::default()
         });
-        assert_eq!(pp.status, "post-processed");
+        assert_eq!(state(&pp, "post_processing"), "done");
+        assert_eq!(pp.group_key, 4);
+        assert_eq!(pp.badge, "To archive");
 
         let archived = derive(&ActivitySignals {
             date_scanned: Some("2026-01-12".into()),
@@ -385,7 +383,10 @@ mod tests {
             date_archived: Some("2026-01-20".into()),
             ..Default::default()
         });
-        assert_eq!(archived.status, "archived");
+        assert_eq!(state(&archived, "archiving"), "done");
+        assert!(archived.done);
+        assert_eq!(archived.group_key, 5);
+        assert_eq!(archived.badge, "Done");
     }
 
     // --- implicit completion nuances ---
@@ -433,8 +434,6 @@ mod tests {
         assert!(ra.done);
         assert_eq!(ra.group_key, 5);
         assert_eq!(ra.badge, "Done");
-        // Compat: N/A has no legacy equivalent; the roll reads post-processed.
-        assert_eq!(ra.status, "post-processed");
     }
 
     #[test]
@@ -464,7 +463,6 @@ mod tests {
         assert!(ra.done);
         assert_eq!(ra.group_key, 5);
         assert_eq!(ra.badge, "Done");
-        assert_eq!(ra.status, "archived");
         for kind in ACTIVITY_KINDS {
             assert_eq!(state(&ra, kind), "done", "{kind} should be done");
         }

@@ -6,19 +6,20 @@ use ::entity::development_lab::{self, Entity as DevelopmentLab};
 use ::entity::development_self::{self, Entity as DevelopmentSelf};
 use ::entity::film_stock::FilmStockType;
 
-use crate::activity::{ActivitySignals, legacy_status};
+use crate::activity::{ActivitySignals, derive};
 
-/// Compat legacy status for a dev-list row (ADR-0013). A dev record always
-/// exists here, so the roll is at least at-lab/developing; the derivation picks
-/// the exact value from the tail dates.
-fn dev_roll_status(
+/// The server-derived activity summary (`badge`, `group_key`) for a dev-list row
+/// (ADR-0013), so the developments UI renders the same phase Badge as every other
+/// roll list. A dev record always exists here, so the roll is at least in
+/// development; the derivation picks the exact phase from the tail dates.
+fn dev_roll_activity(
     is_lab_dev: bool,
     dev_completion: Option<String>,
     date_scanned: Option<String>,
     date_post_processed: Option<String>,
     date_archived: Option<String>,
-) -> String {
-    legacy_status(&ActivitySignals {
+) -> (String, i32) {
+    let activity = derive(&ActivitySignals {
         has_dev: true,
         is_lab_dev,
         dev_completion,
@@ -26,7 +27,8 @@ fn dev_roll_status(
         date_post_processed,
         date_archived,
         ..Default::default()
-    })
+    });
+    (activity.badge, activity.group_key)
 }
 
 /// A self-development list item with its ordered stages merged in.
@@ -44,9 +46,11 @@ pub struct SelfDevListItem {
     pub dev_id: i32,
     pub roll_pk: i32,
     pub roll_id: String,
-    // Compat legacy status, computed in Rust after the query (placeholder in SQL).
-    pub roll_status: String,
-    // Roll tail dates for the compat derivation — not part of the wire contract.
+    // Server-derived activity summary, computed in Rust after the query
+    // (placeholders in SQL). Renders the roll's phase Badge (ADR-0013).
+    pub badge: String,
+    pub group_key: i32,
+    // Roll tail dates for the derivation — not part of the wire contract.
     #[serde(skip)]
     pub roll_date_scanned: Option<String>,
     #[serde(skip)]
@@ -82,9 +86,11 @@ pub struct LabDevListItem {
     pub dev_id: i32,
     pub roll_pk: i32,
     pub roll_id: String,
-    // Compat legacy status, computed in Rust after the query (placeholder in SQL).
-    pub roll_status: String,
-    // Roll tail dates for the compat derivation — not part of the wire contract.
+    // Server-derived activity summary, computed in Rust after the query
+    // (placeholders in SQL). Renders the roll's phase Badge (ADR-0013).
+    pub badge: String,
+    pub group_key: i32,
+    // Roll tail dates for the derivation — not part of the wire contract.
     #[serde(skip)]
     pub roll_date_scanned: Option<String>,
     #[serde(skip)]
@@ -111,7 +117,8 @@ const LIST_LAB_DEVS_SQL: &str = "\
         dl.id AS dev_id, \
         r.id AS roll_pk, \
         r.roll_id, \
-        '' AS roll_status, \
+        '' AS badge, \
+        0 AS group_key, \
         r.date_scanned AS roll_date_scanned, \
         r.date_post_processed AS roll_date_post_processed, \
         r.date_archived AS roll_date_archived, \
@@ -140,7 +147,8 @@ const LIST_SELF_DEVS_SQL: &str = "\
         ds.id AS dev_id, \
         r.id AS roll_pk, \
         r.roll_id, \
-        '' AS roll_status, \
+        '' AS badge, \
+        0 AS group_key, \
         r.date_scanned AS roll_date_scanned, \
         r.date_post_processed AS roll_date_post_processed, \
         r.date_archived AS roll_date_archived, \
@@ -229,7 +237,7 @@ impl DevelopmentService {
         .all(db)
         .await?;
         for item in &mut items {
-            item.roll_status = dev_roll_status(
+            (item.badge, item.group_key) = dev_roll_activity(
                 true,
                 item.date_received.clone(),
                 item.roll_date_scanned.clone(),
@@ -334,7 +342,7 @@ impl DevelopmentService {
         .all(db)
         .await?;
         for item in &mut items {
-            item.roll_status = dev_roll_status(
+            (item.badge, item.group_key) = dev_roll_activity(
                 false,
                 item.date_processed.clone(),
                 item.roll_date_scanned.clone(),
