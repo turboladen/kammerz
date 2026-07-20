@@ -15,7 +15,6 @@ async fn create_roll(app: &axum::Router, roll_id: &str) -> i32 {
     let payload = json!({
         "roll_id": roll_id,
         "camera_id": camera_id,
-        "status": "loaded",
         "date_loaded": "2026-05-01"
     });
     let res = app
@@ -155,7 +154,6 @@ async fn create_roll_with_malformed_date_is_rejected() {
     let payload = json!({
         "roll_id": "BAD-DATE",
         "camera_id": camera_id,
-        "status": "loaded",
         "date_loaded": "2026-13-45"
     });
     let res = app
@@ -183,7 +181,6 @@ async fn create_roll_with_partial_date_is_rejected() {
     let payload = json!({
         "roll_id": "PARTIAL-DATE",
         "camera_id": camera_id,
-        "status": "loaded",
         "date_loaded": "2026-05"
     });
     let res = app
@@ -217,7 +214,6 @@ async fn update_roll_applies_partial_patch() {
     // Partial update: advance status, set finish date and notes;
     // camera_id / date_loaded must survive untouched.
     let payload = json!({
-        "status": "shot",
         "date_finished": "2026-05-15",
         "notes": "windy day"
     });
@@ -425,7 +421,7 @@ async fn create_roll_rejects_whitespace_roll_id() {
     let res = app
         .oneshot(post_json(
             "/api/rolls",
-            &json!({ "roll_id": "   ", "camera_id": camera_id, "status": "loaded" }),
+            &json!({ "roll_id": "   ", "camera_id": camera_id }),
         ))
         .await
         .unwrap();
@@ -452,7 +448,6 @@ async fn create_roll_rejects_negative_frame_count() {
             &json!({
                 "roll_id": "NEG-FRAMES",
                 "camera_id": camera_id,
-                "status": "loaded",
                 "frame_count": -36
             }),
         ))

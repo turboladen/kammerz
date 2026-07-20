@@ -24,27 +24,10 @@ pub const ACTIVITY_KINDS: [&str; 5] = [
     "archiving",
 ];
 
-/// Canonical lifecycle-phase labels, indexed by `group_key` (0..=4 = the earliest
-/// unresolved activity; 5 = Done). Used by the stats `rolls_by_phase` tally; the
-/// frontend's `PHASE_META` labels (phase.ts) MUST match these strings so the stats
-/// panel can color each bar by phase (kammerz-1ezf).
-pub const PHASE_LABELS: [&str; 6] = [
-    "Shooting",
-    "Development",
-    "Scanning",
-    "Post-processing",
-    "Archiving",
-    "Done",
-];
-
-/// The phase label for a `group_key`. Out-of-range keys clamp to "Done" (the
-/// group_key domain is 0..=5, so this is unreachable in practice).
-pub fn phase_label(group_key: i32) -> &'static str {
-    PHASE_LABELS
-        .get(group_key as usize)
-        .copied()
-        .unwrap_or("Done")
-}
+// NOTE: phase LABELS deliberately live only in the frontend (`phase.ts`
+// PHASE_META). The backend speaks `group_key` integers across the wire — a
+// cross-language label-string contract would be unguardable drift (the exact
+// disease the retired status-flows fixture existed to contain).
 
 /// One activity's derived state, with the dates that drive it (for the board UI).
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -96,13 +79,73 @@ pub struct ActivitySignals {
     pub archive_na: bool,
 }
 
+impl ActivitySignals {
+    /// Apply the lab/self dev triplet from raw query columns. The selection —
+    /// lab takes precedence for legacy both-dev rolls; the completion date comes
+    /// from the chosen record — lives HERE so no consumer re-implements it and
+    /// drifts (search/stats/roll-list all route through this).
+    pub fn with_dev(
+        mut self,
+        lab_dev_id: Option<i32>,
+        lab_completion: Option<String>,
+        self_dev_id: Option<i32>,
+        self_completion: Option<String>,
+    ) -> Self {
+        let is_lab_dev = lab_dev_id.is_some();
+        self.has_dev = is_lab_dev || self_dev_id.is_some();
+        self.is_lab_dev = is_lab_dev;
+        self.dev_completion = if is_lab_dev {
+            lab_completion
+        } else {
+            self_completion
+        };
+        self
+    }
+}
+
+/// The per-activity resolution flags in canonical order. Resolved = done, or
+/// (archiving only) N/A. Shared by [`derive`] and [`group_key`] so the two can
+/// never disagree.
+fn resolved_flags(sig: &ActivitySignals) -> [bool; 5] {
+    let any_tail_date = sig.scan_started.is_some()
+        || sig.date_scanned.is_some()
+        || sig.post_processing_started.is_some()
+        || sig.date_post_processed.is_some()
+        || sig.date_archived.is_some();
+    [
+        sig.date_finished.is_some() || sig.has_dev || any_tail_date,
+        sig.dev_completion.is_some() || any_tail_date,
+        sig.date_scanned.is_some(),
+        sig.date_post_processed.is_some(),
+        sig.date_archived.is_some() || sig.archive_na,
+    ]
+}
+
+/// The group/sort key alone — for consumers that need no badge or activity
+/// states (the stats phase tally). Skips [`derive`]'s Vec/String allocations.
+pub fn group_key(sig: &ActivitySignals) -> i32 {
+    resolved_flags(sig)
+        .iter()
+        .position(|r| !r)
+        .map_or(5, |i| i as i32)
+}
+
 /// Derive the full activity view for one roll from its signals.
+///
+/// Every signal column MUST be populated from the query row — a partial signal
+/// set silently derives a different phase/badge than the canonical roll list
+/// (kammerz-1ezf review). `dev_started` is the only display-only exception
+/// (it feeds `Activity.start`, never states/badge/group_key), and shooting's
+/// `shot_count`/`date_loaded` only matter while shooting can still be
+/// in-progress (impossible once a dev record exists).
 pub fn derive(sig: &ActivitySignals) -> RollActivity {
     // Which tail activities carry any date. The tail three overlap and never
     // imply each other, so each is judged only by its own dates.
-    let scanning_has_date = sig.scan_started.is_some() || sig.date_scanned.is_some();
-    let pp_has_date = sig.post_processing_started.is_some() || sig.date_post_processed.is_some();
-    let any_tail_date = scanning_has_date || pp_has_date || sig.date_archived.is_some();
+    let any_tail_date = sig.scan_started.is_some()
+        || sig.date_scanned.is_some()
+        || sig.post_processing_started.is_some()
+        || sig.date_post_processed.is_some()
+        || sig.date_archived.is_some();
 
     // Implicit completion, walking the chain shooting -> development -> tail: an
     // activity is done when a strictly-later activity has a date. We treat an
@@ -158,15 +201,7 @@ pub fn derive(sig: &ActivitySignals) -> RollActivity {
 
     let activities = vec![shooting, development, scanning, post_processing, archiving];
 
-    // Resolved = done, or (archiving only) N/A. group_key is the first unresolved.
-    let resolved = [
-        shooting_done,
-        development_done,
-        scanning_done,
-        pp_done,
-        archiving_done || sig.archive_na,
-    ];
-    let group_key = resolved.iter().position(|r| !r).map_or(5, |i| i as i32);
+    let group_key = group_key(sig);
     let done = group_key == 5;
 
     let badge = badge_for(&activities, done, group_key);

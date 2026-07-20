@@ -3,7 +3,7 @@
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import { getCatalogStats } from '$lib/api/stats';
 	import type { CatalogStats } from '$lib/types';
-	import { phaseByLabel } from '$lib/utils/phase';
+	import { phaseLabel, phaseTheme } from '$lib/utils/phase';
 
 	let stats = $state<CatalogStats | null>(null);
 	let loading = $state(true);
@@ -283,14 +283,17 @@
 						</h2>
 						<div class="rounded-lg border border-border bg-surface-raised p-4">
 							<div class="space-y-2">
-								{#each stats.rolls_by_phase as item}
+								<!-- Buckets arrive as group_key integers; PHASE_META is the sole
+								     source of labels and colors, so backend and frontend cannot
+								     drift on a label string (kammerz-1ezf review). -->
+								{#each stats.rolls_by_phase as item (item.group_key)}
 									<div class="flex items-center gap-3">
-										<span class="w-20 text-right text-xs text-text-muted">{item.label}</span>
+										<span class="w-24 text-right text-xs text-text-muted">{phaseLabel(item.group_key)}</span>
 										<div class="flex-1">
 											<div
 												class="h-5 rounded-r transition-all duration-300"
-												style="width: {(item.count / maxPhase) * 100}%; background-color: {phaseByLabel(item.label)
-													?.colorVar ?? 'var(--color-accent)'}"
+												style="width: {(item.count / maxPhase) * 100}%; background-color: {phaseTheme(item.group_key)
+													.colorVar}"
 											></div>
 										</div>
 										<span class="w-8 font-mono text-xs text-text-faint">{item.count}</span>

@@ -496,7 +496,8 @@ export interface CatalogStats {
 	top_cameras: RankedItem[];
 	top_lenses: RankedItem[];
 	rolls_by_format: RankedItem[];
-	rolls_by_phase: RankedItem[];
+	/** Phase buckets keyed by group_key — PHASE_META owns labels/colors client-side. */
+	rolls_by_phase: { group_key: number; count: number }[];
 	rolls_by_mount: RankedItem[];
 }
 

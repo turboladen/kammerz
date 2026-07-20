@@ -53,6 +53,40 @@ async fn roll_search_hit_carries_derived_activity_fields() {
     assert!(hit.get("status").is_none(), "compat status is retired");
 }
 
+// Regression (kammerz-1ezf review): the search derivation must consume the SAME
+// signal set as the canonical roll list. The *_started columns were once
+// hardcoded None here, so a mid-scan roll searched as "To scan" while every
+// other list showed "Scanning" — same roll, two labels.
+#[tokio::test]
+async fn roll_search_badge_matches_canonical_derivation_mid_scan() {
+    let app = open_app().await;
+
+    let res = app
+        .clone()
+        .oneshot(post_json(
+            "/api/rolls",
+            &json!({ "roll_id": "SEARCHSCAN-7", "date_finished": "2026-01-05", "scan_started": "2026-02-01" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let res = app.oneshot(get("/api/search?q=SEARCHSCAN")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let results: Value = json_body(res).await;
+    let hit = results["rolls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["roll_id"] == "SEARCHSCAN-7")
+        .expect("the created roll appears in search results");
+
+    // scan_started (no completion): scanning is in progress → group_key 2 and
+    // the in-progress "Scanning" badge, never the waiting "To scan".
+    assert_eq!(hit["group_key"], 2);
+    assert_eq!(hit["badge"], "Scanning");
+}
+
 #[tokio::test]
 async fn short_query_returns_empty_results() {
     let app = open_app().await;

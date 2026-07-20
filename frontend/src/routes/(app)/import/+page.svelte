@@ -96,6 +96,11 @@
 
 	const selectedModelLabel = $derived(modelOptions.find((m) => m.value === selectedModel)?.label ?? selectedModel);
 
+	// Legacy lifecycle statuses the import backfill understands. MUST stay a
+	// subset of migration::BACKFILL_ORDER (migration/src/m…030_activity_lifecycle.rs)
+	// — the backend 422s any value outside that list. Kept as a local literal on
+	// purpose: this dropdown is the ONE place the retired status vocabulary is
+	// still user-facing (it names what the paper notes say, not app state).
 	const statusOptions = [
 		{ value: 'loaded', label: 'Loaded' },
 		{ value: 'shooting', label: 'Shooting' },

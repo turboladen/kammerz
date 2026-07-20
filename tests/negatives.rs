@@ -149,7 +149,7 @@ async fn lab_developed_roll(app: &axum::Router) -> (i32, i32) {
         .clone()
         .oneshot(post_json(
             "/api/rolls",
-            &json!({ "roll_id": "R-NEG-A", "camera_id": camera_id, "status": "shot", "date_loaded": "2026-06-01" }),
+            &json!({ "roll_id": "R-NEG-A", "camera_id": camera_id, "date_loaded": "2026-06-01" }),
         ))
         .await
         .unwrap();
@@ -279,7 +279,7 @@ async fn roll_list_computes_negatives_deadline_from_retention() {
         .clone()
         .oneshot(post_json(
             "/api/rolls",
-            &json!({ "roll_id": "R-DL", "camera_id": camera_id, "status": "shot" }),
+            &json!({ "roll_id": "R-DL", "camera_id": camera_id }),
         ))
         .await
         .unwrap();
@@ -316,7 +316,7 @@ async fn roll_without_lab_dev_has_null_negatives() {
         .clone()
         .oneshot(post_json(
             "/api/rolls",
-            &json!({ "roll_id": "R-NONE", "camera_id": camera_id, "status": "loaded" }),
+            &json!({ "roll_id": "R-NONE", "camera_id": camera_id }),
         ))
         .await
         .unwrap();
@@ -359,7 +359,7 @@ async fn partial_date_received_is_rejected() {
         .clone()
         .oneshot(post_json(
             "/api/rolls",
-            &json!({ "roll_id": "R-PARTIAL", "camera_id": camera_id, "status": "shot" }),
+            &json!({ "roll_id": "R-PARTIAL", "camera_id": camera_id }),
         ))
         .await
         .unwrap();

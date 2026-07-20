@@ -17,6 +17,7 @@
 	import { logShot } from '$lib/utils/shot-entry';
 	import { buildLensOptions, lensDisplayName } from '$lib/utils/lens';
 	import { buildFrameCells, nextExtraFrameNumber } from '$lib/utils/frames';
+	import { activityState } from '$lib/utils/activity-board';
 	import { todayLocal, dateFieldError } from '$lib/utils/date';
 	import type { RollWithDetails, Camera, Lens, LensMount, Shot } from '$lib/types';
 
@@ -43,9 +44,7 @@
 	// whose development activity hasn't started (loaded / shooting / finished-shooting).
 	// Once development or any tail activity begins, quick logging is no longer offered
 	// (ADR-0013) — including a roll with a tail start date but no dev record.
-	const activeRolls = $derived(
-		rolls.filter((r) => r.activities.find((a) => a.kind === 'development')?.state === 'not_started')
-	);
+	const activeRolls = $derived(rolls.filter((r) => activityState(r.activities, 'development') === 'not_started'));
 
 	const selectedRoll = $derived(rolls.find((r) => String(r.id) === selectedRollId) ?? null);
 
@@ -89,7 +88,7 @@
 	const finishDateError = $derived(dateFieldError(finishDate));
 
 	const showRollFullNudge = $derived(
-		selectedRoll?.activities.find((a) => a.kind === 'shooting')?.state === 'in_progress' &&
+		(selectedRoll ? activityState(selectedRoll.activities, 'shooting') : null) === 'in_progress' &&
 			frameInfo !== null &&
 			frameInfo.total !== null &&
 			shots.length >= frameInfo.total &&

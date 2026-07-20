@@ -4,8 +4,9 @@ import { defineConfig } from 'vitest/config';
 // Standalone vitest config — deliberately NOT the SvelteKit vite.config.ts. The
 // in-scope unit tests cover pure-logic utils under src/lib/utils, which need
 // nothing from the sveltekit() plugin (routing/SSR) and run faster without it.
-// Only the `$lib` alias is required (status.ts imports $lib/status-flows.json;
-// the other utils use type-only $lib imports that the transform erases).
+// Only the `$lib` alias is required — the utils' runtime imports (e.g.
+// activity-board.ts importing $lib/utils/shot-table) resolve through it; the
+// type-only $lib imports are erased by the transform.
 export default defineConfig({
 	resolve: {
 		alias: {

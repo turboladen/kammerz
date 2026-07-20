@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PHASE_META, phaseTheme, phaseLabel, phaseByLabel } from './phase';
+import { PHASE_META, phaseTheme, phaseLabel } from './phase';
 
 // The canonical phase labels — MUST stay in lockstep with the backend
 // `PHASE_LABELS` (src/activity.rs), which the stats "Rolls by Phase" panel keys
@@ -43,15 +43,5 @@ describe('phaseLabel', () => {
 	it('maps group_key to its phase name', () => {
 		expect(phaseLabel(0)).toBe('Shooting');
 		expect(phaseLabel(5)).toBe('Done');
-	});
-});
-
-describe('phaseByLabel', () => {
-	it('finds a phase by label', () => {
-		expect(phaseByLabel('Scanning')?.groupKey).toBe(2);
-	});
-
-	it('returns undefined for an unknown label', () => {
-		expect(phaseByLabel('Nonexistent')).toBeUndefined();
 	});
 });

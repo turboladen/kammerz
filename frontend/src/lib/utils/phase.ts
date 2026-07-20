@@ -15,7 +15,7 @@ export interface PhaseMeta {
 	/** The `group_key` this entry describes (0..=5). */
 	groupKey: number;
 	/** Human phase name. MUST match the backend `PHASE_LABELS` (activity.rs) so the
-	 *  stats "Rolls by Phase" panel can color each bar via {@link phaseByLabel}. */
+	 *  stats "Rolls by Phase" panel renders group_key buckets through it too. */
 	label: string;
 	/** CSS custom-property color for bars/dots (e.g. the stats + dashboard charts). */
 	colorVar: string;
@@ -88,11 +88,4 @@ export function phaseTheme(groupKey: number): PhaseMeta {
 /** The human phase name for a `group_key`. */
 export function phaseLabel(groupKey: number): string {
 	return phaseTheme(groupKey).label;
-}
-
-/** Look up a phase by its label — for the stats "Rolls by Phase" panel, whose
- *  rows arrive from the backend as `{ label, count }`. Returns undefined for an
- *  unrecognized label so callers can fall back to a neutral color. */
-export function phaseByLabel(label: string): PhaseMeta | undefined {
-	return PHASE_META.find((p) => p.label === label);
 }

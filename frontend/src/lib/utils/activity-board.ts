@@ -4,7 +4,7 @@
 // the roll (`activities`/`badge`/`group_key`/`done`). This module never re-derives
 // state from dates — it maps those server-computed values onto display labels, the
 // page phase, and the writable roll columns each board row edits.
-import type { ActivityKind, ActivityState, Lens, RollActivityView, Shot } from '$lib/types';
+import type { ActivityKind, ActivityState, Lens, RollActivityItem, RollActivityView, Shot } from '$lib/types';
 import { lensDisplayName } from './lens';
 import { formatShotRow } from './shot-table';
 
@@ -91,6 +91,14 @@ export const SLOT_CAPTIONS: Record<DatedActivityKind, Record<DateSlot, string>> 
 	scanning: { start: 'Started', completion: 'Scanned' },
 	post_processing: { start: 'Started', completion: 'Done' }
 };
+
+/**
+ * The derived state of one activity by kind, or null when absent. One accessor
+ * for every by-kind lookup so the `kind` literals stay typed and in one idiom.
+ */
+export function activityState(activities: readonly RollActivityItem[], kind: ActivityKind): ActivityState | null {
+	return activities.find((a) => a.kind === kind)?.state ?? null;
+}
 
 /** Narrow an activity kind to the dated (roll-row date slots) subset. */
 export function isDatedKind(kind: ActivityKind): kind is DatedActivityKind {

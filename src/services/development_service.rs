@@ -15,18 +15,20 @@ use crate::activity::{ActivitySignals, derive};
 fn dev_roll_activity(
     is_lab_dev: bool,
     dev_completion: Option<String>,
-    date_scanned: Option<String>,
-    date_post_processed: Option<String>,
-    date_archived: Option<String>,
+    roll_tail: ActivitySignals,
 ) -> (String, i32) {
+    // `roll_tail` carries every derivation-relevant roll column (the *_started
+    // fields and archive_na were once defaulted, making this list's badge/
+    // group_key disagree with the canonical roll list — e.g. a mid-scan roll
+    // read "To scan" here and "Scanning" there, and an archive-N/A roll read
+    // "To archive" instead of "Done"). Shooting's shot_count/date_loaded/
+    // date_finished stay defaulted: a dev record exists on every row, so
+    // shooting is implicitly done and those fields cannot affect the output.
     let activity = derive(&ActivitySignals {
         has_dev: true,
         is_lab_dev,
         dev_completion,
-        date_scanned,
-        date_post_processed,
-        date_archived,
-        ..Default::default()
+        ..roll_tail
     });
     (activity.badge, activity.group_key)
 }
@@ -57,6 +59,12 @@ pub struct SelfDevListItem {
     pub roll_date_post_processed: Option<String>,
     #[serde(skip)]
     pub roll_date_archived: Option<String>,
+    #[serde(skip)]
+    pub roll_scan_started: Option<String>,
+    #[serde(skip)]
+    pub roll_post_processing_started: Option<String>,
+    #[serde(skip)]
+    pub roll_archive_na: bool,
     pub film_stock_brand: Option<String>,
     pub film_stock_name: Option<String>,
     pub film_stock_iso: Option<i32>,
@@ -97,6 +105,12 @@ pub struct LabDevListItem {
     pub roll_date_post_processed: Option<String>,
     #[serde(skip)]
     pub roll_date_archived: Option<String>,
+    #[serde(skip)]
+    pub roll_scan_started: Option<String>,
+    #[serde(skip)]
+    pub roll_post_processing_started: Option<String>,
+    #[serde(skip)]
+    pub roll_archive_na: bool,
     pub film_stock_brand: Option<String>,
     pub film_stock_name: Option<String>,
     pub film_stock_iso: Option<i32>,
@@ -122,6 +136,9 @@ const LIST_LAB_DEVS_SQL: &str = "\
         r.date_scanned AS roll_date_scanned, \
         r.date_post_processed AS roll_date_post_processed, \
         r.date_archived AS roll_date_archived, \
+        r.scan_started AS roll_scan_started, \
+        r.post_processing_started AS roll_post_processing_started, \
+        r.archive_na AS roll_archive_na, \
         fs.brand AS film_stock_brand, \
         fs.name AS film_stock_name, \
         fs.iso AS film_stock_iso, \
@@ -152,6 +169,9 @@ const LIST_SELF_DEVS_SQL: &str = "\
         r.date_scanned AS roll_date_scanned, \
         r.date_post_processed AS roll_date_post_processed, \
         r.date_archived AS roll_date_archived, \
+        r.scan_started AS roll_scan_started, \
+        r.post_processing_started AS roll_post_processing_started, \
+        r.archive_na AS roll_archive_na, \
         fs.brand AS film_stock_brand, \
         fs.name AS film_stock_name, \
         fs.iso AS film_stock_iso, \
@@ -240,9 +260,15 @@ impl DevelopmentService {
             (item.badge, item.group_key) = dev_roll_activity(
                 true,
                 item.date_received.clone(),
-                item.roll_date_scanned.clone(),
-                item.roll_date_post_processed.clone(),
-                item.roll_date_archived.clone(),
+                ActivitySignals {
+                    scan_started: item.roll_scan_started.clone(),
+                    date_scanned: item.roll_date_scanned.clone(),
+                    post_processing_started: item.roll_post_processing_started.clone(),
+                    date_post_processed: item.roll_date_post_processed.clone(),
+                    date_archived: item.roll_date_archived.clone(),
+                    archive_na: item.roll_archive_na,
+                    ..Default::default()
+                },
             );
         }
         Ok(items)
@@ -345,9 +371,15 @@ impl DevelopmentService {
             (item.badge, item.group_key) = dev_roll_activity(
                 false,
                 item.date_processed.clone(),
-                item.roll_date_scanned.clone(),
-                item.roll_date_post_processed.clone(),
-                item.roll_date_archived.clone(),
+                ActivitySignals {
+                    scan_started: item.roll_scan_started.clone(),
+                    date_scanned: item.roll_date_scanned.clone(),
+                    post_processing_started: item.roll_post_processing_started.clone(),
+                    date_post_processed: item.roll_date_post_processed.clone(),
+                    date_archived: item.roll_date_archived.clone(),
+                    archive_na: item.roll_archive_na,
+                    ..Default::default()
+                },
             );
         }
         Ok(items)

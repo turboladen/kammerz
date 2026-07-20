@@ -167,17 +167,10 @@ falls back to the small `icon` circle for filtered "no matches" states.
 ### DateConfirm (`frontend/src/lib/components/ui/DateConfirm.svelte`)
 
 Small date-pick dialog (built on `Dialog` + a native `<Input type="date">`). Confirm / Cancel, with an
-optional **Clear** (commits null) for inline edits. Used for both the
-confirm-on-transition prompt and inline Timeline date editing. No "Skip" — to leave a
-date blank, advance then Clear it in the Timeline.
-
-### RollTimeline (`frontend/src/lib/components/rolls/RollTimeline.svelte`)
-
-The roll lifecycle Timeline (dot + label + dashed rule + date), with each editable
-milestone click-to-edit via `DateConfirm`. Emits `onedit(milestone, date|null)`; the
-roll-detail page routes the write to the roll / lab-dev / self-dev record by the
-milestone's `target` (see `buildRollTimeline` in `utils/timeline.ts`). The Timeline is
-the single home for lifecycle dates — the roll Edit form has no date pickers.
+optional **Clear** (commits null) for inline edits. Used by the roll page's activity
+board for setting/changing lifecycle dates; the caller supplies the `hint` line naming
+its own edit surface. No "Skip" — a date left blank is cleared later from the board's
+× control (behind a backward-move confirm).
 
 ### FadeIn (`frontend/src/lib/components/ui/FadeIn.svelte`)
 
@@ -365,7 +358,7 @@ This is a sanctioned variant for table cells where standard Input components wou
 ### Dashboard (`/`)
 
 1. **"In the Field"** — Active rolls (loaded/shooting) as prominent amber-tinted cards
-2. **Quick Stats** — 4-column grid: Total Rolls, Cameras, Currently Shooting, At Lab (all `font-mono text-2xl font-semibold`)
+2. **Quick Stats** — 4-column grid: Total Rolls, Cameras, In the Field, In the Darkroom (all `font-mono text-2xl font-semibold`)
 3. **Roll Pipeline** — Horizontal phase distribution bar with proportional per-phase-color segments + legend (bucketed by `group_key` via `PHASE_META`)
 4. **Needs Attention** — Rolls missing camera assignment or waiting at lab, with icon indicators
 
