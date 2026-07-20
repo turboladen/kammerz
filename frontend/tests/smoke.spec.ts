@@ -111,7 +111,7 @@ for (const { path, heading } of sections) {
  */
 test('roll detail page loads without an infinite fetch loop (kammerz-8k5)', async ({ page }) => {
 	const created = await page.request.post(`${BASE}/api/rolls`, {
-		data: { roll_id: `E2E-LOOP-${Date.now()}`, status: 'loaded' }
+		data: { roll_id: `E2E-LOOP-${Date.now()}` }
 	});
 	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
 	const id: number = await created.json();
@@ -150,7 +150,7 @@ test('roll detail page loads without an infinite fetch loop (kammerz-8k5)', asyn
  */
 test('roll detail shows the activity board, quick-add, and activity journal (kammerz-64ga)', async ({ page }) => {
 	const created = await page.request.post(`${BASE}/api/rolls`, {
-		data: { roll_id: `E2E-P3-${Date.now()}`, status: 'loaded', frame_count: 36 }
+		data: { roll_id: `E2E-P3-${Date.now()}`, frame_count: 36 }
 	});
 	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
 	const id: number = await created.json();
@@ -192,7 +192,7 @@ test('roll detail shows the activity board, quick-add, and activity journal (kam
  */
 test('activity board sets a lifecycle date and it persists (kammerz-64ga)', async ({ page }) => {
 	const created = await page.request.post(`${BASE}/api/rolls`, {
-		data: { roll_id: `E2E-P3B-${Date.now()}`, status: 'loaded', frame_count: 36 }
+		data: { roll_id: `E2E-P3B-${Date.now()}`, frame_count: 36 }
 	});
 	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
 	const id: number = await created.json();
@@ -231,7 +231,7 @@ test('activity board sets a lifecycle date and it persists (kammerz-64ga)', asyn
  */
 test('edit-shot dialog auto-saves edits when navigating between shots (kammerz-11o3)', async ({ page }) => {
 	const created = await page.request.post(`${BASE}/api/rolls`, {
-		data: { roll_id: `E2E-NAV-${Date.now()}`, status: 'loaded', frame_count: 36 }
+		data: { roll_id: `E2E-NAV-${Date.now()}`, frame_count: 36 }
 	});
 	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
 	const rollId: number = await created.json();
@@ -292,7 +292,7 @@ test('edit-shot dialog auto-saves edits when navigating between shots (kammerz-1
  */
 test('shot dialog opens view-first and Edit reveals the form (kammerz-4she)', async ({ page }) => {
 	const created = await page.request.post(`${BASE}/api/rolls`, {
-		data: { roll_id: `E2E-VIEW-${Date.now()}`, status: 'loaded', frame_count: 36 }
+		data: { roll_id: `E2E-VIEW-${Date.now()}`, frame_count: 36 }
 	});
 	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
 	const rollId: number = await created.json();
@@ -329,7 +329,7 @@ test('shot dialog opens view-first and Edit reveals the form (kammerz-4she)', as
  */
 test('shots table view lists fields and opens the view dialog (kammerz-4she)', async ({ page }) => {
 	const created = await page.request.post(`${BASE}/api/rolls`, {
-		data: { roll_id: `E2E-TABLE-${Date.now()}`, status: 'loaded', frame_count: 36 }
+		data: { roll_id: `E2E-TABLE-${Date.now()}`, frame_count: 36 }
 	});
 	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
 	const rollId: number = await created.json();

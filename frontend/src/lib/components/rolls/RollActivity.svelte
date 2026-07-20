@@ -1,9 +1,7 @@
 <script lang="ts">
-	import { CornerDownLeft } from 'lucide-svelte';
 	import { groupActivity } from '$lib/utils/activity';
 	import { formatLocalDayLabel, formatLocalTime } from '$lib/utils/datetime';
-	import { getStatusLabel, getStatusColor, allStatusOrder } from '$lib/utils/status';
-	import type { RollEvent, RollStatus } from '$lib/types';
+	import type { RollEvent } from '$lib/types';
 
 	interface Props {
 		events: RollEvent[];
@@ -13,17 +11,6 @@
 	let { events, onopendev }: Props = $props();
 
 	const days = $derived(groupActivity(events));
-
-	/**
-	 * Returns true if to_status comes before from_status in the canonical order
-	 * (i.e., moving backward through the roll lifecycle).
-	 */
-	function isBackwardMove(from: RollStatus | null, to: RollStatus | null): boolean {
-		if (!from || !to) return false;
-		const fromIdx = allStatusOrder.indexOf(from);
-		const toIdx = allStatusOrder.indexOf(to);
-		return fromIdx > toIdx;
-	}
 
 	// Day grouping and time rendering go through $lib/utils/datetime so the
 	// naive-UTC occurred_at strings are shown in the browser's local timezone
@@ -73,35 +60,6 @@
 									</span>
 									<span class="ml-auto font-mono text-[10px] text-text-faint/60">
 										{formatTime(row.latest.occurred_at)}
-									</span>
-								</div>
-							{:else if row.event.event_type === 'status_changed'}
-								<!-- Status change event — prominent dot + label -->
-								{@const backward = isBackwardMove(row.event.from_status, row.event.to_status)}
-								{@const toStatus = row.event.to_status}
-								<div class="flex items-center gap-2 px-1 py-0.5">
-									<!-- Status color dot -->
-									{#if toStatus}
-										<span
-											class="h-2 w-2 flex-shrink-0 rounded-full"
-											style="background-color: {getStatusColor(toStatus)}"
-											aria-hidden="true"
-										></span>
-									{:else}
-										<span class="h-2 w-2 flex-shrink-0 rounded-full bg-border" aria-hidden="true"></span>
-									{/if}
-									<span class="text-xs text-text">
-										{#if backward}
-											<span class="inline-flex items-center gap-1">
-												<CornerDownLeft size={11} class="text-text-faint" aria-hidden="true" />
-												Moved back to {toStatus ? getStatusLabel(toStatus) : '–'}
-											</span>
-										{:else}
-											Status → {toStatus ? getStatusLabel(toStatus) : '–'}
-										{/if}
-									</span>
-									<span class="ml-auto font-mono text-[10px] text-text-faint/60">
-										{formatTime(row.event.occurred_at)}
 									</span>
 								</div>
 							{:else if row.event.event_type === 'roll_loaded'}

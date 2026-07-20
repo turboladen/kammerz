@@ -13,7 +13,7 @@
 	import { lensDisplayName } from '$lib/utils/lens';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { appendNote, coerceApproxDate, dateFieldError } from '$lib/utils/date';
-	import type { ParsedRoll, Camera, FilmStock, Lens, ImportRollDto, ModelInfo, RollStatus } from '$lib/types';
+	import type { ParsedRoll, Camera, FilmStock, Lens, ImportRollDto, ModelInfo } from '$lib/types';
 	import { ChevronDown, ChevronUp, Eye, EyeOff, RefreshCw, Trash2 } from 'lucide-svelte';
 
 	// --- State ---
@@ -335,7 +335,7 @@
 				camera_id: cameraId ? parseInt(cameraId) : null,
 				film_stock_id: filmStockId ? parseInt(filmStockId) : null,
 				lens_id: lensId ? parseInt(lensId) : null,
-				status: rollStatus as RollStatus,
+				status: rollStatus,
 				frame_count: frameCount ? parseInt(frameCount) : null,
 				date_loaded: dateLoaded || null,
 				date_finished: dateFinished || null,

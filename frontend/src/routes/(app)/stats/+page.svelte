@@ -3,7 +3,7 @@
 	import FadeIn from '$lib/components/ui/FadeIn.svelte';
 	import { getCatalogStats } from '$lib/api/stats';
 	import type { CatalogStats } from '$lib/types';
-	import { getStatusColorSafe, getStatusLabel, isRollStatus } from '$lib/utils/status';
+	import { phaseByLabel } from '$lib/utils/phase';
 
 	let stats = $state<CatalogStats | null>(null);
 	let loading = $state(true);
@@ -273,27 +273,24 @@
 					</div>
 				{/if}
 
-				<!-- Rolls by Status -->
-				{#if stats.rolls_by_status.length > 0}
-					{@const maxStatus = Math.max(...stats.rolls_by_status.map((s) => s.count), 1)}
+				<!-- Rolls by Phase -->
+				{#if stats.rolls_by_phase.length > 0}
+					{@const maxPhase = Math.max(...stats.rolls_by_phase.map((s) => s.count), 1)}
 					<div>
 						<h2 class="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-faint">
-							Rolls by Status
+							Rolls by Phase
 							<div class="flex-1 border-b border-border-subtle"></div>
 						</h2>
 						<div class="rounded-lg border border-border bg-surface-raised p-4">
 							<div class="space-y-2">
-								{#each stats.rolls_by_status as item}
+								{#each stats.rolls_by_phase as item}
 									<div class="flex items-center gap-3">
-										<span class="w-20 text-right text-xs text-text-muted"
-											>{isRollStatus(item.label) ? getStatusLabel(item.label) : item.label}</span
-										>
+										<span class="w-20 text-right text-xs text-text-muted">{item.label}</span>
 										<div class="flex-1">
 											<div
 												class="h-5 rounded-r transition-all duration-300"
-												style="width: {(item.count / maxStatus) * 100}%; background-color: {getStatusColorSafe(
-													item.label
-												)}"
+												style="width: {(item.count / maxPhase) * 100}%; background-color: {phaseByLabel(item.label)
+													?.colorVar ?? 'var(--color-accent)'}"
 											></div>
 										</div>
 										<span class="w-8 font-mono text-xs text-text-faint">{item.count}</span>

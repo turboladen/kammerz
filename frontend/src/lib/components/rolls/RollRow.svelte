@@ -37,7 +37,7 @@
 >
 	<FilmStrip orientation="vertical" />
 	<span class="shrink-0 font-mono text-sm font-semibold">{roll.roll_id}</span>
-	<Badge status={roll.status} />
+	<Badge badge={roll.badge} groupKey={roll.group_key} />
 	<!-- Ledger metadata: flows left-to-right with dot separators, wraps gracefully. -->
 	<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
 		{#if roll.camera_brand}

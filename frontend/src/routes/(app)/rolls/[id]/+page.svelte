@@ -44,7 +44,6 @@
 	import { buildShotUpdatePayload, shotFormsEqual, type ShotFormFields } from '$lib/utils/shot-form';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
-	import type { DevAutoPrompt } from '$lib/utils/status';
 	import {
 		rollPhase,
 		lastShotSummary,
@@ -54,7 +53,8 @@
 		slotDateLabel,
 		type DateSlot,
 		type RollDateField,
-		type ArchivePayload
+		type ArchivePayload,
+		type DevAutoPrompt
 	} from '$lib/utils/activity-board';
 	import { todayLocal, dateFieldError } from '$lib/utils/date';
 	import { parseTime } from '$lib/utils/time';
@@ -1024,7 +1024,7 @@
 						<div>
 							<div class="mb-2 flex items-center gap-3">
 								<span class="text-2xl font-mono font-semibold">{roll.roll_id}</span>
-								<Badge status={roll.status} />
+								<Badge badge={roll.badge} groupKey={roll.group_key} />
 							</div>
 							<div class="flex flex-wrap gap-4 text-sm text-text-muted">
 								{#if roll.camera_brand}
@@ -1261,7 +1261,6 @@
 					bind:selfDev
 					bind:devStages
 					bind:autoPrompt={devAutoPrompt}
-					currentStatus={roll?.status ?? null}
 					defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
 					negativesDeadline={roll?.negatives_deadline ?? null}
 					onchange={() => loadRollData()}

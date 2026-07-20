@@ -258,7 +258,7 @@
 			<span class="text-xs text-text-muted">{filmStockLabel(d)}</span>
 		{/if}
 		<span class="font-mono text-xs text-text-faint">{d.roll_id}</span>
-		<Badge status={d.roll_status} />
+		<Badge badge={d.badge} groupKey={d.group_key} />
 		{#if trailingDate}
 			<span class="text-xs text-text-faint">{trailingDate}</span>
 		{/if}

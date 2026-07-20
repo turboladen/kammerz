@@ -12,6 +12,15 @@ import { formatShotRow } from './shot-table';
 export type RollPhase = 'shooting' | 'wrapup' | 'done';
 
 /**
+ * Request to auto-open a development dialog (board "Start development" / journal
+ * dev-event click). The roll page sets this; DevelopmentSection watches it and
+ * opens the matching lab/self dialog, seeding its form from an existing record
+ * when present. (ADR-0013 retired the per-chevron `target` field — starting
+ * development just opens the dialog; its dates then drive the derived state.)
+ */
+export type DevAutoPrompt = { kind: 'lab' | 'self' };
+
+/**
  * Which layout the roll page renders. Derived ONLY from the backend's `done` /
  * `group_key` (never re-derived from dates): a done roll is `done`; otherwise
  * `shooting` while shooting is the earliest unresolved activity (group_key 0), and
