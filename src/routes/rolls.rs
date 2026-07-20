@@ -83,7 +83,7 @@ pub struct UpdateRollDto {
 // --- Response view: a roll row plus its server-derived activity fields ---
 
 /// A roll list/detail row with the derived activity view flattened in
-/// (`activities`, `badge`, `group_key`, `done`, compat `status`) so the frontend
+/// (`activities`, `badge`, `group_key`, `done`) so the frontend
 /// never re-derives the lifecycle (ADR-0013).
 #[derive(Debug, Serialize)]
 pub struct RollView {
