@@ -58,19 +58,26 @@ export interface ShotLensDisplay {
 export function resolveShotLensName(
 	shotId: number,
 	shotLensMap: Record<number, number[]>,
-	lenses: Lens[],
+	lenses: readonly Lens[] | ReadonlyMap<number, Lens>,
 	fallbackLensId: number | null
 ): ShotLensDisplay {
+	// Accept a prebuilt id→lens Map so per-shot callers (the roll page resolves
+	// every shot in one derived) get O(1) lookups instead of re-scanning the
+	// catalog per lens id; a plain array still works for one-off callers/tests.
+	const byId =
+		lenses instanceof Map
+			? (lenses as ReadonlyMap<number, Lens>)
+			: new Map((lenses as readonly Lens[]).map((l) => [l.id, l]));
 	const ids = shotLensMap[shotId] ?? [];
 	if (ids.length > 0) {
 		const names = ids
-			.map((lid) => lenses.find((l) => l.id === lid))
+			.map((lid) => byId.get(lid))
 			.filter((l): l is Lens => l != null)
 			.map((l) => lensDisplayName(l));
 		if (names.length > 0) return { name: names.join(', '), inherited: false };
 	}
 	if (fallbackLensId != null) {
-		const def = lenses.find((l) => l.id === fallbackLensId);
+		const def = byId.get(fallbackLensId);
 		if (def) return { name: lensDisplayName(def), inherited: true };
 	}
 	return { name: '', inherited: false };

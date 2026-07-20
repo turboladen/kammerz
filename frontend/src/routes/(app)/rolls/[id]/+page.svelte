@@ -294,9 +294,12 @@
 	const shotLensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens', lensMounts));
 
 	// Per-shot lens display for the table + view dialog: shot's own lens > roll default.
+	// The id→lens index is built once per catalog change so resolving every shot
+	// stays O(shots), not O(shots × lenses).
+	const lensById = $derived(new Map(allLenses.map((l) => [l.id, l])));
 	const shotLenses = $derived.by(() => {
 		const map: Record<number, ShotLensDisplay> = {};
-		for (const s of shots) map[s.id] = resolveShotLensName(s.id, shotLensMap, allLenses, roll?.lens_id ?? null);
+		for (const s of shots) map[s.id] = resolveShotLensName(s.id, shotLensMap, lensById, roll?.lens_id ?? null);
 		return map;
 	});
 	// The table renders the EFFECTIVE name only (it's what took the shot — the
