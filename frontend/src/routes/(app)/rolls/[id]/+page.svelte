@@ -26,6 +26,7 @@
 	import ActivityBoard from '$lib/components/rolls/ActivityBoard.svelte';
 	import ArchiveDialog from '$lib/components/rolls/ArchiveDialog.svelte';
 	import FrameStrip from '$lib/components/rolls/FrameStrip.svelte';
+	import ShotsTable from '$lib/components/rolls/ShotsTable.svelte';
 	import QuickAddBar from '$lib/components/rolls/QuickAddBar.svelte';
 	import RollActivity from '$lib/components/rolls/RollActivity.svelte';
 	import FilmStrip from '$lib/components/ui/FilmStrip.svelte';
@@ -39,6 +40,7 @@
 	import { listLabs } from '$lib/api/labs';
 	import { lensDisplayName, buildLensOptions } from '$lib/utils/lens';
 	import { buildFrameCells } from '$lib/utils/frames';
+	import { formatShotRow, resolveShotLensName, type ShotLensDisplay } from '$lib/utils/shot-table';
 	import { buildShotUpdatePayload, shotFormsEqual, type ShotFormFields } from '$lib/utils/shot-form';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
@@ -112,6 +114,9 @@
 	let showShotDialog = $state(false);
 	let editingShotId: number | null = $state(null);
 	let deletingShotId: number | null = $state(null);
+	// The shot dialog opens view-first everywhere (kammerz-4she): clicking a shot shows
+	// it read-only with an Edit button. 'edit' is the existing form (also the add path).
+	let shotDialogMode = $state<'view' | 'edit'>('view');
 
 	// Shot form fields
 	let shotFrameNumber = $state('');
@@ -288,6 +293,23 @@
 	// Shot-level lens dropdown options (uses the saved camera, not the edit form camera)
 	const shotLensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens', lensMounts));
 
+	// Per-shot lens display for the table + view dialog: shot's own lens > roll default.
+	// The id→lens index is built once per catalog change so resolving every shot
+	// stays O(shots), not O(shots × lenses).
+	const lensById = $derived(new Map(allLenses.map((l) => [l.id, l])));
+	const shotLenses = $derived.by(() => {
+		const map: Record<number, ShotLensDisplay> = {};
+		for (const s of shots) map[s.id] = resolveShotLensName(s.id, shotLensMap, lensById, roll?.lens_id ?? null);
+		return map;
+	});
+	// The table renders the EFFECTIVE name only (it's what took the shot — the
+	// transcription-correct value); provenance annotation lives in the view dialog.
+	const shotLensNames = $derived.by(() => {
+		const map: Record<number, string> = {};
+		for (const [id, lens] of Object.entries(shotLenses)) map[Number(id)] = lens.name;
+		return map;
+	});
+
 	// "What settings did I just use?" reference card for the shooting phase.
 	const lastShot = $derived(lastShotSummary(shots, shotLensMap, allLenses));
 
@@ -297,6 +319,26 @@
 
 	// Shots in FrameStrip order (skips empty slots) — for in-dialog prev/next nav.
 	const orderedShots = $derived(frameCells.filter((c) => c.shot).map((c) => c.shot!));
+	// The shot the dialog currently targets — drives the read-only view rendering. The
+	// edit form is populated in parallel (populateShotForm) so switching to Edit is instant.
+	const editingShot = $derived(editingShotId == null ? null : (shots.find((s) => s.id === editingShotId) ?? null));
+	const editingShotRow = $derived(editingShot ? formatShotRow(editingShot) : null);
+
+	// The view shows the EFFECTIVE lens (per-shot, else roll default). When it's the
+	// inherited default, say so — the edit form's Lens dropdown deliberately shows
+	// only the per-shot override ('No lens' when inheriting), and without the
+	// annotation view→Edit reads like the lens was cleared. `inherited` comes from
+	// resolveShotLensName itself, never re-derived from the raw lens map here.
+	const viewLensLabel = $derived.by(() => {
+		const lens = editingShot ? shotLenses[editingShot.id] : null;
+		if (!lens || !lens.name) return '';
+		return lens.inherited ? `${lens.name} (roll default)` : lens.name;
+	});
+	// True only while an existing shot is shown read-only (never in add mode).
+	// Row presence is part of the guard: if the viewed shot vanishes from `shots`
+	// (concurrent delete), the title/arrows/body must all agree instead of the body
+	// silently falling through to the edit form under a view-mode header.
+	const isShotView = $derived(editingShotId != null && shotDialogMode === 'view' && editingShotRow != null);
 	const currentShotIdx = $derived(editingShotId == null ? -1 : orderedShots.findIndex((s) => s.id === editingShotId));
 	const hasPrevShot = $derived(currentShotIdx > 0);
 	const hasNextShot = $derived(currentShotIdx >= 0 && currentShotIdx < orderedShots.length - 1);
@@ -311,6 +353,13 @@
 	// clicks still cover the forgotten-shot case in any phase.
 	let quickAddOverride = $state<boolean | null>(null);
 	const quickAddVisible = $derived(quickAddOverride ?? phase === 'shooting');
+
+	// Frames view: the film strip (logging, frame-count progress) by default while
+	// shooting; the shots table (zero-click reading for metadata transcription) in the
+	// post-shooting phases. null = follow the default; 'strip'/'table' = user override,
+	// reset on roll navigation like quickAddOverride/boardExpandedOverride.
+	let shotViewOverride = $state<'strip' | 'table' | null>(null);
+	const shotView = $derived(shotViewOverride ?? (phase === 'shooting' ? 'strip' : 'table'));
 
 	// Default lens id for the QuickAddBar (mirrors the shot dialog's smart cascade,
 	// minus the last-used-on-roll part which is session state — use roll/camera default)
@@ -440,7 +489,10 @@
 		showShotDialog = true;
 	}
 
-	function openEditShotDialog(shot: Shot) {
+	// Seed the shared shot form from a shot and capture the dirty-compare baseline. Used
+	// by both view and edit opens so switching view→Edit needs no reseed and the
+	// kammerz-11o3 snapshot is already correct.
+	function populateShotForm(shot: Shot) {
 		editingShotId = shot.id;
 		shotFrameNumber = shot.frame_number;
 		shotAperture = shot.aperture ?? '';
@@ -453,7 +505,36 @@
 		shotLensId = ids.length > 0 ? String(ids[0]) : '';
 		shotError = '';
 		shotOpenSnapshot = currentShotFormFields();
+	}
+
+	// Open the dialog read-only on a shot (view-first, kammerz-4she).
+	function openShotView(shot: Shot) {
+		populateShotForm(shot);
+		shotDialogMode = 'view';
 		showShotDialog = true;
+	}
+
+	// Open the dialog straight into the edit form (used by the view-mode Edit button
+	// and prev/next auto-save navigation).
+	function openShotEdit(shot: Shot) {
+		populateShotForm(shot);
+		shotDialogMode = 'edit';
+		showShotDialog = true;
+	}
+
+	// Single teardown for every way the shot dialog closes — the mode reset had
+	// already drifted across hand-inlined copies of this block.
+	function closeShotDialog() {
+		showShotDialog = false;
+		resetShotForm();
+		shotDialogMode = 'view';
+	}
+
+	// Close the dialog, then arm the (ConfirmDialog-gated) delete for its shot.
+	function startDeleteShot() {
+		const sid = editingShotId;
+		closeShotDialog();
+		deletingShotId = sid;
 	}
 
 	// Navigate to an adjacent shot, saving the current one's edits first if the
@@ -488,14 +569,28 @@
 			}
 		}
 		const fresh = orderedShots.find((s) => s.id === target.id);
-		if (fresh) openEditShotDialog(fresh);
+		if (fresh) openShotEdit(fresh);
 	}
 
+	// Prev/next branch on mode: edit mode auto-saves on navigate (kammerz-11o3); view
+	// mode navigates freely with nothing to save, re-opening the adjacent shot read-only.
 	function goPrevShot() {
-		if (hasPrevShot) void navigateToShot(-1);
+		if (!hasPrevShot) return;
+		if (shotDialogMode === 'view') {
+			const target = orderedShots[currentShotIdx - 1];
+			if (target) openShotView(target);
+		} else {
+			void navigateToShot(-1);
+		}
 	}
 	function goNextShot() {
-		if (hasNextShot) void navigateToShot(1);
+		if (!hasNextShot) return;
+		if (shotDialogMode === 'view') {
+			const target = orderedShots[currentShotIdx + 1];
+			if (target) openShotView(target);
+		} else {
+			void navigateToShot(1);
+		}
 	}
 
 	function handleShotDialogKeydown(e: KeyboardEvent) {
@@ -537,8 +632,7 @@
 					lens_ids: lensIds
 				});
 			}
-			showShotDialog = false;
-			resetShotForm();
+			closeShotDialog();
 			await loadRollData();
 		} catch (err) {
 			shotError = err instanceof Error ? err.message : String(err);
@@ -813,10 +907,11 @@
 		}
 	}
 
-	// FrameStrip selection: filled frame → edit dialog; open slot → add dialog pre-seeded
+	// FrameStrip / table selection: filled frame → view-first dialog; open slot → add
+	// dialog pre-seeded.
 	function handleFrameSelect(frameNumber: string, shot: Shot | null) {
 		if (shot) {
-			openEditShotDialog(shot);
+			openShotView(shot);
 		} else {
 			openAddShotDialog(frameNumber);
 		}
@@ -837,6 +932,7 @@
 			// phase) on every roll change so a manual override doesn't leak across rolls.
 			quickAddOverride = null;
 			boardExpandedOverride = null;
+			shotViewOverride = null;
 			// Close any board dialog state left from the previous roll: ArchiveDialog's
 			// seed runs only on the open transition (untracked), so a dialog surviving
 			// a roll change would hold — and then save — the PRIOR roll's draft.
@@ -1011,8 +1107,8 @@
 						<h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-text-faint">Last shot</h3>
 						<div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
 							<span class="font-mono text-text">#{lastShot.frame}</span>
-							{#if lastShot.aperture}<span class="font-mono text-text-muted">f/{lastShot.aperture}</span>{/if}
-							{#if lastShot.shutter}<span class="font-mono text-text-muted">{lastShot.shutter}s</span>{/if}
+							{#if lastShot.aperture}<span class="font-mono text-text-muted">{lastShot.aperture}</span>{/if}
+							{#if lastShot.shutter}<span class="font-mono text-text-muted">{lastShot.shutter}</span>{/if}
 							{#if lastShot.lensName}<span class="text-text-faint">{lastShot.lensName}</span>{/if}
 						</div>
 					</div>
@@ -1029,6 +1125,34 @@
 						<div class="flex-1 border-b border-border-subtle"></div>
 					</h2>
 					<div class="flex items-center gap-2">
+						<!-- Strip ↔ table toggle. NATIVE radio inputs (visually hidden) inside the
+						     styled labels — the same standard ArchiveDialog documents: a shared name
+						     gives single-tab-stop + arrow-key roving + "1 of 2" announcements for
+						     free, which aria-only role=radio buttons do not. -->
+						<div
+							class="inline-flex overflow-hidden rounded-lg border border-border"
+							role="radiogroup"
+							aria-label="Frames view"
+						>
+							{#each [{ value: 'strip', label: 'Strip' }, { value: 'table', label: 'Table' }] as const as opt (opt.value)}
+								<label
+									class="cursor-pointer px-2.5 py-1 text-xs font-medium transition-colors not-first:border-l not-first:border-border has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-accent/50 {shotView ===
+									opt.value
+										? 'bg-accent text-surface'
+										: 'text-text-muted hover:bg-surface-overlay hover:text-text'}"
+								>
+									<input
+										type="radio"
+										name="frames-view"
+										value={opt.value}
+										checked={shotView === opt.value}
+										onchange={() => (shotViewOverride = opt.value)}
+										class="sr-only"
+									/>
+									{opt.label}
+								</label>
+							{/each}
+						</div>
 						<Button
 							size="sm"
 							variant="secondary"
@@ -1110,7 +1234,16 @@
 					{:else}
 						{@render activityPane()}
 					{/if}
-					<FrameStrip frames={frameCells} onselect={handleFrameSelect} onaddextra={() => openAddShotDialog()} />
+					{#if shotView === 'strip'}
+						<FrameStrip frames={frameCells} onselect={handleFrameSelect} onaddextra={() => openAddShotDialog()} />
+					{:else}
+						<ShotsTable
+							shots={orderedShots}
+							lensNames={shotLensNames}
+							onselect={openShotView}
+							onaddextra={() => openAddShotDialog()}
+						/>
+					{/if}
 				</div>
 			</section>
 		{/snippet}
@@ -1164,18 +1297,15 @@
 {#if showShotDialog}
 	<Dialog
 		open={true}
-		title={editingShotId ? 'Edit Shot' : 'Add Shot'}
-		onclose={() => {
-			showShotDialog = false;
-			resetShotForm();
-		}}
+		title={isShotView ? `Shot ${editingShotRow?.frame ?? ''}` : editingShotId ? 'Edit Shot' : 'Add Shot'}
+		onclose={closeShotDialog}
 	>
 		<div class="space-y-4">
 			{#if editingShotId}
 				<div class="flex items-center justify-between">
 					<button
 						class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:bg-surface-overlay hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
-						disabled={!hasPrevShot || shotNavSaving || !!shotDateError}
+						disabled={!hasPrevShot || (!isShotView && (shotNavSaving || !!shotDateError))}
 						onclick={goPrevShot}
 						aria-label="Previous shot"
 						title="Previous shot"
@@ -1187,7 +1317,7 @@
 					{/if}
 					<button
 						class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:bg-surface-overlay hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
-						disabled={!hasNextShot || shotNavSaving || !!shotDateError}
+						disabled={!hasNextShot || (!isShotView && (shotNavSaving || !!shotDateError))}
 						onclick={goNextShot}
 						aria-label="Next shot"
 						title="Next shot"
@@ -1196,80 +1326,115 @@
 					</button>
 				</div>
 			{/if}
-			<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-				<Input label="Frame #" bind:value={shotFrameNumber} placeholder="1" required />
-				<ComboInput
-					label="Aperture (f/)"
-					placeholder="5.6"
-					mono
-					options={APERTURE_SUGGESTIONS}
-					normalize={normalizeAperture}
-					warning={shotAperture && !isRecognizedAperture(shotAperture) ? 'Non-standard f/ value' : ''}
-					bind:value={shotAperture}
-				/>
-				<ComboInput
-					label="Shutter Speed"
-					placeholder="1/250"
-					mono
-					options={SHUTTER_SUGGESTIONS}
-					normalize={normalizeShutter}
-					warning={shotShutterSpeed && !isRecognizedShutter(shotShutterSpeed) ? 'Non-standard shutter speed' : ''}
-					bind:value={shotShutterSpeed}
-				/>
-			</div>
-			<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-				<Input type="date" label="Date" class="h-[38px]" bind:value={shotDate} />
-				<TimeInput label="Time" bind:value={shotTime} />
-				<Input label="Location" bind:value={shotLocation} placeholder="Central Park" />
-			</div>
-
-			<!-- Lens Selection -->
-			{#if isFixedLensCamera && fixedLens}
-				<div>
-					<span class="mb-1.5 block text-xs font-medium text-text-muted">Lens</span>
-					<div class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted">
-						{lensDisplayName(fixedLens)} <span class="text-text-faint">(fixed)</span>
+			{#if isShotView && editingShotRow}
+				<!-- Read-only view: every field shown, em-dash for the empties (mirrors the
+				     strip's — convention). Edit reveals the form below. -->
+				<dl class="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+					{#snippet viewField(label: string, value: string, mono = true)}
+						<div>
+							<dt class="mb-0.5 text-xs font-medium text-text-faint">{label}</dt>
+							<dd class="text-sm {mono ? 'font-mono' : ''} {value ? 'text-text' : 'text-text-faint'}">
+								{value || '—'}
+							</dd>
+						</div>
+					{/snippet}
+					{@render viewField('Frame #', editingShotRow.frame)}
+					{@render viewField('Aperture', editingShotRow.aperture)}
+					{@render viewField('Shutter', editingShotRow.shutter)}
+					{@render viewField('Date', editingShotRow.date)}
+					{@render viewField('Time', editingShotRow.time)}
+					{@render viewField('Location', editingShotRow.location, false)}
+					{@render viewField('Lens', viewLensLabel, false)}
+					<div class="col-span-2 sm:col-span-3">
+						<dt class="mb-0.5 text-xs font-medium text-text-faint">Notes</dt>
+						<dd
+							class="text-sm whitespace-pre-wrap break-words {editingShotRow.notes ? 'text-text' : 'text-text-faint'}"
+						>
+							{editingShotRow.notes || '—'}
+						</dd>
+					</div>
+				</dl>
+				<div class="flex items-center justify-between gap-2 pt-2">
+					<Button variant="danger" onclick={startDeleteShot}>Delete</Button>
+					<div class="flex gap-2">
+						<Button variant="ghost" onclick={closeShotDialog}>Close</Button>
+						<!-- Re-open through openShotEdit so the form and dirty baseline re-seed
+						     from the LIVE shot — a bare mode flip would edit the values seeded
+						     when the view opened, stale if the roll refreshed since. -->
+						<Button variant="primary" onclick={() => editingShot && openShotEdit(editingShot)}>Edit</Button>
 					</div>
 				</div>
 			{:else}
-				<Select label="Lens" bind:value={shotLensId} options={shotLensOptions} />
-			{/if}
-
-			<Textarea label="Notes" bind:value={shotNotes} placeholder="Any notes about this shot..." />
-
-			{#if shotError}
-				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{shotError}</div>
-			{/if}
-			<div class="flex items-center justify-between gap-2 pt-2">
-				{#if editingShotId}
-					<Button
-						variant="danger"
-						onclick={() => {
-							const sid = editingShotId;
-							showShotDialog = false;
-							resetShotForm();
-							deletingShotId = sid;
-						}}>Delete</Button
-					>
-				{:else}
-					<span></span>
-				{/if}
-				<div class="flex gap-2">
-					<Button
-						variant="ghost"
-						onclick={() => {
-							showShotDialog = false;
-							resetShotForm();
-						}}>Cancel</Button
-					>
-					{#if !editingShotId}
-						<Button variant="ghost" disabled={!!shotDateError} onclick={handleSaveShotAndNext}>Save & Next</Button>
-					{/if}
-					<Button variant="primary" disabled={!!shotDateError} onclick={handleSaveShot}>
-						{editingShotId ? 'Save' : 'Add Shot'}
-					</Button>
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+					<Input label="Frame #" bind:value={shotFrameNumber} placeholder="1" required />
+					<ComboInput
+						label="Aperture (f/)"
+						placeholder="5.6"
+						mono
+						options={APERTURE_SUGGESTIONS}
+						normalize={normalizeAperture}
+						warning={shotAperture && !isRecognizedAperture(shotAperture) ? 'Non-standard f/ value' : ''}
+						bind:value={shotAperture}
+					/>
+					<ComboInput
+						label="Shutter Speed"
+						placeholder="1/250"
+						mono
+						options={SHUTTER_SUGGESTIONS}
+						normalize={normalizeShutter}
+						warning={shotShutterSpeed && !isRecognizedShutter(shotShutterSpeed) ? 'Non-standard shutter speed' : ''}
+						bind:value={shotShutterSpeed}
+					/>
 				</div>
-			</div>
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+					<Input type="date" label="Date" class="h-[38px]" bind:value={shotDate} />
+					<TimeInput label="Time" bind:value={shotTime} />
+					<Input label="Location" bind:value={shotLocation} placeholder="Central Park" />
+				</div>
+
+				<!-- Lens Selection -->
+				{#if isFixedLensCamera && fixedLens}
+					<div>
+						<span class="mb-1.5 block text-xs font-medium text-text-muted">Lens</span>
+						<div class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted">
+							{lensDisplayName(fixedLens)} <span class="text-text-faint">(fixed)</span>
+						</div>
+					</div>
+				{:else}
+					<Select label="Lens" bind:value={shotLensId} options={shotLensOptions} />
+				{/if}
+
+				<Textarea label="Notes" bind:value={shotNotes} placeholder="Any notes about this shot..." />
+
+				{#if shotError}
+					<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{shotError}</div>
+				{/if}
+				<div class="flex items-center justify-between gap-2 pt-2">
+					{#if editingShotId}
+						<Button variant="danger" onclick={startDeleteShot}>Delete</Button>
+					{:else}
+						<span></span>
+					{/if}
+					<div class="flex gap-2">
+						<!-- Edit mode is reached FROM the read-only view, so Cancel returns
+						     there (discarding edits by re-seeding from the live shot) instead
+						     of closing the whole dialog; add mode just closes. -->
+						<Button
+							variant="ghost"
+							onclick={() => {
+								if (editingShot) openShotView(editingShot);
+								else closeShotDialog();
+							}}>Cancel</Button
+						>
+						{#if !editingShotId}
+							<Button variant="ghost" disabled={!!shotDateError} onclick={handleSaveShotAndNext}>Save & Next</Button>
+						{/if}
+						<Button variant="primary" disabled={!!shotDateError} onclick={handleSaveShot}>
+							{editingShotId ? 'Save' : 'Add Shot'}
+						</Button>
+					</div>
+				</div>
+			{/if}
 		</div>
 	</Dialog>
 {/if}

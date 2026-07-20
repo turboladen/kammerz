@@ -249,14 +249,21 @@ test('edit-shot dialog auto-saves edits when navigating between shots (kammerz-1
 		await page.goto(`${BASE}/rolls/${rollId}`);
 		await page.waitForLoadState('networkidle');
 
-		// Open the Edit Shot dialog on frame 1 via the FrameStrip. Scope every
-		// in-dialog locator through role=dialog — the QuickAddBar behind it also
-		// has a <textarea> and a "Save & Next" button.
-		await page.getByRole('button', { name: /^Frame 1[ ,].*click to edit/ }).click();
+		// Click frame 1 via the FrameStrip — the dialog now opens VIEW-first
+		// (kammerz-4she), so there's no form yet. Scope every in-dialog locator through
+		// role=dialog — the QuickAddBar behind it also has a <textarea> and a
+		// "Save & Next" button.
+		await page.getByRole('button', { name: /^Frame 1[ ,].*click to view/ }).click();
 		const dialog = page.getByRole('dialog');
 		await expect(dialog.getByText('Shot 1 of 2')).toBeVisible();
+		await expect(dialog.locator('textarea'), 'view mode shows no form').toHaveCount(0);
 
-		// Edit shot 1's notes, then navigate — this must auto-save shot 1.
+		// Enter edit mode via the dialog-scoped Edit button (bare "Edit" collides with
+		// the roll-header / board / development Edits). Now the form is present.
+		await dialog.getByRole('button', { name: 'Edit', exact: true }).click();
+
+		// Edit shot 1's notes, then navigate — this must auto-save shot 1 (edit-mode
+		// nav carries the mode across, so shot 2 opens straight into the form).
 		await dialog.locator('textarea').fill('note one');
 		await dialog.getByRole('button', { name: 'Next shot' }).click();
 		await expect(dialog.getByText('Shot 2 of 2')).toBeVisible();
@@ -274,6 +281,91 @@ test('edit-shot dialog auto-saves edits when navigating between shots (kammerz-1
 		const shot2 = await (await page.request.get(`${BASE}/api/shots/${shotIds[1]}`)).json();
 		expect(shot1.notes, 'shot 1 edit must survive < > navigation').toBe('note one');
 		expect(shot2.notes).toBe('note two');
+	} finally {
+		await page.request.delete(`${BASE}/api/rolls/${rollId}`);
+	}
+});
+
+/**
+ * kammerz-4she: clicking a shot opens the dialog READ-ONLY (view-first) with the
+ * shot's fields displayed and an Edit button — the form appears only after Edit.
+ */
+test('shot dialog opens view-first and Edit reveals the form (kammerz-4she)', async ({ page }) => {
+	const created = await page.request.post(`${BASE}/api/rolls`, {
+		data: { roll_id: `E2E-VIEW-${Date.now()}`, status: 'loaded', frame_count: 36 }
+	});
+	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
+	const rollId: number = await created.json();
+	try {
+		const res = await page.request.post(`${BASE}/api/shots`, {
+			data: { roll_id: rollId, frame_number: '1', aperture: '8', notes: 'sunny sixteen', lens_ids: [] }
+		});
+		expect(res.ok(), `create shot failed: ${res.status()}`).toBeTruthy();
+
+		await page.goto(`${BASE}/rolls/${rollId}`);
+		await page.waitForLoadState('networkidle');
+
+		// Click the shot via the FrameStrip. The dialog opens view-first: the read-only
+		// value (f/8) is shown and there is NO form textarea yet.
+		await page.getByRole('button', { name: /^Frame 1[ ,].*click to view/ }).click();
+		const dialog = page.getByRole('dialog');
+		// Title is the h2 "Shot 1" (exact — the nav header renders "Shot 1 of 2").
+		await expect(dialog.getByRole('heading', { name: 'Shot 1', exact: true })).toBeVisible();
+		await expect(dialog.getByText('f/8')).toBeVisible();
+		await expect(dialog.locator('textarea'), 'view mode is read-only').toHaveCount(0);
+
+		// Edit reveals the form, seeded with the shot's values.
+		await dialog.getByRole('button', { name: 'Edit', exact: true }).click();
+		await expect(dialog.locator('textarea')).toHaveValue('sunny sixteen');
+	} finally {
+		await page.request.delete(`${BASE}/api/rolls/${rollId}`);
+	}
+});
+
+/**
+ * kammerz-4she: the Frames section can toggle to a shots TABLE that lists every
+ * shot's fields (frame, f/, shutter, location, …) for zero-click reading, and a
+ * table row opens the same view-first dialog.
+ */
+test('shots table view lists fields and opens the view dialog (kammerz-4she)', async ({ page }) => {
+	const created = await page.request.post(`${BASE}/api/rolls`, {
+		data: { roll_id: `E2E-TABLE-${Date.now()}`, status: 'loaded', frame_count: 36 }
+	});
+	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
+	const rollId: number = await created.json();
+	try {
+		const res = await page.request.post(`${BASE}/api/shots`, {
+			data: {
+				roll_id: rollId,
+				frame_number: '1',
+				aperture: '5.6',
+				shutter_speed: '1/250',
+				location: 'Corlieu Falls',
+				lens_ids: []
+			}
+		});
+		expect(res.ok(), `create shot failed: ${res.status()}`).toBeTruthy();
+
+		await page.goto(`${BASE}/rolls/${rollId}`);
+		await page.waitForLoadState('networkidle');
+
+		// A fresh loaded roll is in the shooting phase → strip by default. Switch to
+		// Table via the segmented control. The control is a native radiogroup with
+		// visually-hidden (sr-only) inputs — Playwright's actionability check
+		// rejects clicking hidden elements, so click the visible label text, then
+		// assert the radio actually became checked.
+		await page.getByText('Table', { exact: true }).click();
+		await expect(page.getByRole('radio', { name: 'Table', exact: true })).toBeChecked();
+
+		// The table renders the decorated fields (f/ prefix, s suffix) and the location.
+		await expect(page.getByRole('cell', { name: 'f/5.6', exact: true })).toBeVisible();
+		await expect(page.getByRole('cell', { name: '1/250s', exact: true })).toBeVisible();
+		await expect(page.getByRole('cell', { name: 'Corlieu Falls', exact: true })).toBeVisible();
+
+		// The Frame-cell button is the row's control; clicking it opens the view dialog.
+		await page.getByRole('button', { name: 'View frame 1', exact: true }).click();
+		const dialog = page.getByRole('dialog');
+		await expect(dialog.getByRole('heading', { name: 'Shot 1', exact: true })).toBeVisible();
 	} finally {
 		await page.request.delete(`${BASE}/api/rolls/${rollId}`);
 	}

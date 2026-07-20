@@ -124,8 +124,9 @@ describe('lastShotSummary', () => {
 		const summary = lastShotSummary(shots, { 11: [7] }, [lens({ id: 7, brand: 'Leica', model: 'Summicron' })]);
 		expect(summary).toEqual({
 			frame: '2',
-			aperture: '5.6',
-			shutter: '1/125',
+			// Pre-decorated via the shared formatShotRow convention (f/ prefix, s suffix).
+			aperture: 'f/5.6',
+			shutter: '1/125s',
 			lensName: 'Leica Summicron'
 		});
 	});

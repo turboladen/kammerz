@@ -6,6 +6,7 @@
 // page phase, and the writable roll columns each board row edits.
 import type { ActivityKind, ActivityState, Lens, RollActivityView, Shot } from '$lib/types';
 import { lensDisplayName } from './lens';
+import { formatShotRow } from './shot-table';
 
 /** The page's layout phase, derived purely from the server's group_key/done. */
 export type RollPhase = 'shooting' | 'wrapup' | 'done';
@@ -124,7 +125,9 @@ export interface ArchivePayload {
 /** The "what settings did I just use?" reference card shown in the shooting phase. */
 export interface LastShotSummary {
 	frame: string;
+	/** Display-decorated ("f/5.6") via the shared formatShotRow convention; null when unset. */
 	aperture: string | null;
+	/** Display-decorated ("1/250s") via the shared formatShotRow convention; null when unset. */
 	shutter: string | null;
 	lensName: string | null;
 }
@@ -133,7 +136,8 @@ export interface LastShotSummary {
  * Summarize the most recent shot (highest frame, matching the roll page's
  * date-default convention) for the shooting-phase reference card. Null when the
  * roll has no shots. `lensName` is null when the shot carries no lens or its lens
- * id is not in the catalog.
+ * id is not in the catalog. Exposure values come pre-decorated from
+ * formatShotRow so the card can never drift from the table/view formatting.
  */
 export function lastShotSummary(
 	shots: Shot[],
@@ -142,12 +146,13 @@ export function lastShotSummary(
 ): LastShotSummary | null {
 	if (shots.length === 0) return null;
 	const shot = shots[shots.length - 1];
+	const row = formatShotRow(shot);
 	const lensIds = shotLensMap[shot.id] ?? [];
 	const lens = lensIds.length > 0 ? (lenses.find((l) => l.id === lensIds[0]) ?? null) : null;
 	return {
-		frame: shot.frame_number,
-		aperture: shot.aperture,
-		shutter: shot.shutter_speed,
+		frame: row.frame,
+		aperture: row.aperture || null,
+		shutter: row.shutter || null,
 		lensName: lens ? lensDisplayName(lens) : null
 	};
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Shot } from '$lib/types';
+	import { formatShotRow } from '$lib/utils/shot-table';
 
 	interface FrameCell {
 		frameNumber: string;
@@ -11,9 +12,23 @@
 		frames: FrameCell[];
 		onselect: (frameNumber: string, shot: Shot | null) => void;
 		onaddextra: () => void;
+		/** Whether clicking a FILLED frame does something on this page. Pass false
+		 * where it's a no-op (quick-entry), so the label never advertises a click
+		 * action the page doesn't have. */
+		filledClickable?: boolean;
 	}
 
-	let { frames, onselect, onaddextra }: Props = $props();
+	let { frames, onselect, onaddextra, filledClickable = true }: Props = $props();
+
+	// ONE filled-frame hint builder for both the tooltip (title) and the
+	// accessible name — two hand-maintained templates would let the sighted hint
+	// and the screen-reader one drift. Exposure values come from the shared
+	// formatShotRow convention (f/ prefix, s suffix), same as the table/view.
+	function filledHint(cell: FrameCell, sep: string, action = ''): string {
+		const row = formatShotRow(cell.shot!);
+		const parts = [row.date, row.aperture, row.shutter, row.time].filter(Boolean).join(sep);
+		return `Frame ${cell.frameNumber}${parts ? sep + parts : ''}${action}`;
+	}
 </script>
 
 <!-- Outer wrapper: the "film strip" surface with sprocket rails top & bottom -->
@@ -29,12 +44,12 @@
 					<button
 						onclick={() => onselect(cell.frameNumber, cell.shot)}
 						title={cell.shot
-							? `Frame ${cell.frameNumber}${cell.shot.date ? ' · ' + cell.shot.date : ''}${cell.shot.aperture ? ' · f/' + cell.shot.aperture : ''}${cell.shot.shutter_speed ? ' · ' + cell.shot.shutter_speed + 's' : ''}${cell.shot.time ? ' · ' + cell.shot.time : ''}`
+							? filledHint(cell, ' · ')
 							: cell.isNext
 								? `Frame ${cell.frameNumber} — next open frame`
 								: `Frame ${cell.frameNumber} — open`}
 						aria-label={cell.shot
-							? `Frame ${cell.frameNumber}${cell.shot.date ? ', ' + cell.shot.date : ''}${cell.shot.aperture ? ', f/' + cell.shot.aperture : ''}${cell.shot.shutter_speed ? ', ' + cell.shot.shutter_speed + 's' : ''}${cell.shot.time ? ', ' + cell.shot.time : ''} — click to edit`
+							? filledHint(cell, ', ', filledClickable ? ' — click to view' : '')
 							: cell.isNext
 								? `Frame ${cell.frameNumber}, next open frame — click to add`
 								: `Frame ${cell.frameNumber}, open — click to add`}
