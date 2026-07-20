@@ -281,14 +281,14 @@
 						error={quickError}
 						onsave={handleQuickAdd}
 					/>
-					<!-- filledAction={null}: clicking a filled frame is a no-op on this page
+					<!-- filledClickable={false}: clicking a filled frame is a no-op on this page
 				     (viewing/editing lives on the roll page), so the label must not
 				     advertise a click action that doesn't exist. -->
 					<FrameStrip
 						frames={frameCells}
 						onselect={handleFrameSelect}
 						onaddextra={handleAddExtra}
-						filledAction={null}
+						filledClickable={false}
 					/>
 				</div>
 			</FadeIn>

@@ -40,7 +40,7 @@
 	import { listLabs } from '$lib/api/labs';
 	import { lensDisplayName, buildLensOptions } from '$lib/utils/lens';
 	import { buildFrameCells } from '$lib/utils/frames';
-	import { formatShotRow, resolveShotLensName } from '$lib/utils/shot-table';
+	import { formatShotRow, resolveShotLensName, type ShotLensDisplay } from '$lib/utils/shot-table';
 	import { buildShotUpdatePayload, shotFormsEqual, type ShotFormFields } from '$lib/utils/shot-form';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
@@ -294,9 +294,16 @@
 	const shotLensOptions = $derived(buildLensOptions(allLenses, selectedCamera, 'No lens', lensMounts));
 
 	// Per-shot lens display for the table + view dialog: shot's own lens > roll default.
+	const shotLenses = $derived.by(() => {
+		const map: Record<number, ShotLensDisplay> = {};
+		for (const s of shots) map[s.id] = resolveShotLensName(s.id, shotLensMap, allLenses, roll?.lens_id ?? null);
+		return map;
+	});
+	// The table renders the EFFECTIVE name only (it's what took the shot — the
+	// transcription-correct value); provenance annotation lives in the view dialog.
 	const shotLensNames = $derived.by(() => {
 		const map: Record<number, string> = {};
-		for (const s of shots) map[s.id] = resolveShotLensName(s.id, shotLensMap, allLenses, roll?.lens_id ?? null);
+		for (const [id, lens] of Object.entries(shotLenses)) map[Number(id)] = lens.name;
 		return map;
 	});
 
@@ -317,13 +324,12 @@
 	// The view shows the EFFECTIVE lens (per-shot, else roll default). When it's the
 	// inherited default, say so — the edit form's Lens dropdown deliberately shows
 	// only the per-shot override ('No lens' when inheriting), and without the
-	// annotation view→Edit reads like the lens was cleared.
+	// annotation view→Edit reads like the lens was cleared. `inherited` comes from
+	// resolveShotLensName itself, never re-derived from the raw lens map here.
 	const viewLensLabel = $derived.by(() => {
-		if (!editingShot) return '';
-		const name = shotLensNames[editingShot.id] ?? '';
-		if (!name) return '';
-		const hasOwn = (shotLensMap[editingShot.id]?.length ?? 0) > 0;
-		return hasOwn ? name : `${name} (roll default)`;
+		const lens = editingShot ? shotLenses[editingShot.id] : null;
+		if (!lens || !lens.name) return '';
+		return lens.inherited ? `${lens.name} (roll default)` : lens.name;
 	});
 	// True only while an existing shot is shown read-only (never in add mode).
 	// Row presence is part of the guard: if the viewed shot vanishes from `shots`
@@ -1116,28 +1122,32 @@
 						<div class="flex-1 border-b border-border-subtle"></div>
 					</h2>
 					<div class="flex items-center gap-2">
-						<!-- Strip ↔ table toggle: the strip for logging/progress, the table for
-						     zero-click reading. Exactly-one-of, so a radiogroup (not aria-pressed
-						     toggles, which read as independently pressable); one {#each} keeps the
-						     two options' styling in lockstep. -->
+						<!-- Strip ↔ table toggle. NATIVE radio inputs (visually hidden) inside the
+						     styled labels — the same standard ArchiveDialog documents: a shared name
+						     gives single-tab-stop + arrow-key roving + "1 of 2" announcements for
+						     free, which aria-only role=radio buttons do not. -->
 						<div
 							class="inline-flex overflow-hidden rounded-lg border border-border"
 							role="radiogroup"
 							aria-label="Frames view"
 						>
 							{#each [{ value: 'strip', label: 'Strip' }, { value: 'table', label: 'Table' }] as const as opt (opt.value)}
-								<button
-									type="button"
-									role="radio"
-									aria-checked={shotView === opt.value}
-									class="px-2.5 py-1 text-xs font-medium transition-colors not-first:border-l not-first:border-border {shotView ===
+								<label
+									class="cursor-pointer px-2.5 py-1 text-xs font-medium transition-colors not-first:border-l not-first:border-border has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-accent/50 {shotView ===
 									opt.value
 										? 'bg-accent text-surface'
 										: 'text-text-muted hover:bg-surface-overlay hover:text-text'}"
-									onclick={() => (shotViewOverride = opt.value)}
 								>
+									<input
+										type="radio"
+										name="frames-view"
+										value={opt.value}
+										checked={shotView === opt.value}
+										onchange={() => (shotViewOverride = opt.value)}
+										class="sr-only"
+									/>
 									{opt.label}
-								</button>
+								</label>
 							{/each}
 						</div>
 						<Button

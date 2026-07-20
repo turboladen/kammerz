@@ -350,8 +350,12 @@ test('shots table view lists fields and opens the view dialog (kammerz-4she)', a
 		await page.waitForLoadState('networkidle');
 
 		// A fresh loaded roll is in the shooting phase → strip by default. Switch to
-		// Table via the segmented control (a radiogroup — exactly-one-of semantics).
-		await page.getByRole('radio', { name: 'Table', exact: true }).click();
+		// Table via the segmented control. The control is a native radiogroup with
+		// visually-hidden (sr-only) inputs — Playwright's actionability check
+		// rejects clicking hidden elements, so click the visible label text, then
+		// assert the radio actually became checked.
+		await page.getByText('Table', { exact: true }).click();
+		await expect(page.getByRole('radio', { name: 'Table', exact: true })).toBeChecked();
 
 		// The table renders the decorated fields (f/ prefix, s suffix) and the location.
 		await expect(page.getByRole('cell', { name: 'f/5.6', exact: true })).toBeVisible();

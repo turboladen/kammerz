@@ -96,22 +96,29 @@ describe('resolveShotLensName', () => {
 	];
 
 	it("uses the shot's own lens when present", () => {
-		expect(resolveShotLensName(1, { 1: [3] }, lenses, 7)).toBe('Nikon AI-S 50mm');
+		expect(resolveShotLensName(1, { 1: [3] }, lenses, 7)).toEqual({ name: 'Nikon AI-S 50mm', inherited: false });
 	});
 
 	it('joins multiple lens names with a comma', () => {
-		expect(resolveShotLensName(1, { 1: [3, 7] }, lenses, null)).toBe('Nikon AI-S 50mm, Canon FD 35mm');
+		expect(resolveShotLensName(1, { 1: [3, 7] }, lenses, null)).toEqual({
+			name: 'Nikon AI-S 50mm, Canon FD 35mm',
+			inherited: false
+		});
 	});
 
 	it('falls back to the roll default lens when the shot has none', () => {
-		expect(resolveShotLensName(1, {}, lenses, 7)).toBe('Canon FD 35mm');
-		expect(resolveShotLensName(1, { 1: [] }, lenses, 3)).toBe('Nikon AI-S 50mm');
+		expect(resolveShotLensName(1, {}, lenses, 7)).toEqual({ name: 'Canon FD 35mm', inherited: true });
+		expect(resolveShotLensName(1, { 1: [] }, lenses, 3)).toEqual({ name: 'Nikon AI-S 50mm', inherited: true });
 	});
 
 	it('returns empty when neither the shot nor the roll has a resolvable lens', () => {
-		expect(resolveShotLensName(1, {}, lenses, null)).toBe('');
+		expect(resolveShotLensName(1, {}, lenses, null)).toEqual({ name: '', inherited: false });
 		// A lens id not in the catalog resolves to nothing, not a crash.
-		expect(resolveShotLensName(1, { 1: [999] }, lenses, null)).toBe('');
-		expect(resolveShotLensName(1, {}, lenses, 999)).toBe('');
+		expect(resolveShotLensName(1, { 1: [999] }, lenses, null)).toEqual({ name: '', inherited: false });
+		// All-unresolvable own ids fall through to the roll default AND are marked
+		// inherited — the flag comes from the same function as the name, so the
+		// view's '(roll default)' annotation can't disagree with the resolution.
+		expect(resolveShotLensName(1, { 1: [999] }, lenses, 7)).toEqual({ name: 'Canon FD 35mm', inherited: true });
+		expect(resolveShotLensName(1, {}, lenses, 999)).toEqual({ name: '', inherited: false });
 	});
 });

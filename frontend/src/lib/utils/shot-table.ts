@@ -39,30 +39,39 @@ export function formatShotRow(shot: Shot): ShotRowDisplay {
 	};
 }
 
+/** A shot's effective lens display, plus whether it was inherited from the roll. */
+export interface ShotLensDisplay {
+	name: string;
+	/** True when `name` came from the roll-default fallback, not the shot's own ids. */
+	inherited: boolean;
+}
+
 /**
- * The lens display name(s) for a shot: the shot's own per-shot lens ids (joined
+ * The effective lens display for a shot: the shot's own per-shot lens ids (joined
  * with ", ") take priority; otherwise the roll's default lens; otherwise empty.
  * Ids absent from `lenses` are skipped — and unlike the print page's
  * `shotLensDisplay`, an all-unresolvable id list falls through to the roll
  * default rather than returning '' (more helpful; near-impossible under FKs).
+ * `inherited` is decided HERE, alongside the name, so no consumer ever
+ * re-derives own-vs-default from the raw map and drifts from this priority.
  */
 export function resolveShotLensName(
 	shotId: number,
 	shotLensMap: Record<number, number[]>,
 	lenses: Lens[],
 	fallbackLensId: number | null
-): string {
+): ShotLensDisplay {
 	const ids = shotLensMap[shotId] ?? [];
 	if (ids.length > 0) {
 		const names = ids
 			.map((lid) => lenses.find((l) => l.id === lid))
 			.filter((l): l is Lens => l != null)
 			.map((l) => lensDisplayName(l));
-		if (names.length > 0) return names.join(', ');
+		if (names.length > 0) return { name: names.join(', '), inherited: false };
 	}
 	if (fallbackLensId != null) {
 		const def = lenses.find((l) => l.id === fallbackLensId);
-		if (def) return lensDisplayName(def);
+		if (def) return { name: lensDisplayName(def), inherited: true };
 	}
-	return '';
+	return { name: '', inherited: false };
 }

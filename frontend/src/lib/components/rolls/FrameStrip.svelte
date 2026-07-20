@@ -12,29 +12,22 @@
 		frames: FrameCell[];
 		onselect: (frameNumber: string, shot: Shot | null) => void;
 		onaddextra: () => void;
-		/** Action clause for filled-frame labels ("click to view"). Pass null on
-		 * pages where clicking a filled frame does nothing (quick-entry), so the
-		 * label never advertises an affordance the page doesn't have. */
-		filledAction?: string | null;
+		/** Whether clicking a FILLED frame does something on this page. Pass false
+		 * where it's a no-op (quick-entry), so the label never advertises a click
+		 * action the page doesn't have. */
+		filledClickable?: boolean;
 	}
 
-	let { frames, onselect, onaddextra, filledAction = 'view' }: Props = $props();
+	let { frames, onselect, onaddextra, filledClickable = true }: Props = $props();
 
-	// Filled-frame hint strings built from the shared formatShotRow convention
-	// (f/ prefix, s suffix) so the strip's tooltip/accessible name can't drift
-	// from what the table and view dialog render for the same shot.
-	function filledParts(shot: Shot, sep: string): string {
-		const row = formatShotRow(shot);
-		return [row.date, row.aperture, row.shutter, row.time].filter(Boolean).join(sep);
-	}
-	function filledTitle(cell: FrameCell): string {
-		const parts = filledParts(cell.shot!, ' · ');
-		return `Frame ${cell.frameNumber}${parts ? ' · ' + parts : ''}`;
-	}
-	function filledLabel(cell: FrameCell): string {
-		const parts = filledParts(cell.shot!, ', ');
-		const action = filledAction ? ` — click to ${filledAction}` : '';
-		return `Frame ${cell.frameNumber}${parts ? ', ' + parts : ''}${action}`;
+	// ONE filled-frame hint builder for both the tooltip (title) and the
+	// accessible name — two hand-maintained templates would let the sighted hint
+	// and the screen-reader one drift. Exposure values come from the shared
+	// formatShotRow convention (f/ prefix, s suffix), same as the table/view.
+	function filledHint(cell: FrameCell, sep: string, action = ''): string {
+		const row = formatShotRow(cell.shot!);
+		const parts = [row.date, row.aperture, row.shutter, row.time].filter(Boolean).join(sep);
+		return `Frame ${cell.frameNumber}${parts ? sep + parts : ''}${action}`;
 	}
 </script>
 
@@ -51,12 +44,12 @@
 					<button
 						onclick={() => onselect(cell.frameNumber, cell.shot)}
 						title={cell.shot
-							? filledTitle(cell)
+							? filledHint(cell, ' · ')
 							: cell.isNext
 								? `Frame ${cell.frameNumber} — next open frame`
 								: `Frame ${cell.frameNumber} — open`}
 						aria-label={cell.shot
-							? filledLabel(cell)
+							? filledHint(cell, ', ', filledClickable ? ' — click to view' : '')
 							: cell.isNext
 								? `Frame ${cell.frameNumber}, next open frame — click to add`
 								: `Frame ${cell.frameNumber}, open — click to add`}
