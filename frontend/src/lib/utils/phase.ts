@@ -14,8 +14,10 @@
 export interface PhaseMeta {
 	/** The `group_key` this entry describes (0..=5). */
 	groupKey: number;
-	/** Human phase name. MUST match the backend `PHASE_LABELS` (activity.rs) so the
-	 *  stats "Rolls by Phase" panel renders group_key buckets through it too. */
+	/** Human phase name. This is the ONLY home of phase labels — the backend
+	 *  speaks `group_key` integers on every surface (stats buckets included), so
+	 *  renaming here is safe and complete by itself. Never add a backend label
+	 *  list (frontend-patterns.md). */
 	label: string;
 	/** CSS custom-property color for bars/dots (e.g. the stats + dashboard charts). */
 	colorVar: string;

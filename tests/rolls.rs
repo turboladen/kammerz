@@ -211,7 +211,7 @@ async fn update_roll_applies_partial_patch() {
     let app = open_app().await;
     let id = create_roll(&app, "UPD-OK").await;
 
-    // Partial update: advance status, set finish date and notes;
+    // Partial update: set finish date and notes;
     // camera_id / date_loaded must survive untouched.
     let payload = json!({
         "date_finished": "2026-05-15",

@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { PHASE_META, phaseTheme, phaseLabel } from './phase';
 
-// The canonical phase labels — MUST stay in lockstep with the backend
-// `PHASE_LABELS` (src/activity.rs), which the stats "Rolls by Phase" panel keys
-// on for coloring. A change here without the Rust side (or vice versa) silently
-// uncolors that panel.
+// The canonical phase labels. PHASE_META is their ONLY home — the backend
+// speaks group_key integers on every surface (stats buckets included), so this
+// pin guards against accidental frontend renames/reorders, not a backend sync
+// (no backend label list exists, and none should be added).
 const EXPECTED_LABELS = ['Shooting', 'Development', 'Scanning', 'Post-processing', 'Archiving', 'Done'];
 
 describe('PHASE_META', () => {

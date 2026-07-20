@@ -46,6 +46,7 @@
 	import { listLensMounts } from '$lib/api/lens-mounts';
 	import {
 		rollPhase,
+		activityState,
 		lastShotSummary,
 		activityLabel,
 		isDatedKind,
@@ -169,7 +170,6 @@
 	// from dates (ADR-0013) — read the backend's activities/badge/group_key/done.
 	const activities = $derived(roll?.activities ?? []);
 	const phase = $derived(roll ? rollPhase(roll) : 'shooting');
-	const shootingActivity = $derived(activities.find((a) => a.kind === 'shooting') ?? null);
 
 	// Board expand/collapse: collapsed by default in the shooting phase (the tail
 	// activities are all not-started then), expanded otherwise. `null` follows the
@@ -196,7 +196,7 @@
 	// dev record) and every frame is exposed — completing Shooting sets date_finished.
 	const showRollFullNudge = $derived(
 		phase === 'shooting' &&
-			shootingActivity?.state === 'in_progress' &&
+			activityState(activities, 'shooting') === 'in_progress' &&
 			frameProgress !== null &&
 			shots.length >= frameProgress.total &&
 			!rollFullDismissed

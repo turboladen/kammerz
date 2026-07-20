@@ -104,8 +104,11 @@ impl ActivitySignals {
 }
 
 /// The per-activity resolution flags in canonical order. Resolved = done, or
-/// (archiving only) N/A. Shared by [`derive`] and [`group_key`] so the two can
-/// never disagree.
+/// (archiving only) N/A. [`derive`] destructures these for its activity states
+/// and [`group_key`] positions on them — one definition, so the badge/states
+/// and the group key can never disagree. The implicit-completion chain
+/// (shooting -> development -> tail; a dev record or any tail date completes
+/// its predecessors; the tail three never imply each other) lives HERE.
 fn resolved_flags(sig: &ActivitySignals) -> [bool; 5] {
     let any_tail_date = sig.scan_started.is_some()
         || sig.date_scanned.is_some()
@@ -139,25 +142,20 @@ pub fn group_key(sig: &ActivitySignals) -> i32 {
 /// `shot_count`/`date_loaded` only matter while shooting can still be
 /// in-progress (impossible once a dev record exists).
 pub fn derive(sig: &ActivitySignals) -> RollActivity {
-    // Which tail activities carry any date. The tail three overlap and never
-    // imply each other, so each is judged only by its own dates.
-    let any_tail_date = sig.scan_started.is_some()
-        || sig.date_scanned.is_some()
-        || sig.post_processing_started.is_some()
-        || sig.date_post_processed.is_some()
-        || sig.date_archived.is_some();
-
-    // Implicit completion, walking the chain shooting -> development -> tail: an
-    // activity is done when a strictly-later activity has a date. We treat an
-    // existing dev record (`has_dev`) as evidence shooting finished — you do not
-    // develop a roll you are still shooting.
-    let development_done = sig.dev_completion.is_some() || any_tail_date;
+    // The per-activity done flags come from the SAME resolved_flags source as
+    // group_key — destructured, not recomputed — so the activity states/badge
+    // and the group key cannot drift apart. (resolved_flags[4] is
+    // "archiving RESOLVED" — done OR N/A — so archiving's done flag is read
+    // from its own date below to keep the done-vs-na distinction.)
+    let [
+        shooting_done,
+        development_done,
+        scanning_done,
+        pp_done,
+        _archiving_resolved,
+    ] = resolved_flags(sig);
     let development_started = sig.has_dev;
-    let shooting_done = sig.date_finished.is_some() || sig.has_dev || any_tail_date;
     let shooting_started = sig.date_loaded.is_some() || sig.shot_count > 0;
-
-    let scanning_done = sig.date_scanned.is_some();
-    let pp_done = sig.date_post_processed.is_some();
     let archiving_done = sig.date_archived.is_some();
 
     let shooting = Activity {
