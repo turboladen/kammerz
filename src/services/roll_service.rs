@@ -7,7 +7,7 @@ use crate::services::roll_event_service::RollEventService;
 use crate::services::shot_service::ShotService;
 use ::entity::roll::{self, Entity as Roll, PushPull};
 use ::entity::roll_event::RollEventType;
-use ::entity::shot;
+use ::entity::{development_lab, development_self, shot};
 
 /// Convert `TransactionError<DbErr>` to `DbErr`.
 fn transaction_err(e: TransactionError<DbErr>) -> DbErr {
@@ -141,6 +141,19 @@ const ROLLS_WITH_DETAILS_SQL: &str = "\
     LEFT JOIN labs lab ON dl.lab_id = lab.id \
     LEFT JOIN development_selves ds ON ds.roll_id = r.id";
 
+/// A development record to synthesize during import so a dev-stage legacy status
+/// derives its intended activity state (kammerz-gsj6). Lab vs self mirrors the
+/// legacy status the paper note used; the completion date is an honest
+/// lower-bound borrow (never fabricated) and is `None` when nothing recorded
+/// exists to borrow — in which case the roll derives "Developing" rather than
+/// done. Terminal statuses create no record (development derives implicitly-done
+/// from a tail date — see `activity.rs`).
+#[derive(Debug, PartialEq)]
+pub enum ImportDevRecord {
+    Lab { date_received: Option<String> },
+    SelfDev { date_processed: Option<String> },
+}
+
 /// Data for a single shot during roll import.
 pub struct ImportShotEntry {
     pub frame_number: String,
@@ -216,11 +229,15 @@ impl RollService {
         .await
     }
 
-    /// Import a roll with its shots in a single transaction.
+    /// Import a roll with its shots in a single transaction. An optional
+    /// [`ImportDevRecord`] (for dev-stage legacy statuses) is inserted in the same
+    /// transaction so the imported roll derives the right activity state
+    /// (kammerz-gsj6).
     pub async fn import_roll(
         db: &DatabaseConnection,
         roll_model: roll::ActiveModel,
         shot_entries: Vec<ImportShotEntry>,
+        dev: Option<ImportDevRecord>,
     ) -> Result<i32, DbErr> {
         let roll_id = db
             .transaction::<_, i32, DbErr>(|txn| {
@@ -242,6 +259,35 @@ impl RollService {
                     .await?;
 
                     let now = now_string();
+
+                    // Synthesize the dev record for a dev-stage import inside the same
+                    // transaction (rest defaulted, mirroring routes/development.rs — the
+                    // DB default handles negatives_not_collecting).
+                    match dev {
+                        Some(ImportDevRecord::Lab { date_received }) => {
+                            development_lab::ActiveModel {
+                                roll_id: Set(new_roll_id),
+                                date_received: Set(date_received),
+                                created_at: Set(now.clone()),
+                                updated_at: Set(now.clone()),
+                                ..Default::default()
+                            }
+                            .insert(txn)
+                            .await?;
+                        }
+                        Some(ImportDevRecord::SelfDev { date_processed }) => {
+                            development_self::ActiveModel {
+                                roll_id: Set(new_roll_id),
+                                date_processed: Set(date_processed),
+                                created_at: Set(now.clone()),
+                                updated_at: Set(now.clone()),
+                                ..Default::default()
+                            }
+                            .insert(txn)
+                            .await?;
+                        }
+                        None => {}
+                    }
 
                     for entry in shot_entries {
                         let shot_model = shot::ActiveModel {

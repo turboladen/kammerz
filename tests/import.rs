@@ -407,6 +407,163 @@ async fn import_roll_blank_shot_time_persists_as_null() {
     );
 }
 
+// --- Legacy-status → derived-lifecycle round-trips (kammerz-gsj6) ---
+// Each imports a roll at a legacy status (with a real date_finished so the
+// honest-borrow anchor exists) then reads the composite detail and asserts the
+// derived activity fields AND the synthesized dev record match the intended
+// lifecycle. Together these assert every "anchor present" row of the fidelity
+// table. See src/routes/import.rs::import_lifecycle.
+
+/// Import a roll at `status` (anchor = date_finished 2026-04-10) and return its
+/// `/detail`. `date_finished` gives a real recorded date to borrow so terminal /
+/// completed statuses reach their intended group_key.
+async fn import_status_detail(app: &axum::Router, roll_id: &str, status: &str) -> Value {
+    let payload = json!({
+        "roll_id": roll_id,
+        "status": status,
+        "date_loaded": "2026-04-01",
+        "date_finished": "2026-04-10",
+        "shots": []
+    });
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/import/roll", &payload))
+        .await
+        .unwrap();
+    assert_eq!(
+        res.status(),
+        StatusCode::CREATED,
+        "import at status {status} should succeed"
+    );
+    let roll_pk: i32 = json_body(res).await;
+    let res = app
+        .clone()
+        .oneshot(get(&format!("/api/rolls/{roll_pk}/detail")))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    json_body(res).await
+}
+
+#[tokio::test]
+async fn import_at_lab_creates_lab_dev_and_derives_developing() {
+    let app = open_app().await;
+    let detail = import_status_detail(&app, "IMPORT-ATLAB", "at-lab").await;
+    assert_eq!(detail["roll"]["group_key"], 1);
+    assert_eq!(detail["roll"]["badge"], "Developing");
+    // Lab dev record exists (in progress — no date_received), no self dev.
+    assert!(
+        detail["lab_dev"].is_object(),
+        "at-lab creates a lab dev record"
+    );
+    assert_eq!(detail["lab_dev"]["date_received"], Value::Null);
+    assert!(detail["self_dev"].is_null(), "no self dev for a lab status");
+}
+
+#[tokio::test]
+async fn import_developing_creates_self_dev_and_derives_developing() {
+    let app = open_app().await;
+    let detail = import_status_detail(&app, "IMPORT-DEVING", "developing").await;
+    assert_eq!(detail["roll"]["group_key"], 1);
+    assert_eq!(detail["roll"]["badge"], "Developing");
+    assert!(
+        detail["self_dev"].is_object(),
+        "developing creates a self dev record"
+    );
+    assert_eq!(detail["self_dev"]["date_processed"], Value::Null);
+    assert!(detail["lab_dev"].is_null(), "no lab dev for a self status");
+}
+
+#[tokio::test]
+async fn import_lab_done_borrows_completion_and_derives_to_scan() {
+    let app = open_app().await;
+    let detail = import_status_detail(&app, "IMPORT-LABDONE", "lab-done").await;
+    assert_eq!(detail["roll"]["group_key"], 2);
+    assert_eq!(detail["roll"]["badge"], "To scan");
+    // date_received borrowed from the anchor (finished-shooting date) so the
+    // development activity derives done.
+    assert_eq!(detail["lab_dev"]["date_received"], "2026-04-10");
+    assert!(detail["self_dev"].is_null());
+}
+
+#[tokio::test]
+async fn import_developed_borrows_completion_and_derives_to_scan() {
+    let app = open_app().await;
+    let detail = import_status_detail(&app, "IMPORT-DEVED", "developed").await;
+    assert_eq!(detail["roll"]["group_key"], 2);
+    assert_eq!(detail["roll"]["badge"], "To scan");
+    assert_eq!(detail["self_dev"]["date_processed"], "2026-04-10");
+    assert!(detail["lab_dev"].is_null());
+}
+
+#[tokio::test]
+async fn import_scanned_derives_to_edit_with_no_dev_record() {
+    let app = open_app().await;
+    let detail = import_status_detail(&app, "IMPORT-SCANNED", "scanned").await;
+    assert_eq!(detail["roll"]["group_key"], 3);
+    assert_eq!(detail["roll"]["badge"], "To edit");
+    // Recordless-tail: development derives implicitly-done from date_scanned, so
+    // no dev record is (or can be) synthesized for a terminal status.
+    assert!(
+        detail["lab_dev"].is_null(),
+        "no lab dev for a terminal status"
+    );
+    assert!(
+        detail["self_dev"].is_null(),
+        "no self dev for a terminal status"
+    );
+    assert_eq!(detail["roll"]["date_scanned"], "2026-04-10");
+}
+
+#[tokio::test]
+async fn import_post_processed_derives_to_archive() {
+    let app = open_app().await;
+    let detail = import_status_detail(&app, "IMPORT-PP", "post-processed").await;
+    assert_eq!(detail["roll"]["group_key"], 4);
+    assert_eq!(detail["roll"]["badge"], "To archive");
+    assert_eq!(detail["roll"]["date_scanned"], "2026-04-10");
+    assert_eq!(detail["roll"]["date_post_processed"], "2026-04-10");
+}
+
+#[tokio::test]
+async fn import_archived_derives_done() {
+    let app = open_app().await;
+    let detail = import_status_detail(&app, "IMPORT-ARCHIVED", "archived").await;
+    assert_eq!(detail["roll"]["group_key"], 5);
+    assert_eq!(detail["roll"]["badge"], "Done");
+    assert_eq!(detail["roll"]["done"], true);
+    assert_eq!(detail["roll"]["date_archived"], "2026-04-10");
+}
+
+#[tokio::test]
+async fn import_archived_with_no_dates_degrades_to_develop() {
+    // Documented degradation: with NO date to borrow (no loaded/finished/shot
+    // dates), an archived import has no honest anchor at all — not even a
+    // date_finished — so every date stays unset and the roll derives all the way
+    // back to group_key 0 "Loaded". Nothing is fabricated (kammerz-gsj6).
+    let app = open_app().await;
+    let payload = json!({
+        "roll_id": "IMPORT-ARCH-NODATES",
+        "status": "archived",
+        "shots": []
+    });
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/import/roll", &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let roll_pk: i32 = json_body(res).await;
+    let res = app
+        .oneshot(get(&format!("/api/rolls/{roll_pk}/detail")))
+        .await
+        .unwrap();
+    let detail: Value = json_body(res).await;
+    assert_eq!(detail["roll"]["group_key"], 0);
+    assert_eq!(detail["roll"]["badge"], "Loaded");
+    assert_eq!(detail["roll"]["date_archived"], Value::Null);
+}
+
 #[tokio::test]
 async fn import_roll_with_unknown_status_is_422() {
     // With the RollStatus enum retired, `status` is a plain string consumed only

@@ -13,7 +13,7 @@ use crate::extract::Json;
 use crate::patch::{now_string, trim, trim_opt};
 use crate::routes::friendly_err;
 use crate::services::import_service::{ImportService, ModelInfo, ParsedRoll};
-use crate::services::roll_service::{ImportShotEntry, RollService};
+use crate::services::roll_service::{ImportDevRecord, ImportShotEntry, RollService};
 use crate::services::settings_service::SettingsService;
 use crate::validate::{
     require_nonempty, validate_date_opt, validate_non_negative_i32, validate_time,
@@ -206,6 +206,20 @@ async fn import_parsed_roll(
         .map(str::to_string)
         .or(filled.date_finished);
 
+    // Synthesize the dev record (dev-stage statuses) and tail dates (terminal
+    // statuses) the roll needs to derive its intended activity state. `anchor` is
+    // the best real recorded date to borrow as an honest LOWER BOUND for any
+    // milestone the paper note doesn't date — finished-shooting ?? max shot date
+    // ?? loaded. It is never a fabricated date. Consequence, disclosed to the user
+    // at entry (import page hint) and in the PR: a completed-status import stamps
+    // Scanned/Post-processed/Archived with this same shoot-era date, correctable on
+    // the roll's activity board (kammerz-gsj6).
+    let anchor = date_finished_final
+        .as_deref()
+        .or(max_shot_date.as_deref())
+        .or(date_loaded_in);
+    let life = import_lifecycle(&data.status, anchor);
+
     let now = now_string();
 
     let roll_model = roll::ActiveModel {
@@ -216,8 +230,9 @@ async fn import_parsed_roll(
         frame_count: Set(data.frame_count),
         date_loaded: trim_opt(data.date_loaded),
         date_finished: Set(date_finished_final),
-        date_scanned: Set(filled.date_scanned),
-        date_archived: Set(filled.date_archived),
+        date_scanned: Set(life.date_scanned),
+        date_post_processed: Set(life.date_post_processed),
+        date_archived: Set(life.date_archived),
         push_pull: Set(data.push_pull),
         notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
@@ -251,8 +266,164 @@ async fn import_parsed_roll(
         })
         .collect();
 
-    let id = RollService::import_roll(&state.db, roll_model, shot_entries)
+    let id = RollService::import_roll(&state.db, roll_model, shot_entries, life.dev)
         .await
         .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
     Ok((StatusCode::CREATED, Json(id)))
+}
+
+/// What an import synthesizes for a legacy status beyond `date_finished`: the dev
+/// record to create (dev-stage statuses) and the tail dates to set (terminal
+/// statuses).
+struct ImportLifecycle {
+    dev: Option<ImportDevRecord>,
+    date_scanned: Option<String>,
+    date_post_processed: Option<String>,
+    date_archived: Option<String>,
+}
+
+/// Map a legacy import status to the dev record + tail dates the roll needs to
+/// derive its intended activity state (kammerz-gsj6). `anchor` is the honest
+/// lower-bound date borrowed for milestones the note doesn't date (never
+/// fabricated); when `None`, completion/tail dates stay unset and the status
+/// degrades one step (documented per-status in `tests/import.rs`).
+///
+/// Terminal statuses (scanned/post-processed/archived) create NO dev record —
+/// lab vs self is unknowable from a terminal status, and development derives
+/// implicitly-done from any tail date (`activity.rs`). The tail three don't imply
+/// each other, so each must be set explicitly up to the status's rank.
+fn import_lifecycle(status: &str, anchor: Option<&str>) -> ImportLifecycle {
+    let a = || anchor.map(str::to_string);
+    let mut out = ImportLifecycle {
+        dev: None,
+        date_scanned: None,
+        date_post_processed: None,
+        date_archived: None,
+    };
+    match status {
+        "at-lab" => {
+            out.dev = Some(ImportDevRecord::Lab {
+                date_received: None,
+            })
+        }
+        "lab-done" => out.dev = Some(ImportDevRecord::Lab { date_received: a() }),
+        "developing" => {
+            out.dev = Some(ImportDevRecord::SelfDev {
+                date_processed: None,
+            })
+        }
+        "developed" => {
+            out.dev = Some(ImportDevRecord::SelfDev {
+                date_processed: a(),
+            })
+        }
+        "scanned" => out.date_scanned = a(),
+        "post-processed" => {
+            out.date_scanned = a();
+            out.date_post_processed = a();
+        }
+        "archived" => {
+            out.date_scanned = a();
+            out.date_post_processed = a();
+            out.date_archived = a();
+        }
+        _ => {}
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lifecycle_pre_dev_statuses_synthesize_nothing() {
+        for s in ["loaded", "shooting", "shot"] {
+            let l = import_lifecycle(s, Some("2026-01-05"));
+            assert!(
+                l.dev.is_none()
+                    && l.date_scanned.is_none()
+                    && l.date_post_processed.is_none()
+                    && l.date_archived.is_none(),
+                "{s} should synthesize no dev record or tail dates"
+            );
+        }
+    }
+
+    #[test]
+    fn lifecycle_dev_stage_statuses_create_records() {
+        assert_eq!(
+            import_lifecycle("at-lab", Some("2026-01-05")).dev,
+            Some(ImportDevRecord::Lab {
+                date_received: None
+            }),
+            "at-lab: lab record in progress, no completion"
+        );
+        assert_eq!(
+            import_lifecycle("lab-done", Some("2026-01-05")).dev,
+            Some(ImportDevRecord::Lab {
+                date_received: Some("2026-01-05".into())
+            }),
+            "lab-done: lab record completed via anchor"
+        );
+        assert_eq!(
+            import_lifecycle("developing", Some("2026-01-05")).dev,
+            Some(ImportDevRecord::SelfDev {
+                date_processed: None
+            }),
+            "developing: self record in progress, no completion"
+        );
+        assert_eq!(
+            import_lifecycle("developed", Some("2026-01-05")).dev,
+            Some(ImportDevRecord::SelfDev {
+                date_processed: Some("2026-01-05".into())
+            }),
+            "developed: self record completed via anchor"
+        );
+    }
+
+    #[test]
+    fn lifecycle_terminal_statuses_fill_tail_chain_up_to_rank() {
+        let scanned = import_lifecycle("scanned", Some("2026-01-05"));
+        assert_eq!(scanned.date_scanned.as_deref(), Some("2026-01-05"));
+        assert!(scanned.date_post_processed.is_none() && scanned.date_archived.is_none());
+        assert!(
+            scanned.dev.is_none(),
+            "terminal statuses create no dev record"
+        );
+
+        let pp = import_lifecycle("post-processed", Some("2026-01-05"));
+        assert_eq!(pp.date_scanned.as_deref(), Some("2026-01-05"));
+        assert_eq!(pp.date_post_processed.as_deref(), Some("2026-01-05"));
+        assert!(pp.date_archived.is_none());
+
+        let arch = import_lifecycle("archived", Some("2026-01-05"));
+        assert_eq!(arch.date_scanned.as_deref(), Some("2026-01-05"));
+        assert_eq!(arch.date_post_processed.as_deref(), Some("2026-01-05"));
+        assert_eq!(arch.date_archived.as_deref(), Some("2026-01-05"));
+    }
+
+    #[test]
+    fn lifecycle_absent_anchor_degrades_completions() {
+        // Nothing recorded to borrow: completion/tail dates stay None. In-progress
+        // dev states still get their (dateless) record — the honest floor.
+        assert_eq!(
+            import_lifecycle("lab-done", None).dev,
+            Some(ImportDevRecord::Lab {
+                date_received: None
+            })
+        );
+        assert_eq!(
+            import_lifecycle("developed", None).dev,
+            Some(ImportDevRecord::SelfDev {
+                date_processed: None
+            })
+        );
+        let arch = import_lifecycle("archived", None);
+        assert!(
+            arch.date_scanned.is_none()
+                && arch.date_post_processed.is_none()
+                && arch.date_archived.is_none()
+        );
+    }
 }

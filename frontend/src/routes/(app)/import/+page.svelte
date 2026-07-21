@@ -114,6 +114,14 @@
 		{ value: 'archived', label: 'Archived' }
 	];
 
+	// Completed statuses estimate milestone dates from the finish date (the backend
+	// borrows it as an honest lower bound — kammerz-gsj6). Disclose that at entry so
+	// the imported dates aren't a silent surprise; in-progress dev statuses borrow
+	// nothing, so they don't show the hint.
+	const statusEstimatesDates = $derived(
+		['lab-done', 'developed', 'scanned', 'post-processed', 'archived'].includes(rollStatus)
+	);
+
 	const cameraLabels = $derived(buildCameraLabels(cameras));
 	const cameraOptions = $derived(
 		cameras.map((c) => ({
@@ -503,7 +511,15 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 					</h3>
 					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<Input label="Roll ID" bind:value={rollId} />
-						<Select label="Status" options={statusOptions} bind:value={rollStatus} />
+						<div>
+							<Select label="Status" options={statusOptions} bind:value={rollStatus} />
+							{#if statusEstimatesDates}
+								<p class="mt-1 text-xs text-text-faint">
+									Completed statuses estimate milestone dates from the finish date — correct them on the roll's activity
+									board.
+								</p>
+							{/if}
+						</div>
 						<div>
 							<Select label="Camera" options={cameraOptions} bind:value={cameraId} placeholder="Select camera..." />
 							{#if cameraUnmatched}
