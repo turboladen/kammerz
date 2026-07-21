@@ -19,7 +19,7 @@ use crate::validate::{
     require_nonempty, validate_date_opt, validate_non_negative_i32, validate_time,
 };
 use entity::roll::{self, PushPull};
-use migration::backfilled_dates;
+use migration::{LegacyStatus, backfilled_dates};
 
 const DEFAULT_MODEL: &str = "claude-sonnet-4-5-20250929";
 
@@ -159,18 +159,17 @@ async fn import_parsed_roll(
         }
     }
 
-    // Reject an unknown legacy status outright: `backfilled_dates` treats it as
-    // rank-0 (a silent no-op), which would mask client drift/typos and import the
-    // roll with an unintended derived lifecycle. The old `RollStatus` enum got
-    // this 422 for free from serde; with the enum retired, enforce it here
-    // against the same canonical value set the backfill ranks by.
-    if !migration::BACKFILL_ORDER.contains(&data.status.as_str()) {
-        return Err(AppError::UnprocessableEntity(format!(
+    // Parse, don't validate: the legacy status string becomes a typed
+    // `LegacyStatus` here (422 on anything outside the canonical vocabulary),
+    // so every downstream consumer matches exhaustively — no unreachable
+    // catch-all arms whose safety depends on remembering this guard ran.
+    let status: LegacyStatus = data.status.parse().map_err(|_| {
+        AppError::UnprocessableEntity(format!(
             "unknown status \"{}\" — expected one of: {}",
             data.status,
             migration::BACKFILL_ORDER.join(", ")
-        )));
-    }
+        ))
+    })?;
 
     // No stored status (ADR-0013): translate the legacy status the import UI
     // sends into lifecycle dates so the roll derives to the intended activity
@@ -198,7 +197,7 @@ async fn import_parsed_roll(
     // migration fn is kept for date_finished so the "borrow max shot date /
     // loaded date" rule can't drift from the migration's.
     let filled = backfilled_dates(
-        &data.status,
+        status,
         date_loaded_in,
         date_finished_in,
         max_shot_date.as_deref(),
@@ -223,7 +222,7 @@ async fn import_parsed_roll(
         .as_deref()
         .or(max_shot_date.as_deref())
         .or(date_loaded_in);
-    let life = import_lifecycle(&data.status, anchor);
+    let life = import_lifecycle(status, anchor);
 
     let now = now_string();
 
@@ -297,7 +296,7 @@ struct ImportLifecycle {
 /// lab vs self is unknowable from a terminal status, and development derives
 /// implicitly-done from any tail date (`activity.rs`). The tail three don't imply
 /// each other, so each must be set explicitly up to the status's rank.
-fn import_lifecycle(status: &str, anchor: Option<&str>) -> ImportLifecycle {
+fn import_lifecycle(status: LegacyStatus, anchor: Option<&str>) -> ImportLifecycle {
     let a = || anchor.map(str::to_string);
     let mut out = ImportLifecycle {
         dev: None,
@@ -305,34 +304,36 @@ fn import_lifecycle(status: &str, anchor: Option<&str>) -> ImportLifecycle {
         date_post_processed: None,
         date_archived: None,
     };
+    // Exhaustive over the typed vocabulary — adding a LegacyStatus variant is a
+    // compile error here until its lifecycle mapping is decided.
     match status {
-        "at-lab" => {
+        LegacyStatus::Loaded | LegacyStatus::Shooting | LegacyStatus::Shot => {}
+        LegacyStatus::AtLab => {
             out.dev = Some(ImportDevRecord::Lab {
                 date_received: None,
             })
         }
-        "lab-done" => out.dev = Some(ImportDevRecord::Lab { date_received: a() }),
-        "developing" => {
+        LegacyStatus::LabDone => out.dev = Some(ImportDevRecord::Lab { date_received: a() }),
+        LegacyStatus::Developing => {
             out.dev = Some(ImportDevRecord::SelfDev {
                 date_processed: None,
             })
         }
-        "developed" => {
+        LegacyStatus::Developed => {
             out.dev = Some(ImportDevRecord::SelfDev {
                 date_processed: a(),
             })
         }
-        "scanned" => out.date_scanned = a(),
-        "post-processed" => {
+        LegacyStatus::Scanned => out.date_scanned = a(),
+        LegacyStatus::PostProcessed => {
             out.date_scanned = a();
             out.date_post_processed = a();
         }
-        "archived" => {
+        LegacyStatus::Archived => {
             out.date_scanned = a();
             out.date_post_processed = a();
             out.date_archived = a();
         }
-        _ => {}
     }
     out
 }
@@ -343,14 +344,18 @@ mod tests {
 
     #[test]
     fn lifecycle_pre_dev_statuses_synthesize_nothing() {
-        for s in ["loaded", "shooting", "shot"] {
+        for s in [
+            LegacyStatus::Loaded,
+            LegacyStatus::Shooting,
+            LegacyStatus::Shot,
+        ] {
             let l = import_lifecycle(s, Some("2026-01-05"));
             assert!(
                 l.dev.is_none()
                     && l.date_scanned.is_none()
                     && l.date_post_processed.is_none()
                     && l.date_archived.is_none(),
-                "{s} should synthesize no dev record or tail dates"
+                "{s:?} should synthesize no dev record or tail dates"
             );
         }
     }
@@ -358,28 +363,28 @@ mod tests {
     #[test]
     fn lifecycle_dev_stage_statuses_create_records() {
         assert_eq!(
-            import_lifecycle("at-lab", Some("2026-01-05")).dev,
+            import_lifecycle(LegacyStatus::AtLab, Some("2026-01-05")).dev,
             Some(ImportDevRecord::Lab {
                 date_received: None
             }),
             "at-lab: lab record in progress, no completion"
         );
         assert_eq!(
-            import_lifecycle("lab-done", Some("2026-01-05")).dev,
+            import_lifecycle(LegacyStatus::LabDone, Some("2026-01-05")).dev,
             Some(ImportDevRecord::Lab {
                 date_received: Some("2026-01-05".into())
             }),
             "lab-done: lab record completed via anchor"
         );
         assert_eq!(
-            import_lifecycle("developing", Some("2026-01-05")).dev,
+            import_lifecycle(LegacyStatus::Developing, Some("2026-01-05")).dev,
             Some(ImportDevRecord::SelfDev {
                 date_processed: None
             }),
             "developing: self record in progress, no completion"
         );
         assert_eq!(
-            import_lifecycle("developed", Some("2026-01-05")).dev,
+            import_lifecycle(LegacyStatus::Developed, Some("2026-01-05")).dev,
             Some(ImportDevRecord::SelfDev {
                 date_processed: Some("2026-01-05".into())
             }),
@@ -389,7 +394,7 @@ mod tests {
 
     #[test]
     fn lifecycle_terminal_statuses_fill_tail_chain_up_to_rank() {
-        let scanned = import_lifecycle("scanned", Some("2026-01-05"));
+        let scanned = import_lifecycle(LegacyStatus::Scanned, Some("2026-01-05"));
         assert_eq!(scanned.date_scanned.as_deref(), Some("2026-01-05"));
         assert!(scanned.date_post_processed.is_none() && scanned.date_archived.is_none());
         assert!(
@@ -397,12 +402,12 @@ mod tests {
             "terminal statuses create no dev record"
         );
 
-        let pp = import_lifecycle("post-processed", Some("2026-01-05"));
+        let pp = import_lifecycle(LegacyStatus::PostProcessed, Some("2026-01-05"));
         assert_eq!(pp.date_scanned.as_deref(), Some("2026-01-05"));
         assert_eq!(pp.date_post_processed.as_deref(), Some("2026-01-05"));
         assert!(pp.date_archived.is_none());
 
-        let arch = import_lifecycle("archived", Some("2026-01-05"));
+        let arch = import_lifecycle(LegacyStatus::Archived, Some("2026-01-05"));
         assert_eq!(arch.date_scanned.as_deref(), Some("2026-01-05"));
         assert_eq!(arch.date_post_processed.as_deref(), Some("2026-01-05"));
         assert_eq!(arch.date_archived.as_deref(), Some("2026-01-05"));
@@ -413,18 +418,18 @@ mod tests {
         // Nothing recorded to borrow: completion/tail dates stay None. In-progress
         // dev states still get their (dateless) record — the honest floor.
         assert_eq!(
-            import_lifecycle("lab-done", None).dev,
+            import_lifecycle(LegacyStatus::LabDone, None).dev,
             Some(ImportDevRecord::Lab {
                 date_received: None
             })
         );
         assert_eq!(
-            import_lifecycle("developed", None).dev,
+            import_lifecycle(LegacyStatus::Developed, None).dev,
             Some(ImportDevRecord::SelfDev {
                 date_processed: None
             })
         );
-        let arch = import_lifecycle("archived", None);
+        let arch = import_lifecycle(LegacyStatus::Archived, None);
         assert!(
             arch.date_scanned.is_none()
                 && arch.date_post_processed.is_none()

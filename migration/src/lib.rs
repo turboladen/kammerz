@@ -37,7 +37,9 @@ pub use m20260713_000029_normalize_dev_chemistry::{NORMALIZATIONS, apply_normali
 
 /// Re-exported so `tests/` and `import.rs` reuse the exact status→date backfill
 /// mapping the m..030 activity-lifecycle migration applies (kammerz-b0ix).
-pub use m20260718_000030_activity_lifecycle::{BACKFILL_ORDER, BackfilledDates, backfilled_dates};
+pub use m20260718_000030_activity_lifecycle::{
+    BACKFILL_ORDER, BackfilledDates, LegacyStatus, backfilled_dates,
+};
 
 pub struct Migrator;
 
