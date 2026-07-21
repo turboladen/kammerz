@@ -63,11 +63,13 @@ async fn roll_status(app: &axum::Router, roll_pk: i32) -> String {
             }
         }
         // Development done, waiting to scan: lab-done vs developed per record kind.
+        // Lab precedence mirrors ActivitySignals::with_dev — a legacy both-dev
+        // roll derives from the LAB record, so its legacy label is lab-done.
         2 => {
-            if has_self {
-                "developed"
-            } else {
+            if has_lab {
                 "lab-done"
+            } else {
+                "developed"
             }
         }
         3 => "scanned",

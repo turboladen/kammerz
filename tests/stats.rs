@@ -56,8 +56,8 @@ async fn stats_rolls_by_phase_replaces_rolls_by_status() {
     assert!(!phases.is_empty(), "at least the fresh rolls are counted");
     for item in phases {
         assert!(
-            item["label"].is_null(),
-            "phase buckets carry no label strings"
+            item.get("label").is_none(),
+            "phase buckets carry no label key — labels live only in the frontend's PHASE_META"
         );
         let gk = item["group_key"].as_i64().expect("group_key is an integer");
         assert!((0..=5).contains(&gk), "group_key {gk} out of range");
