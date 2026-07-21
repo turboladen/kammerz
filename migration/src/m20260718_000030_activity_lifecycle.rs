@@ -62,6 +62,9 @@ pub struct BackfilledDates {
 /// `import.rs` so imported rolls derive the same way. `max_shot_date` is
 /// `MAX(shots.date)` for the roll; `dev_completion` is the lab `date_received` or
 /// self `date_processed`.
+// Genuine false positive: the eight parameters ARE the spec table's columns
+// (one status + seven date signals); bundling them into a struct would only
+// move the same list behind a constructor at every call site.
 #[allow(clippy::too_many_arguments)]
 pub fn backfilled_dates(
     status: LegacyStatus,
@@ -236,7 +239,7 @@ impl MigrationTrait for Migration {
                 let dev_completion: Option<String> = row.try_get("", "dev_completion")?;
 
                 // Historical rows can hold arbitrary strings; an unparseable
-                // status backfills nothing (same as the old rank() None path).
+                // status backfills nothing (the row is left untouched).
                 let filled = status
                     .parse::<LegacyStatus>()
                     .map(|legacy| {
@@ -473,11 +476,29 @@ mod tests {
     }
 
     #[test]
-    fn unknown_status_fails_to_parse() {
+    fn unknown_status_fails_to_parse_and_backfills_nothing() {
         // The old string API returned a silent no-op for unknown statuses; the
-        // enum moves that to a parse failure (import 422s, the migration's up()
-        // skips the row's backfill).
+        // enum moves that to a parse failure (import 422s). The migration's up()
+        // composes the failure into a zero-backfill exactly like this — assert
+        // the COMPOSED shape so an edit to that branch can't silently change
+        // what happens to historical rows with unrecognized statuses.
         assert!("bogus".parse::<LegacyStatus>().is_err());
+        let filled = "bogus"
+            .parse::<LegacyStatus>()
+            .map(|legacy| {
+                backfilled_dates(
+                    legacy,
+                    Some("2026-01-01"),
+                    None,
+                    Some("2026-01-05"),
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+            })
+            .unwrap_or_default();
+        assert_eq!(filled, BackfilledDates::default());
     }
 
     #[test]

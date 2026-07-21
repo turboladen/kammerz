@@ -32,9 +32,9 @@ pub struct ImportRollDto {
     pub film_stock_id: Option<i32>,
     pub lens_id: Option<i32>,
     /// Legacy lifecycle status the import UI still sends. There is no stored
-    /// status (ADR-0013); it is consumed only to backfill lifecycle dates so the
-    /// imported roll derives to the intended activity state (kammerz-gsj6 tracks
-    /// the dev-stage-status import gap).
+    /// status (ADR-0013); it parses into [`LegacyStatus`] and drives the dev
+    /// record + lifecycle-date synthesis so the imported roll derives to the
+    /// intended activity state (kammerz-gsj6).
     pub status: String,
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
