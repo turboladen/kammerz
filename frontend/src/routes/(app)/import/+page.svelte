@@ -114,9 +114,10 @@
 		{ value: 'archived', label: 'Archived' }
 	];
 
-	// Completed statuses estimate milestone dates from the finish date (the backend
-	// borrows it as an honest lower bound — kammerz-gsj6). Disclose that at entry so
-	// the imported dates aren't a silent surprise; in-progress dev statuses borrow
+	// Completed statuses estimate milestone dates from the latest shooting-era date
+	// on the note (finish date, else last shot date, else loaded date) — an honest
+	// lower bound the backend borrows (kammerz-gsj6). Disclose that at entry so the
+	// imported dates aren't a silent surprise; in-progress dev statuses borrow
 	// nothing, so they don't show the hint.
 	const statusEstimatesDates = $derived(
 		['lab-done', 'developed', 'scanned', 'post-processed', 'archived'].includes(rollStatus)
@@ -515,8 +516,8 @@ M67-24 Ilford Delta 400 Loaded 5/16/21
 							<Select label="Status" options={statusOptions} bind:value={rollStatus} />
 							{#if statusEstimatesDates}
 								<p class="mt-1 text-xs text-text-faint">
-									Completed statuses estimate milestone dates from the finish date — correct them on the roll's activity
-									board.
+									Completed statuses estimate milestone dates from the roll's latest shooting date — correct them on the
+									roll's activity board.
 								</p>
 							{/if}
 						</div>
