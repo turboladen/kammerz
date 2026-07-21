@@ -17,6 +17,7 @@
 	import { logShot } from '$lib/utils/shot-entry';
 	import { buildLensOptions, lensDisplayName } from '$lib/utils/lens';
 	import { buildFrameCells, nextExtraFrameNumber } from '$lib/utils/frames';
+	import { activityState } from '$lib/utils/activity-board';
 	import { todayLocal, dateFieldError } from '$lib/utils/date';
 	import type { RollWithDetails, Camera, Lens, LensMount, Shot } from '$lib/types';
 
@@ -39,9 +40,11 @@
 	// successful save so logging returns to sequential.
 	let jumpFrame = $state('');
 
-	// Active rolls only — the ones you'd realistically log frames against.
-	const activeStatuses = ['loaded', 'shooting', 'shot'];
-	const activeRolls = $derived(rolls.filter((r) => activeStatuses.includes(r.status)));
+	// Active rolls only — the ones you'd realistically log frames against: those
+	// whose development activity hasn't started (loaded / shooting / finished-shooting).
+	// Once development or any tail activity begins, quick logging is no longer offered
+	// (ADR-0013) — including a roll with a tail start date but no dev record.
+	const activeRolls = $derived(rolls.filter((r) => activityState(r.activities, 'development') === 'not_started'));
 
 	const selectedRoll = $derived(rolls.find((r) => String(r.id) === selectedRollId) ?? null);
 
@@ -85,7 +88,7 @@
 	const finishDateError = $derived(dateFieldError(finishDate));
 
 	const showRollFullNudge = $derived(
-		selectedRoll?.status === 'shooting' &&
+		(selectedRoll ? activityState(selectedRoll.activities, 'shooting') : null) === 'in_progress' &&
 			frameInfo !== null &&
 			frameInfo.total !== null &&
 			shots.length >= frameInfo.total &&
@@ -95,7 +98,7 @@
 	async function markRollShot() {
 		if (!selectedRoll || !finishDate.trim() || finishDateError) return;
 		try {
-			await updateRoll(selectedRoll.id, { status: 'shot', date_finished: finishDate });
+			await updateRoll(selectedRoll.id, { date_finished: finishDate });
 			rolls = await listRolls();
 			rollFullDismissed = true;
 		} catch (err) {

@@ -160,7 +160,6 @@
 				camera_id: cameraId ? Number(cameraId) : null,
 				film_stock_id: filmStockId ? Number(filmStockId) : null,
 				lens_id: lensId ? Number(lensId) : null,
-				status: 'loaded',
 				frame_count: frameCount ? parseInt(frameCount) : null,
 				date_loaded: dateLoaded || null,
 				date_finished: null,

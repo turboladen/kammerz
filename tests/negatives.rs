@@ -149,7 +149,7 @@ async fn lab_developed_roll(app: &axum::Router) -> (i32, i32) {
         .clone()
         .oneshot(post_json(
             "/api/rolls",
-            &json!({ "roll_id": "R-NEG-A", "camera_id": camera_id, "status": "shot", "date_loaded": "2026-06-01" }),
+            &json!({ "roll_id": "R-NEG-A", "camera_id": camera_id, "date_loaded": "2026-06-01" }),
         ))
         .await
         .unwrap();
@@ -172,14 +172,14 @@ async fn mark_picked_up_sets_date_logs_event_and_keeps_status() {
     let app = open_app().await;
     let (roll_pk, lab_dev_id) = lab_developed_roll(&app).await;
 
-    let status_before = {
+    let badge_before = {
         let res = app
             .clone()
             .oneshot(get(&format!("/api/rolls/{roll_pk}")))
             .await
             .unwrap();
         let r: Value = json_body(res).await;
-        r["status"].as_str().unwrap().to_string()
+        r["badge"].as_str().unwrap().to_string()
     };
 
     let res = app
@@ -199,8 +199,8 @@ async fn mark_picked_up_sets_date_logs_event_and_keeps_status() {
         .unwrap();
     let detail: Value = json_body(res).await;
     assert_eq!(detail["lab_dev"]["date_negatives_picked_up"], "2026-07-10");
-    // Status untouched by a pickup edit.
-    assert_eq!(detail["roll"]["status"], status_before);
+    // Lifecycle untouched by a pickup edit (the derived badge is unchanged).
+    assert_eq!(detail["roll"]["badge"], badge_before);
     // Journal recorded the specialized event.
     let types: Vec<&str> = detail["events"]
         .as_array()
@@ -279,7 +279,7 @@ async fn roll_list_computes_negatives_deadline_from_retention() {
         .clone()
         .oneshot(post_json(
             "/api/rolls",
-            &json!({ "roll_id": "R-DL", "camera_id": camera_id, "status": "shot" }),
+            &json!({ "roll_id": "R-DL", "camera_id": camera_id }),
         ))
         .await
         .unwrap();
@@ -316,7 +316,7 @@ async fn roll_without_lab_dev_has_null_negatives() {
         .clone()
         .oneshot(post_json(
             "/api/rolls",
-            &json!({ "roll_id": "R-NONE", "camera_id": camera_id, "status": "loaded" }),
+            &json!({ "roll_id": "R-NONE", "camera_id": camera_id }),
         ))
         .await
         .unwrap();
@@ -359,7 +359,7 @@ async fn partial_date_received_is_rejected() {
         .clone()
         .oneshot(post_json(
             "/api/rolls",
-            &json!({ "roll_id": "R-PARTIAL", "camera_id": camera_id, "status": "shot" }),
+            &json!({ "roll_id": "R-PARTIAL", "camera_id": camera_id }),
         ))
         .await
         .unwrap();

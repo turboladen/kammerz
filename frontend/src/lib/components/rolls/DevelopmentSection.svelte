@@ -22,9 +22,8 @@
 	import { secondsToMmSs, mmSsToSeconds } from '$lib/utils/duration';
 	import { dateFieldError, todayLocal } from '$lib/utils/date';
 	import { defaultDilutionFor, dilutionPrefill } from '$lib/utils/chemistry';
-	import { labFlow, selfFlow, getStatusLabel } from '$lib/utils/status';
-	import type { DevAutoPrompt } from '$lib/utils/status';
-	import type { Lab, DevelopmentLab, DevelopmentSelf, DevStage, RollStatus, GroupedChemicals } from '$lib/types';
+	import type { DevAutoPrompt } from '$lib/utils/activity-board';
+	import type { Lab, DevelopmentLab, DevelopmentSelf, DevStage, GroupedChemicals } from '$lib/types';
 
 	let {
 		rollId,
@@ -33,7 +32,6 @@
 		selfDev = $bindable(),
 		devStages = $bindable(),
 		autoPrompt = $bindable(null),
-		currentStatus = null,
 		defaultDate = '',
 		negativesDeadline = null,
 		onchange,
@@ -45,10 +43,6 @@
 		selfDev: DevelopmentSelf | null;
 		devStages: DevStage[];
 		autoPrompt: DevAutoPrompt | null;
-		/** The roll's current status — lets the dialog notes tell the truth when the
-		 * backend's forward-only sync won't actually move the roll (e.g. retroactively
-		 * recording dev info on a scanned roll). */
-		currentStatus?: RollStatus | null;
 		defaultDate?: string;
 		/** roll.negatives_deadline (date_received + retention), for the pickup countdown. */
 		negativesDeadline?: string | null;
@@ -105,10 +99,8 @@
 		}
 	}
 
-	// Auto-prompt bookkeeping: which status chevron opened the current dialog (null when
-	// opened via Edit or with no specific target), and whether the dialog was opened by a
-	// prompt at all (so Cancel can report "status unchanged" back to the parent).
-	let promptTarget: RollStatus | null = $state(null);
+	// Auto-prompt bookkeeping: whether the dialog was opened by a prompt at all, so
+	// Cancel can report the dropped "Start development" click back to the parent.
 	let promptOpen = $state(false);
 
 	// Lab dev form
@@ -173,14 +165,11 @@
 		...labs.map((l) => ({ value: String(l.id), label: l.name }))
 	]);
 
-	// Auto-prompt: parent sets autoPrompt to trigger opening a dialog. The clicked
-	// status target (if any) is captured first so the open functions can seed the
-	// date field that actually lands the roll there (kammerz-zoo).
+	// Auto-prompt: parent sets autoPrompt to trigger opening a dialog.
 	$effect(() => {
 		if (autoPrompt) {
-			const { kind, target } = autoPrompt;
+			const { kind } = autoPrompt;
 			autoPrompt = null;
-			promptTarget = target ?? null;
 			promptOpen = true;
 			if (kind === 'lab') {
 				openLabDevDialog();
@@ -190,36 +179,19 @@
 		}
 	});
 
-	// Contextual status notes — the backend syncs roll status from the dev record's
-	// date fields (date_received → Lab Done, date_processed → Developed), which is
-	// invisible from the form alone. These react to the live field values so the
-	// dialog always tells the truth about where Save will land the roll — including
-	// when it won't move at all: the backend's advance_status_along is forward-only,
-	// so a roll already at/past the target (e.g. retroactively recording dev info on
-	// a scanned roll) keeps its status, and the note must not claim otherwise.
-	function saveWillMoveTo(flow: RollStatus[], target: RollStatus): boolean {
-		if (!currentStatus) return true; // status unknown — assume the normal forward case
-		const cur = flow.indexOf(currentStatus);
-		return cur !== -1 && cur < flow.indexOf(target);
-	}
-	const labStatusNote = $derived.by(() => {
-		const target: RollStatus = devDateReceived ? 'lab-done' : 'at-lab';
-		if (currentStatus && !saveWillMoveTo(labFlow, target)) {
-			return `Saving will record the development info — this roll stays at ${getStatusLabel(currentStatus)}.`;
-		}
-		return devDateReceived
-			? 'Saving will move this roll to Lab Done (Date Received is set).'
-			: 'Saving will move this roll to At Lab — set Date Received to mark it Lab Done.';
-	});
-	const selfStatusNote = $derived.by(() => {
-		const target: RollStatus = devDateProcessed ? 'developed' : 'developing';
-		if (currentStatus && !saveWillMoveTo(selfFlow, target)) {
-			return `Saving will record the development info — this roll stays at ${getStatusLabel(currentStatus)}.`;
-		}
-		return devDateProcessed
-			? 'Saving will move this roll to Developed (Date Processed is set).'
-			: 'Saving will move this roll to Developing — set Date Processed to mark it Developed.';
-	});
+	// Contextual notes — the roll's lifecycle is derived from these dates (ADR-0013),
+	// which is invisible from the form alone, so the note says what recording each
+	// date will do. They react to the live field values.
+	const labStatusNote = $derived(
+		devDateReceived
+			? 'Saving records the lab development and marks Development done (Date Received is set).'
+			: 'Saving records the lab development — set Date Received to mark Development done.'
+	);
+	const selfStatusNote = $derived(
+		devDateProcessed
+			? 'Saving records the development and marks it done (Date Processed is set).'
+			: 'Saving records the development — set Date Processed to mark it done.'
+	);
 
 	// --- Form helpers ---
 
@@ -259,9 +231,6 @@
 			resetLabDevForm();
 			// Smart date default: last shot's date > roll's date_loaded > empty
 			if (defaultDate) devDateDroppedOff = defaultDate;
-			// Honor a "Lab Done" chevron click: date_received is what the backend
-			// uses to land the roll at Lab Done instead of At Lab, so seed it.
-			if (promptTarget === 'lab-done') devDateReceived = todayLocal();
 		}
 		devLabError = '';
 		showLabDevDialog = true;
@@ -287,25 +256,16 @@
 			}));
 		} else {
 			resetSelfDevForm();
-			// Honor the clicked chevron: date_processed is what the backend uses to land
-			// the roll at Developed vs Developing. "Developed" seeds today; "Developing"
-			// leaves it empty (a pre-filled date would overshoot the clicked status).
-			if (promptTarget === 'developed') {
-				devDateProcessed = todayLocal();
-			} else if (promptTarget !== 'developing' && defaultDate) {
-				// Smart date default: last shot's date > roll's date_loaded > empty
-				devDateProcessed = defaultDate;
-			}
+			// Smart date default: last shot's date > roll's date_loaded > empty
+			if (defaultDate) devDateProcessed = defaultDate;
 		}
 		devSelfError = '';
 		showSelfDevDialog = true;
 	}
 
-	// Clear the auto-prompt bookkeeping once a dialog closes (saved or not) so the
-	// next Edit-button open doesn't inherit a stale target.
+	// Clear the auto-prompt bookkeeping once a dialog closes (saved or not).
 	function clearPromptState() {
 		promptOpen = false;
-		promptTarget = null;
 	}
 
 	function cancelLabDevDialog() {

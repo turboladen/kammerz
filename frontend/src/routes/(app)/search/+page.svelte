@@ -204,7 +204,7 @@
 								>
 									<div class="flex items-center gap-3">
 										<span class="font-mono text-sm font-semibold">{roll.roll_id}</span>
-										<Badge status={roll.status} />
+										<Badge badge={roll.badge} groupKey={roll.group_key} />
 										{#if roll.camera_brand}
 											<span class="text-xs text-text-muted">{roll.camera_brand} {roll.camera_model}</span>
 										{/if}

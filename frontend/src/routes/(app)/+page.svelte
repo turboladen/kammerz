@@ -13,8 +13,8 @@
 	import { listLenses } from '$lib/api/lenses';
 	import { listFilmStocks } from '$lib/api/film-stocks';
 	import { updateLabDev } from '$lib/api/development';
-	import type { RollWithDetails, Camera as CameraType, Lens, FilmStock, RollStatus } from '$lib/types';
-	import { allStatusOrder, statusConfig } from '$lib/utils/status';
+	import type { RollWithDetails, Camera as CameraType, Lens, FilmStock } from '$lib/types';
+	import { PHASE_META } from '$lib/utils/phase';
 	import { negativesState, isNegativesPending } from '$lib/utils/negatives';
 	import { todayLocal } from '$lib/utils/date';
 
@@ -25,40 +25,34 @@
 	let loading = $state(true);
 	let error = $state('');
 
-	const rollsByStatus = $derived(
+	// Roll counts per lifecycle phase (group_key 0..=5), for the pipeline bar.
+	const rollsByPhase = $derived(
 		rolls.reduce(
 			(acc, roll) => {
-				acc[roll.status] = (acc[roll.status] || 0) + 1;
+				acc[roll.group_key] = (acc[roll.group_key] || 0) + 1;
 				return acc;
 			},
-			{} as Record<RollStatus, number>
+			{} as Record<number, number>
 		)
 	);
 
-	// Rolls currently in cameras (loaded or shooting)
-	const activeRolls = $derived(rolls.filter((r) => r.status === 'loaded' || r.status === 'shooting'));
+	// Rolls still being shot (shooting is the earliest unresolved activity).
+	const activeRolls = $derived(rolls.filter((r) => r.group_key === 0));
 
-	// Rolls in post-shooting processing (shot through post-processed)
-	const processingStatuses: RollStatus[] = [
-		'shot',
-		'at-lab',
-		'lab-done',
-		'developing',
-		'developed',
-		'scanned',
-		'post-processed'
-	];
+	// Rolls in the post-shooting pipeline: past shooting (group_key ≥ 1) but not
+	// yet Done. Ordered by phase, then most-recently-finished/loaded first.
 	const processingRolls = $derived.by(() => {
 		return rolls
-			.filter((r) => processingStatuses.includes(r.status))
+			.filter((r) => r.group_key >= 1 && !r.done)
 			.sort((a, b) => {
-				const statusDiff = processingStatuses.indexOf(a.status) - processingStatuses.indexOf(b.status);
-				if (statusDiff !== 0) return statusDiff;
+				const phaseDiff = a.group_key - b.group_key;
+				if (phaseDiff !== 0) return phaseDiff;
 				return (b.date_finished ?? b.date_loaded ?? '').localeCompare(a.date_finished ?? a.date_loaded ?? '');
 			});
 	});
 
-	const needsAttention = $derived(rolls.filter((r) => !r.camera_id && r.status !== 'archived'));
+	// Rolls needing a camera assignment — excluding Done rolls (nothing to act on).
+	const needsAttention = $derived(rolls.filter((r) => !r.camera_id && !r.done));
 
 	// Rolls whose negatives are still at the lab (awaiting or overdue), each with
 	// its live view. Sorted ascending by daysLeft → most-overdue first, then
@@ -85,17 +79,15 @@
 		}
 	}
 
-	// Status distribution for the progress bar (uses shared allStatusOrder + statusConfig)
+	// Phase distribution for the progress bar (uses the shared PHASE_META order).
 	const statusSegments = $derived(
-		allStatusOrder
-			.map((key) => ({
-				key,
-				label: statusConfig[key].label,
-				colorVar: statusConfig[key].colorVar,
-				count: rollsByStatus[key] ?? 0,
-				pct: rolls.length > 0 ? ((rollsByStatus[key] ?? 0) / rolls.length) * 100 : 0
-			}))
-			.filter((s) => s.count > 0)
+		PHASE_META.map((phase) => ({
+			key: phase.groupKey,
+			label: phase.label,
+			colorVar: phase.colorVar,
+			count: rollsByPhase[phase.groupKey] ?? 0,
+			pct: rolls.length > 0 ? ((rollsByPhase[phase.groupKey] ?? 0) / rolls.length) * 100 : 0
+		})).filter((s) => s.count > 0)
 	);
 
 	async function load() {
@@ -177,7 +169,7 @@
 				<FilmStrip />
 				<div class="flex items-center gap-2">
 					<span class="font-mono text-sm font-semibold">{roll.roll_id}</span>
-					<Badge status={roll.status} />
+					<Badge badge={roll.badge} groupKey={roll.group_key} />
 					<span class="ml-auto"><FrameCounter current={roll.shot_count} total={roll.frame_count} /></span>
 				</div>
 				<div class="mt-1 text-xs text-text-muted">
@@ -344,7 +336,7 @@
 								<div class="flex items-center gap-3">
 									<AlertTriangle size={14} class="text-status-at-lab" />
 									<span class="font-mono text-sm">{roll.roll_id}</span>
-									<Badge status={roll.status} />
+									<Badge badge={roll.badge} groupKey={roll.group_key} />
 								</div>
 								<div class="text-xs text-text-muted">No camera assigned</div>
 							</a>

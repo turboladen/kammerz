@@ -13,9 +13,9 @@
 	import { Film } from 'lucide-svelte';
 	import { listRolls } from '$lib/api/rolls';
 	import { filterBySearch, groupItems, sortByString, sortByDate } from '$lib/utils/list';
-	import { statusConfig } from '$lib/utils/status';
+	import { PHASE_META, phaseLabel } from '$lib/utils/phase';
 	import { negativesState, isNegativesPending } from '$lib/utils/negatives';
-	import type { RollWithDetails, RollStatus } from '$lib/types';
+	import type { RollWithDetails } from '$lib/types';
 
 	let rolls: RollWithDetails[] = $state([]);
 	let loading = $state(true);
@@ -25,23 +25,15 @@
 	const now = new Date();
 	// Toolbar option sets — defined before the URL seeds so a seed can reject a value
 	// that isn't an allowed option (a stale/hand-edited URL falls back to the default).
-	const statuses: { value: string; label: string }[] = [
+	// Phase filter values are the `group_key` scalar as a string (ADR-0013).
+	const phases: { value: string; label: string }[] = [
 		{ value: 'all', label: 'All' },
-		{ value: 'loaded', label: 'Loaded' },
-		{ value: 'shooting', label: 'Shooting' },
-		{ value: 'shot', label: 'Shot' },
-		{ value: 'at-lab', label: 'At Lab' },
-		{ value: 'lab-done', label: 'Lab Done' },
-		{ value: 'developing', label: 'Developing' },
-		{ value: 'developed', label: 'Developed' },
-		{ value: 'scanned', label: 'Scanned' },
-		{ value: 'post-processed', label: 'Post-processed' },
-		{ value: 'archived', label: 'Archived' }
+		...PHASE_META.map((p) => ({ value: String(p.groupKey), label: p.label }))
 	];
 
 	const groupByOptions = [
 		{ value: 'none', label: 'None' },
-		{ value: 'status', label: 'Status' },
+		{ value: 'phase', label: 'Phase' },
 		{ value: 'camera', label: 'Camera' },
 		{ value: 'film-stock', label: 'Film Stock' }
 	];
@@ -62,7 +54,7 @@
 		return v !== null && options.some((o) => o.value === v) ? v : fallback;
 	}
 
-	let filterStatus = $state(paramOr('status', statuses, 'all'));
+	let filterPhase = $state(paramOr('phase', phases, 'all'));
 
 	// Toolbar state — seeded from the URL so Back from a roll restores the view (kammerz-pq8)
 	let searchQuery = $state(page.url.searchParams.get('q') ?? '');
@@ -76,7 +68,7 @@
 	$effect(() => {
 		const params = new URLSearchParams();
 		if (searchQuery) params.set('q', searchQuery);
-		if (filterStatus !== 'all') params.set('status', filterStatus);
+		if (filterPhase !== 'all') params.set('phase', filterPhase);
 		if (groupBy !== 'none') params.set('group', groupBy);
 		if (sortBy !== 'date-loaded-desc') params.set('sort', sortBy);
 		const qs = params.toString();
@@ -86,11 +78,13 @@
 		}
 	});
 
-	// Pipeline: status filter → search → sort → group
-	const afterStatusFilter = $derived(filterStatus === 'all' ? rolls : rolls.filter((r) => r.status === filterStatus));
+	// Pipeline: phase filter → search → sort → group
+	const afterPhaseFilter = $derived(
+		filterPhase === 'all' ? rolls : rolls.filter((r) => String(r.group_key) === filterPhase)
+	);
 
 	const afterSearch = $derived(
-		filterBySearch(afterStatusFilter, searchQuery, (r) =>
+		filterBySearch(afterPhaseFilter, searchQuery, (r) =>
 			[
 				r.roll_id,
 				r.camera_brand ?? '',
@@ -124,7 +118,7 @@
 	});
 
 	const grouped = $derived.by(() => {
-		if (groupBy === 'status') return groupItems(afterSort, (r) => statusConfig[r.status]?.label ?? r.status);
+		if (groupBy === 'phase') return groupItems(afterSort, (r) => phaseLabel(r.group_key));
 		if (groupBy === 'camera')
 			return groupItems(afterSort, (r) => (r.camera_brand ? `${r.camera_brand} ${r.camera_model}` : 'No Camera'));
 		if (groupBy === 'film-stock')
@@ -171,17 +165,15 @@
 		{groupByOptions}
 		{sortOptions}
 		{resultCount}
-		totalCount={afterStatusFilter.length}
+		totalCount={afterPhaseFilter.length}
 		placeholder="Search rolls..."
 	/>
 
-	<!-- Status filter tabs -->
+	<!-- Phase filter tabs -->
 	<div class="mb-4 flex flex-wrap gap-2">
-		{#each statuses as s}
-			<Button
-				size="sm"
-				variant={filterStatus === s.value ? 'primary' : 'ghost'}
-				onclick={() => (filterStatus = s.value)}>{s.label}</Button
+		{#each phases as p}
+			<Button size="sm" variant={filterPhase === p.value ? 'primary' : 'ghost'} onclick={() => (filterPhase = p.value)}
+				>{p.label}</Button
 			>
 		{/each}
 	</div>
@@ -194,9 +186,9 @@
 			<Button variant="primary" href="/rolls/new">+ New Roll</Button>
 		</EmptyState>
 	{:else if resultCount === 0}
-		{#if filterStatus !== 'all' && !searchQuery}
+		{#if filterPhase !== 'all' && !searchQuery}
 			<EmptyState
-				title={`No ${statuses.find((s) => s.value === filterStatus)?.label ?? filterStatus} Rolls`}
+				title={`No ${phases.find((p) => p.value === filterPhase)?.label ?? filterPhase} Rolls`}
 				message="Try a different filter."
 			>
 				{#snippet icon()}<Film size={24} strokeWidth={1.5} />{/snippet}

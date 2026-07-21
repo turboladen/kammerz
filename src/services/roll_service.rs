@@ -24,7 +24,7 @@ fn transaction_err(e: TransactionError<DbErr>) -> DbErr {
 /// presence by [`crate::activity`]. The `self_dev_*` / `lab_dev_id` /
 /// `negatives_date_received` join columns are the derivation's dev signals; the
 /// handler wraps this row in a `RollView` that flattens in the derived
-/// `activities`/`badge`/`group_key`/`done`/compat-`status` fields.
+/// `activities`/`badge`/`group_key`/`done` fields.
 #[derive(Debug, Serialize, FromQueryResult)]
 pub struct RollWithDetails {
     // Roll fields
@@ -84,30 +84,27 @@ pub struct RollWithDetails {
 impl RollWithDetails {
     /// The activity-derivation signals for this roll (ADR-0013).
     pub fn signals(&self) -> ActivitySignals {
-        let is_lab_dev = self.lab_dev_id.is_some();
-        let dev_completion = if is_lab_dev {
-            self.negatives_date_received.clone()
-        } else {
-            self.self_dev_date_processed.clone()
-        };
         ActivitySignals {
             shot_count: self.shot_count,
             date_loaded: self.date_loaded.clone(),
             date_finished: self.date_finished.clone(),
-            has_dev: is_lab_dev || self.self_dev_id.is_some(),
-            is_lab_dev,
-            dev_started: None,
-            dev_completion,
             scan_started: self.scan_started.clone(),
             date_scanned: self.date_scanned.clone(),
             post_processing_started: self.post_processing_started.clone(),
             date_post_processed: self.date_post_processed.clone(),
             date_archived: self.date_archived.clone(),
             archive_na: self.archive_na,
+            ..Default::default()
         }
+        .with_dev(
+            self.lab_dev_id,
+            self.negatives_date_received.clone(),
+            self.self_dev_id,
+            self.self_dev_date_processed.clone(),
+        )
     }
 
-    /// The derived activity view (per-activity states, badge, group key, compat status).
+    /// The derived activity view (per-activity states, badge, group key).
     pub fn activity(&self) -> RollActivity {
         derive(&self.signals())
     }

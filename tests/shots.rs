@@ -90,10 +90,12 @@ async fn create_shot_transaction_links_lens_and_syncs_status() {
         .await
         .unwrap();
     let roll: Value = json_body(res).await;
+    // Shooting in progress (a shot exists, not finished): group_key 0, badge "Shooting".
     assert_eq!(
-        roll["status"], "shooting",
-        "a logged shot derives the roll to shooting"
+        roll["group_key"], 0,
+        "a logged shot keeps the roll in the shooting phase"
     );
+    assert_eq!(roll["badge"], "Shooting");
 }
 
 #[tokio::test]
@@ -125,10 +127,14 @@ async fn delete_last_shot_reverts_status() {
         .await
         .unwrap();
     let roll: Value = json_body(res).await;
+    // With no shots the roll derives back to the shooting phase (group_key 0). The
+    // badge is "Shooting" (not "Loaded") because date_loaded is set → shooting is
+    // in progress, just with no frames yet.
     assert_eq!(
-        roll["status"], "loaded",
-        "with no shots the roll derives back to loaded"
+        roll["group_key"], 0,
+        "with no shots the roll derives back to the shooting phase"
     );
+    assert_eq!(roll["badge"], "Shooting");
 }
 
 // A roll with a lab dev derives to at-lab regardless of its shots. Deleting its
@@ -173,10 +179,13 @@ async fn delete_last_shot_past_shot_leaves_status_untouched() {
         .await
         .unwrap();
     let roll: Value = json_body(res).await;
+    // The lab dev keeps the roll in development (group_key 1, badge "Developing"):
+    // deleting its last shot must NOT pull it back to the shooting phase (group_key 0).
     assert_eq!(
-        roll["status"], "at-lab",
-        "deleting the last shot of a roll with a lab dev must not revert it to loaded"
+        roll["group_key"], 1,
+        "deleting the last shot of a roll with a lab dev must not revert it to shooting"
     );
+    assert_eq!(roll["badge"], "Developing");
 }
 
 // kammerz-rwa: deleting a shot that doesn't exist (e.g. a stale-id double-delete

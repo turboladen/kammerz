@@ -667,7 +667,7 @@
 							>
 								<div class="flex items-center gap-3">
 									<span class="font-mono text-sm">{roll.roll_id}</span>
-									<Badge status={roll.status} />
+									<Badge badge={roll.badge} groupKey={roll.group_key} />
 									{#if roll.film_stock_brand}
 										<span class="text-xs text-text-muted">{roll.film_stock_brand} {roll.film_stock_name}</span>
 									{/if}

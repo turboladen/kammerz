@@ -126,18 +126,6 @@ export type LabInsert = Omit<Lab, 'id' | 'created_at' | 'updated_at' | 'negative
 
 // --- Rolls ---
 
-export type RollStatus =
-	| 'loaded'
-	| 'shooting'
-	| 'shot'
-	| 'at-lab'
-	| 'lab-done'
-	| 'developing'
-	| 'developed'
-	| 'scanned'
-	| 'post-processed'
-	| 'archived';
-
 export type PushPull = '-2' | '-1' | '+1' | '+2' | '+3';
 
 export interface Roll {
@@ -146,7 +134,6 @@ export interface Roll {
 	camera_id: number | null;
 	film_stock_id: number | null;
 	lens_id: number | null;
-	status: RollStatus;
 	frame_count: number | null;
 	date_loaded: string | null;
 	date_finished: string | null;
@@ -234,8 +221,10 @@ export interface RollEvent {
 	id: number;
 	roll_id: number;
 	event_type: RollEventType;
-	from_status: RollStatus | null;
-	to_status: RollStatus | null;
+	// Historical status columns on the roll_event row (ADR-0007). The activity
+	// model (ADR-0013) emits no new status_changed events; these carry legacy rows.
+	from_status: string | null;
+	to_status: string | null;
 	ref_kind: RollEventRefKind | null;
 	ref_id: number | null;
 	summary: string;
@@ -361,7 +350,9 @@ export interface SelfDevListItem {
 	dev_id: number;
 	roll_pk: number;
 	roll_id: string;
-	roll_status: RollStatus;
+	// Server-derived activity summary for the roll's phase Badge (ADR-0013).
+	badge: string;
+	group_key: number;
 	film_stock_brand: string | null;
 	film_stock_name: string | null;
 	film_stock_iso: number | null;
@@ -390,7 +381,9 @@ export interface LabDevListItem {
 	dev_id: number;
 	roll_pk: number;
 	roll_id: string;
-	roll_status: RollStatus;
+	// Server-derived activity summary for the roll's phase Badge (ADR-0013).
+	badge: string;
+	group_key: number;
 	film_stock_brand: string | null;
 	film_stock_name: string | null;
 	film_stock_iso: number | null;
@@ -439,7 +432,9 @@ export interface FilmStockSearchResult {
 export interface RollSearchResult {
 	id: number;
 	roll_id: string;
-	status: RollStatus;
+	// Server-derived activity summary for the roll's phase Badge (ADR-0013).
+	badge: string;
+	group_key: number;
 	camera_brand: string | null;
 	camera_model: string | null;
 	film_stock_brand: string | null;
@@ -501,7 +496,8 @@ export interface CatalogStats {
 	top_cameras: RankedItem[];
 	top_lenses: RankedItem[];
 	rolls_by_format: RankedItem[];
-	rolls_by_status: RankedItem[];
+	/** Phase buckets keyed by group_key — PHASE_META owns labels/colors client-side. */
+	rolls_by_phase: { group_key: number; count: number }[];
 	rolls_by_mount: RankedItem[];
 }
 
@@ -539,7 +535,9 @@ export interface ImportRollDto {
 	camera_id: number | null;
 	film_stock_id: number | null;
 	lens_id: number | null;
-	status: RollStatus;
+	// Free-form lifecycle status consumed only by the importer's date backfill; the
+	// backend validates it and 422s an unknown value (there is no stored status).
+	status: string;
 	frame_count: number | null;
 	date_loaded: string | null;
 	date_finished: string | null;

@@ -19,6 +19,9 @@ use sea_orm_migration::sea_orm::{ConnectionTrait, Statement};
 
 /// Legacy `RollStatus` values in progression order. A status's index is its rank;
 /// the backfill fills a date once a roll reached at least the ranked milestone.
+// NOTE: the import page's statusOptions dropdown
+// (frontend/src/routes/(app)/import/+page.svelte) must stay a subset of this
+// list — routes/import.rs 422s anything outside it. Update both together.
 pub const BACKFILL_ORDER: &[&str] = &[
     "loaded",
     "shooting",

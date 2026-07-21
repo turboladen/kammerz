@@ -4,12 +4,21 @@
 // the roll (`activities`/`badge`/`group_key`/`done`). This module never re-derives
 // state from dates — it maps those server-computed values onto display labels, the
 // page phase, and the writable roll columns each board row edits.
-import type { ActivityKind, ActivityState, Lens, RollActivityView, Shot } from '$lib/types';
+import type { ActivityKind, ActivityState, Lens, RollActivityItem, RollActivityView, Shot } from '$lib/types';
 import { lensDisplayName } from './lens';
 import { formatShotRow } from './shot-table';
 
 /** The page's layout phase, derived purely from the server's group_key/done. */
 export type RollPhase = 'shooting' | 'wrapup' | 'done';
+
+/**
+ * Request to auto-open a development dialog (board "Start development" / journal
+ * dev-event click). The roll page sets this; DevelopmentSection watches it and
+ * opens the matching lab/self dialog, seeding its form from an existing record
+ * when present. (ADR-0013 retired the per-chevron `target` field — starting
+ * development just opens the dialog; its dates then drive the derived state.)
+ */
+export type DevAutoPrompt = { kind: 'lab' | 'self' };
 
 /**
  * Which layout the roll page renders. Derived ONLY from the backend's `done` /
@@ -82,6 +91,14 @@ export const SLOT_CAPTIONS: Record<DatedActivityKind, Record<DateSlot, string>> 
 	scanning: { start: 'Started', completion: 'Scanned' },
 	post_processing: { start: 'Started', completion: 'Done' }
 };
+
+/**
+ * The derived state of one activity by kind, or null when absent. One accessor
+ * for every by-kind lookup so the `kind` literals stay typed and in one idiom.
+ */
+export function activityState(activities: readonly RollActivityItem[], kind: ActivityKind): ActivityState | null {
+	return activities.find((a) => a.kind === kind)?.state ?? null;
+}
 
 /** Narrow an activity kind to the dated (roll-row date slots) subset. */
 export function isDatedKind(kind: ActivityKind): kind is DatedActivityKind {

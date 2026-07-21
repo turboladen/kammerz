@@ -44,9 +44,9 @@
 	import { buildShotUpdatePayload, shotFormsEqual, type ShotFormFields } from '$lib/utils/shot-form';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { listLensMounts } from '$lib/api/lens-mounts';
-	import type { DevAutoPrompt } from '$lib/utils/status';
 	import {
 		rollPhase,
+		activityState,
 		lastShotSummary,
 		activityLabel,
 		isDatedKind,
@@ -54,7 +54,8 @@
 		slotDateLabel,
 		type DateSlot,
 		type RollDateField,
-		type ArchivePayload
+		type ArchivePayload,
+		type DevAutoPrompt
 	} from '$lib/utils/activity-board';
 	import { todayLocal, dateFieldError } from '$lib/utils/date';
 	import { parseTime } from '$lib/utils/time';
@@ -169,7 +170,6 @@
 	// from dates (ADR-0013) — read the backend's activities/badge/group_key/done.
 	const activities = $derived(roll?.activities ?? []);
 	const phase = $derived(roll ? rollPhase(roll) : 'shooting');
-	const shootingActivity = $derived(activities.find((a) => a.kind === 'shooting') ?? null);
 
 	// Board expand/collapse: collapsed by default in the shooting phase (the tail
 	// activities are all not-started then), expanded otherwise. `null` follows the
@@ -196,7 +196,7 @@
 	// dev record) and every frame is exposed — completing Shooting sets date_finished.
 	const showRollFullNudge = $derived(
 		phase === 'shooting' &&
-			shootingActivity?.state === 'in_progress' &&
+			activityState(activities, 'shooting') === 'in_progress' &&
 			frameProgress !== null &&
 			shots.length >= frameProgress.total &&
 			!rollFullDismissed
@@ -1024,7 +1024,7 @@
 						<div>
 							<div class="mb-2 flex items-center gap-3">
 								<span class="text-2xl font-mono font-semibold">{roll.roll_id}</span>
-								<Badge status={roll.status} />
+								<Badge badge={roll.badge} groupKey={roll.group_key} />
 							</div>
 							<div class="flex flex-wrap gap-4 text-sm text-text-muted">
 								{#if roll.camera_brand}
@@ -1261,7 +1261,6 @@
 					bind:selfDev
 					bind:devStages
 					bind:autoPrompt={devAutoPrompt}
-					currentStatus={roll?.status ?? null}
 					defaultDate={shots.length > 0 ? (shots[shots.length - 1].date ?? '') : (roll?.date_loaded ?? '')}
 					negativesDeadline={roll?.negatives_deadline ?? null}
 					onchange={() => loadRollData()}

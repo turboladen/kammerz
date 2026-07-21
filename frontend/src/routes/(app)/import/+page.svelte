@@ -13,7 +13,7 @@
 	import { lensDisplayName } from '$lib/utils/lens';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { appendNote, coerceApproxDate, dateFieldError } from '$lib/utils/date';
-	import type { ParsedRoll, Camera, FilmStock, Lens, ImportRollDto, ModelInfo, RollStatus } from '$lib/types';
+	import type { ParsedRoll, Camera, FilmStock, Lens, ImportRollDto, ModelInfo } from '$lib/types';
 	import { ChevronDown, ChevronUp, Eye, EyeOff, RefreshCw, Trash2 } from 'lucide-svelte';
 
 	// --- State ---
@@ -96,6 +96,11 @@
 
 	const selectedModelLabel = $derived(modelOptions.find((m) => m.value === selectedModel)?.label ?? selectedModel);
 
+	// Legacy lifecycle statuses the import backfill understands. MUST stay a
+	// subset of migration::BACKFILL_ORDER (migration/src/m…030_activity_lifecycle.rs)
+	// — the backend 422s any value outside that list. Kept as a local literal on
+	// purpose: this dropdown is the ONE place the retired status vocabulary is
+	// still user-facing (it names what the paper notes say, not app state).
 	const statusOptions = [
 		{ value: 'loaded', label: 'Loaded' },
 		{ value: 'shooting', label: 'Shooting' },
@@ -335,7 +340,7 @@
 				camera_id: cameraId ? parseInt(cameraId) : null,
 				film_stock_id: filmStockId ? parseInt(filmStockId) : null,
 				lens_id: lensId ? parseInt(lensId) : null,
-				status: rollStatus as RollStatus,
+				status: rollStatus,
 				frame_count: frameCount ? parseInt(frameCount) : null,
 				date_loaded: dateLoaded || null,
 				date_finished: dateFinished || null,

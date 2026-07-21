@@ -7,7 +7,6 @@
 	import { listLabs } from '$lib/api/labs';
 	import { lensDisplayName } from '$lib/utils/lens';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
-	import { getStatusLabel } from '$lib/utils/status';
 	import { secondsToMmSs } from '$lib/utils/duration';
 	import type { RollWithDetails, Shot, DevelopmentLab, DevelopmentSelf, DevStage, Lens, Lab, Camera } from '$lib/types';
 
@@ -148,7 +147,7 @@
 		<header class="mb-6 border-b border-border pb-4">
 			<div class="flex items-baseline justify-between gap-4">
 				<h1 class="font-mono text-2xl font-semibold">{roll.roll_id}</h1>
-				<span class="text-sm text-text-muted">{getStatusLabel(roll.status)}</span>
+				<span class="text-sm text-text-muted">{roll.badge}</span>
 			</div>
 			<div class="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-text-muted">
 				{#if cameraLabel}<span>{cameraLabel}</span>{/if}

@@ -48,24 +48,27 @@ The one warm element against the neutral field. Used deliberately for primary ac
 | `--color-accent-hover` | `#eeb878` | Button hover states                   |
 | `--color-accent-muted` | `#7d5a32` | Subtle accent backgrounds             |
 
-### Status Colors (red/green-safe, grouped by lifecycle phase)
+### Phase Colors (red/green-safe, one per lifecycle phase)
 
-Statuses are distinguished primarily on the **blue↔yellow axis** (the axis red/green
-color vision reads reliably) plus lightness, grouped by phase: shooting = cool blues,
-development = warm ambers, finished = neutral (cool `scanned` vs warm `archived`). The
-status label text is always shown alongside the color, so color is never the sole signal.
+A roll's lifecycle collapses to six phases keyed on the derived `group_key` (ADR-0013;
+`PHASE_META` in `phase.ts`). Phases are distinguished primarily on the **blue↔yellow
+axis** (the axis red/green color vision reads reliably) plus lightness: shooting = cool
+azure, development = amber, scanning = cool slate, post-processing = violet, archiving /
+done = neutral taupe. The badge label text is always shown alongside the color, so color
+is never the sole signal. Phases reuse the existing `--color-status-*` tokens.
 
-| Status     | Hex       | Phase                   |
-| ---------- | --------- | ----------------------- |
-| Loaded     | `#6fbcff` | Shooting — vivid azure  |
-| Shooting   | `#93c4ec` | Shooting — sky blue     |
-| Shot       | `#afb3ea` | Shooting — blue-violet  |
-| At Lab     | `#e3a347` | Development — amber     |
-| Lab Done   | `#f0cf57` | Development — yellow    |
-| Developing | `#dd8b44` | Development — orange    |
-| Developed  | `#ecc185` | Development — light tan |
-| Scanned    | `#a8cdd8` | Finished — cool slate   |
-| Archived   | `#b3a99c` | Finished — warm taupe   |
+| group_key | Phase           | Token                           | Hex       |
+| --------- | --------------- | ------------------------------- | --------- |
+| 0         | Shooting        | `--color-status-loaded`         | `#6fbcff` |
+| 1         | Development     | `--color-status-at-lab`         | `#e3a347` |
+| 2         | Scanning        | `--color-status-scanned`        | `#a8cdd8` |
+| 3         | Post-processing | `--color-status-post-processed` | `#bfb0d8` |
+| 4         | Archiving       | `--color-status-archived`       | `#b3a99c` |
+| 5         | Done            | `--color-status-archived`       | `#b3a99c` |
+
+Done reuses the archived taupe — a distinct green would break the red/green-safe rule.
+(The remaining `--color-status-*` tokens still exist in `app.css` but are no longer
+individually surfaced now that the ten statuses collapsed to six phases.)
 
 ### Danger
 
@@ -125,13 +128,14 @@ Sizes: `md` (default, px-4 py-2) and `sm` (px-2.5 py-1.5).
 
 ### Badge (`frontend/src/lib/components/ui/Badge.svelte`)
 
-Roll status pills with a small color dot indicator:
+Roll lifecycle-phase pills with a small color dot indicator (ADR-0013):
 
+- Takes the server-derived compound `badge` label (e.g. "To develop", "Scanning · Post-processing", "Done") and the `group_key` scalar
+- Colored by **phase** via `phaseTheme(groupKey)` (`$lib/utils/phase.ts` `PHASE_META`) — not by any per-status color
 - 1.5px solid dot before the label text
-- Background at 10% opacity of the status color
-- Text in the status color
+- Background at 10% opacity of the phase color, text in the phase color
 - `rounded-full` shape
-- Always use `<Badge>` for roll statuses — never inline status pills.
+- Always use `<Badge badge={…} groupKey={…} />` — never inline lifecycle pills.
 
 ### Dialog (`frontend/src/lib/components/ui/Dialog.svelte`)
 
@@ -163,17 +167,10 @@ falls back to the small `icon` circle for filtered "no matches" states.
 ### DateConfirm (`frontend/src/lib/components/ui/DateConfirm.svelte`)
 
 Small date-pick dialog (built on `Dialog` + a native `<Input type="date">`). Confirm / Cancel, with an
-optional **Clear** (commits null) for inline edits. Used for both the
-confirm-on-transition prompt and inline Timeline date editing. No "Skip" — to leave a
-date blank, advance then Clear it in the Timeline.
-
-### RollTimeline (`frontend/src/lib/components/rolls/RollTimeline.svelte`)
-
-The roll lifecycle Timeline (dot + label + dashed rule + date), with each editable
-milestone click-to-edit via `DateConfirm`. Emits `onedit(milestone, date|null)`; the
-roll-detail page routes the write to the roll / lab-dev / self-dev record by the
-milestone's `target` (see `buildRollTimeline` in `utils/timeline.ts`). The Timeline is
-the single home for lifecycle dates — the roll Edit form has no date pickers.
+optional **Clear** (commits null) for inline edits. Used by the roll page's activity
+board for setting/changing lifecycle dates; the caller supplies the `hint` line naming
+its own edit surface. No "Skip" — a date left blank is cleared later from the board's
+× control (behind a backward-move confirm).
 
 ### FadeIn (`frontend/src/lib/components/ui/FadeIn.svelte`)
 
@@ -212,7 +209,7 @@ The app is used in the field on a phone, so every layout must degrade below `md`
 - **Form grids** (dialogs, edit panes, create pages) collapse to one column on phones: `grid-cols-1 sm:grid-cols-2` (or `sm:grid-cols-3`). Never a fixed multi-column form grid.
 - **Dialog backdrops** carry `p-4` so panels are never edge-to-edge on small screens.
 - **ListToolbar** wraps (`flex-wrap`); the search input takes its own full row below `sm` (`basis-full sm:basis-0 sm:flex-1`).
-- **Roll status chevron bar** wraps (`flex-wrap`) with `whitespace-nowrap` segments instead of crushing/clipping.
+- **Rolls list phase-filter tabs** wrap (`flex-wrap`) with `whitespace-nowrap` segments instead of crushing/clipping.
 
 ### Sidebar (`frontend/src/lib/components/layout/Sidebar.svelte`)
 
@@ -361,8 +358,8 @@ This is a sanctioned variant for table cells where standard Input components wou
 ### Dashboard (`/`)
 
 1. **"In the Field"** — Active rolls (loaded/shooting) as prominent amber-tinted cards
-2. **Quick Stats** — 4-column grid: Total Rolls, Cameras, Currently Shooting, At Lab (all `font-mono text-2xl font-semibold`)
-3. **Roll Pipeline** — Horizontal status distribution bar with proportional per-status-color segments + legend
+2. **Quick Stats** — 4-column grid: Total Rolls, Cameras, In the Field, In the Darkroom (all `font-mono text-2xl font-semibold`)
+3. **Roll Pipeline** — Horizontal phase distribution bar with proportional per-phase-color segments + legend (bucketed by `group_key` via `PHASE_META`)
 4. **Needs Attention** — Rolls missing camera assignment or waiting at lab, with icon indicators
 
 Empty state: Camera icon in accent circle, "Start your log" in Instrument Serif, explanatory text, CTAs.
@@ -382,9 +379,9 @@ Empty state: Camera icon in accent circle, "Start your log" in Instrument Serif,
 - **Cost Breakdown** — Stacked bar (Lab Development amber, Maintenance muted) with legend
 - **Rolls Per Month** — Horizontal bar chart (`bg-accent/80`, `rounded-r`)
 - **Rankings Row** — 3-column grid: Top Film Stocks, Top Cameras, Top Lenses (numbered lists with accent count pills)
-- **Distribution Row** — 3-column grid: Rolls by Format, Rolls by Lens Mount, Rolls by Status
+- **Distribution Row** — 3-column grid: Rolls by Format, Rolls by Lens Mount, Rolls by Phase
   - Format and Mount charts use `bg-accent/80`
-  - Status chart uses per-status CSS variable colors (matching Dashboard Pipeline)
+  - Phase chart uses per-phase CSS variable colors via `phaseByLabel` (matching Dashboard Pipeline)
 
 ### Import (`/import`)
 

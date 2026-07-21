@@ -4,7 +4,7 @@ use serde::Serialize;
 use ::entity::camera::CameraFormat;
 use ::entity::film_stock::{FilmFormat, FilmStockType};
 
-use crate::activity::{ActivitySignals, legacy_status};
+use crate::activity::{ActivitySignals, derive};
 
 pub struct SearchService;
 
@@ -41,13 +41,15 @@ pub struct FilmStockSearchResult {
     pub match_snippet: String,
 }
 
-/// A roll search hit. `status` is the compat legacy status, derived in Rust from
-/// the roll's dates (ADR-0013) — there is no stored status column to select.
+/// A roll search hit. `badge` + `group_key` are the server-derived activity
+/// summary (ADR-0013) — there is no stored status column to select — so the
+/// search UI renders the same phase Badge as every other roll list.
 #[derive(Debug, Serialize)]
 pub struct RollSearchResult {
     pub id: i32,
     pub roll_id: String,
-    pub status: String,
+    pub badge: String,
+    pub group_key: i32,
     pub camera_brand: Option<String>,
     pub camera_model: Option<String>,
     pub film_stock_brand: Option<String>,
@@ -67,7 +69,9 @@ struct RollSearchRow {
     film_stock_name: Option<String>,
     date_loaded: Option<String>,
     date_finished: Option<String>,
+    scan_started: Option<String>,
     date_scanned: Option<String>,
+    post_processing_started: Option<String>,
     date_post_processed: Option<String>,
     date_archived: Option<String>,
     archive_na: bool,
@@ -82,30 +86,33 @@ struct RollSearchRow {
 
 impl From<RollSearchRow> for RollSearchResult {
     fn from(row: RollSearchRow) -> Self {
-        let is_lab_dev = row.lab_dev_id.is_some();
+        // EVERY signal column is selected and passed through — omitting one (the
+        // *_started fields were once hardcoded None here) silently derives a
+        // different badge/group_key than the canonical roll list for the same roll.
         let sig = ActivitySignals {
             shot_count: row.shot_count,
             date_loaded: row.date_loaded,
             date_finished: row.date_finished,
-            has_dev: is_lab_dev || row.self_dev_id.is_some(),
-            is_lab_dev,
-            dev_started: None,
-            dev_completion: if is_lab_dev {
-                row.lab_completion
-            } else {
-                row.self_completion
-            },
-            scan_started: None,
+            scan_started: row.scan_started,
             date_scanned: row.date_scanned,
-            post_processing_started: None,
+            post_processing_started: row.post_processing_started,
             date_post_processed: row.date_post_processed,
             date_archived: row.date_archived,
             archive_na: row.archive_na,
-        };
+            ..Default::default()
+        }
+        .with_dev(
+            row.lab_dev_id,
+            row.lab_completion,
+            row.self_dev_id,
+            row.self_completion,
+        );
+        let activity = derive(&sig);
         RollSearchResult {
             id: row.id,
             roll_id: row.roll_id,
-            status: legacy_status(&sig),
+            badge: activity.badge,
+            group_key: activity.group_key,
             camera_brand: row.camera_brand,
             camera_model: row.camera_model,
             film_stock_brand: row.film_stock_brand,
@@ -254,8 +261,8 @@ impl SearchService {
                 r#"SELECT r.id, r.roll_id,
                 c.brand AS camera_brand, c.model AS camera_model,
                 fs.brand AS film_stock_brand, fs.name AS film_stock_name,
-                r.date_loaded, r.date_finished, r.date_scanned,
-                r.date_post_processed, r.date_archived, r.archive_na,
+                r.date_loaded, r.date_finished, r.scan_started, r.date_scanned,
+                r.post_processing_started, r.date_post_processed, r.date_archived, r.archive_na,
                 (SELECT COUNT(*) FROM shots s WHERE s.roll_id = r.id) AS shot_count,
                 dl.id AS lab_dev_id, dl.date_received AS lab_completion,
                 ds.id AS self_dev_id, ds.date_processed AS self_completion,

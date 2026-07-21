@@ -3,19 +3,20 @@ use std::collections::HashMap;
 use sea_orm::*;
 use serde::Serialize;
 
-use crate::activity::{ActivitySignals, legacy_status};
+use crate::activity::{ActivitySignals, group_key};
 
 pub struct StatsService;
 
-/// Per-roll activity-derivation signals for the `rolls_by_status` distribution.
+/// Per-roll activity-derivation signals for the `rolls_by_phase` distribution.
 #[derive(Debug, FromQueryResult)]
-struct StatusSignalRow {
+struct PhaseSignalRow {
     date_finished: Option<String>,
+    scan_started: Option<String>,
     date_scanned: Option<String>,
+    post_processing_started: Option<String>,
     date_post_processed: Option<String>,
     date_archived: Option<String>,
     archive_na: bool,
-    shot_count: i64,
     lab_dev_id: Option<i32>,
     lab_completion: Option<String>,
     self_dev_id: Option<i32>,
@@ -35,6 +36,15 @@ pub struct SumRow {
 #[derive(Debug, Serialize, FromQueryResult)]
 pub struct MonthCount {
     pub month: String,
+    pub count: i64,
+}
+
+/// One `rolls_by_phase` bucket. The backend speaks `group_key` integers only —
+/// the frontend's PHASE_META owns the labels and colors, so there is no
+/// cross-language label-string contract to drift (kammerz-1ezf review).
+#[derive(Debug, Serialize)]
+pub struct PhaseCount {
+    pub group_key: i32,
     pub count: i64,
 }
 
@@ -58,7 +68,7 @@ pub struct CatalogStats {
     pub top_cameras: Vec<RankedItem>,
     pub top_lenses: Vec<RankedItem>,
     pub rolls_by_format: Vec<RankedItem>,
-    pub rolls_by_status: Vec<RankedItem>,
+    pub rolls_by_phase: Vec<PhaseCount>,
     pub rolls_by_mount: Vec<RankedItem>,
 }
 
@@ -216,20 +226,21 @@ impl StatsService {
         .all(db)
         .await?;
 
-        // --- Rolls by status ---
-        // There is no stored status (ADR-0013): derive each roll's compat status
-        // from its activity signals and tally in Rust, preserving the endpoint's
-        // shape (RankedItem, ordered by count desc).
-        let status_rows = StatusSignalRow::find_by_statement(Statement::from_string(
+        // --- Rolls by phase ---
+        // There is no stored status (ADR-0013): compute each roll's lifecycle
+        // phase (the earliest-unresolved `group_key`, 0..=5) from its signals and
+        // tally. Uses the group_key-only fast path — no badge/activity-vec
+        // allocations — and selects EVERY group_key-relevant signal column
+        // (shot_count/date_loaded are deliberately absent: they affect only the
+        // shooting *state string*, never resolution, so no shots scan is needed).
+        let phase_rows = PhaseSignalRow::find_by_statement(Statement::from_string(
             backend,
-            "SELECT r.date_finished, r.date_scanned, r.date_post_processed, \
+            "SELECT r.date_finished, r.scan_started, r.date_scanned, \
+                    r.post_processing_started, r.date_post_processed, \
                     r.date_archived, r.archive_na, \
-                    COALESCE(sc.shot_count, 0) AS shot_count, \
                     dl.id AS lab_dev_id, dl.date_received AS lab_completion, \
                     ds.id AS self_dev_id, ds.date_processed AS self_completion \
              FROM rolls r \
-             LEFT JOIN (SELECT roll_id, COUNT(*) AS shot_count FROM shots GROUP BY roll_id) sc \
-                    ON sc.roll_id = r.id \
              LEFT JOIN development_labs dl ON dl.roll_id = r.id \
              LEFT JOIN development_selves ds ON ds.roll_id = r.id"
                 .to_owned(),
@@ -237,36 +248,32 @@ impl StatsService {
         .all(db)
         .await?;
 
-        let mut status_counts: HashMap<String, i64> = HashMap::new();
-        for row in status_rows {
-            let is_lab_dev = row.lab_dev_id.is_some();
+        let mut phase_counts: HashMap<i32, i64> = HashMap::new();
+        for row in phase_rows {
             let sig = ActivitySignals {
-                shot_count: row.shot_count,
-                date_loaded: None,
                 date_finished: row.date_finished,
-                has_dev: is_lab_dev || row.self_dev_id.is_some(),
-                is_lab_dev,
-                dev_started: None,
-                dev_completion: if is_lab_dev {
-                    row.lab_completion
-                } else {
-                    row.self_completion
-                },
-                scan_started: None,
+                scan_started: row.scan_started,
                 date_scanned: row.date_scanned,
-                post_processing_started: None,
+                post_processing_started: row.post_processing_started,
                 date_post_processed: row.date_post_processed,
                 date_archived: row.date_archived,
                 archive_na: row.archive_na,
-            };
-            *status_counts.entry(legacy_status(&sig)).or_insert(0) += 1;
+                ..Default::default()
+            }
+            .with_dev(
+                row.lab_dev_id,
+                row.lab_completion,
+                row.self_dev_id,
+                row.self_completion,
+            );
+            *phase_counts.entry(group_key(&sig)).or_insert(0) += 1;
         }
-        let mut rolls_by_status: Vec<RankedItem> = status_counts
+        let mut rolls_by_phase: Vec<PhaseCount> = phase_counts
             .into_iter()
-            .map(|(label, count)| RankedItem { label, count })
+            .map(|(group_key, count)| PhaseCount { group_key, count })
             .collect();
-        // Count desc, then label asc for a deterministic order.
-        rolls_by_status.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.label.cmp(&b.label)));
+        // Canonical phase order — the frontend renders the buckets as sent.
+        rolls_by_phase.sort_by_key(|p| p.group_key);
 
         // --- Rolls by lens mount ---
         let rolls_by_mount = RankedItem::find_by_statement(Statement::from_string(
@@ -295,7 +302,7 @@ impl StatsService {
             top_cameras,
             top_lenses,
             rolls_by_format,
-            rolls_by_status,
+            rolls_by_phase,
             rolls_by_mount,
         })
     }
