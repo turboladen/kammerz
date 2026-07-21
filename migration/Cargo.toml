@@ -5,3 +5,6 @@ edition = "2024"
 
 [dependencies]
 sea-orm-migration = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-rustls"], default-features = false }
+# 0.26 on purpose: sea-orm already resolves strum 0.26 transitively, so this
+# reuses that core instead of compiling a second (semver-incompatible) major.
+strum = { version = "0.26", features = ["derive"] }

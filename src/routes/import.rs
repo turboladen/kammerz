@@ -13,13 +13,13 @@ use crate::extract::Json;
 use crate::patch::{now_string, trim, trim_opt};
 use crate::routes::friendly_err;
 use crate::services::import_service::{ImportService, ModelInfo, ParsedRoll};
-use crate::services::roll_service::{ImportShotEntry, RollService};
+use crate::services::roll_service::{ImportDevRecord, ImportShotEntry, RollService};
 use crate::services::settings_service::SettingsService;
 use crate::validate::{
     require_nonempty, validate_date_opt, validate_non_negative_i32, validate_time,
 };
 use entity::roll::{self, PushPull};
-use migration::backfilled_dates;
+use migration::{LegacyStatus, backfilled_dates};
 
 const DEFAULT_MODEL: &str = "claude-sonnet-4-5-20250929";
 
@@ -32,9 +32,9 @@ pub struct ImportRollDto {
     pub film_stock_id: Option<i32>,
     pub lens_id: Option<i32>,
     /// Legacy lifecycle status the import UI still sends. There is no stored
-    /// status (ADR-0013); it is consumed only to backfill lifecycle dates so the
-    /// imported roll derives to the intended activity state (kammerz-gsj6 tracks
-    /// the dev-stage-status import gap).
+    /// status (ADR-0013); it parses into [`LegacyStatus`] and drives the dev
+    /// record + lifecycle-date synthesis so the imported roll derives to the
+    /// intended activity state (kammerz-gsj6).
     pub status: String,
     pub frame_count: Option<i32>,
     pub date_loaded: Option<String>,
@@ -159,18 +159,17 @@ async fn import_parsed_roll(
         }
     }
 
-    // Reject an unknown legacy status outright: `backfilled_dates` treats it as
-    // rank-0 (a silent no-op), which would mask client drift/typos and import the
-    // roll with an unintended derived lifecycle. The old `RollStatus` enum got
-    // this 422 for free from serde; with the enum retired, enforce it here
-    // against the same canonical value set the backfill ranks by.
-    if !migration::BACKFILL_ORDER.contains(&data.status.as_str()) {
-        return Err(AppError::UnprocessableEntity(format!(
+    // Parse, don't validate: the legacy status string becomes a typed
+    // `LegacyStatus` here (422 on anything outside the canonical vocabulary),
+    // so every downstream consumer matches exhaustively — no unreachable
+    // catch-all arms whose safety depends on remembering this guard ran.
+    let status: LegacyStatus = data.status.parse().map_err(|_| {
+        AppError::UnprocessableEntity(format!(
             "unknown status \"{}\" — expected one of: {}",
             data.status,
             migration::BACKFILL_ORDER.join(", ")
-        )));
-    }
+        ))
+    })?;
 
     // No stored status (ADR-0013): translate the legacy status the import UI
     // sends into lifecycle dates so the roll derives to the intended activity
@@ -192,8 +191,13 @@ async fn import_parsed_roll(
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty());
+    // Only `.date_finished` is consumed from this call: its tail-date outputs
+    // need dev/scan/pp inputs that import never has (all None here), so the tail
+    // dates are synthesized by `import_lifecycle` below instead. The shared
+    // migration fn is kept for date_finished so the "borrow max shot date /
+    // loaded date" rule can't drift from the migration's.
     let filled = backfilled_dates(
-        &data.status,
+        status,
         date_loaded_in,
         date_finished_in,
         max_shot_date.as_deref(),
@@ -206,6 +210,20 @@ async fn import_parsed_roll(
         .map(str::to_string)
         .or(filled.date_finished);
 
+    // Synthesize the dev record (dev-stage statuses) and tail dates (terminal
+    // statuses) the roll needs to derive its intended activity state. `anchor` is
+    // the best real recorded date to borrow as an honest LOWER BOUND for any
+    // milestone the paper note doesn't date — finished-shooting ?? max shot date
+    // ?? loaded. It is never a fabricated date. Consequence, disclosed to the user
+    // at entry (import page hint) and in the PR: a completed-status import stamps
+    // Scanned/Post-processed/Archived with this same shoot-era date, correctable on
+    // the roll's activity board (kammerz-gsj6).
+    let anchor = date_finished_final
+        .as_deref()
+        .or(max_shot_date.as_deref())
+        .or(date_loaded_in);
+    let life = import_lifecycle(status, anchor);
+
     let now = now_string();
 
     let roll_model = roll::ActiveModel {
@@ -216,8 +234,9 @@ async fn import_parsed_roll(
         frame_count: Set(data.frame_count),
         date_loaded: trim_opt(data.date_loaded),
         date_finished: Set(date_finished_final),
-        date_scanned: Set(filled.date_scanned),
-        date_archived: Set(filled.date_archived),
+        date_scanned: Set(life.date_scanned),
+        date_post_processed: Set(life.date_post_processed),
+        date_archived: Set(life.date_archived),
         push_pull: Set(data.push_pull),
         notes: trim_opt(data.notes),
         created_at: Set(now.clone()),
@@ -251,8 +270,170 @@ async fn import_parsed_roll(
         })
         .collect();
 
-    let id = RollService::import_roll(&state.db, roll_model, shot_entries)
+    let id = RollService::import_roll(&state.db, roll_model, shot_entries, life.dev)
         .await
         .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
     Ok((StatusCode::CREATED, Json(id)))
+}
+
+/// What an import synthesizes for a legacy status beyond `date_finished`: the dev
+/// record to create (dev-stage statuses) and the tail dates to set (terminal
+/// statuses).
+struct ImportLifecycle {
+    dev: Option<ImportDevRecord>,
+    date_scanned: Option<String>,
+    date_post_processed: Option<String>,
+    date_archived: Option<String>,
+}
+
+/// Map a legacy import status to the dev record + tail dates the roll needs to
+/// derive its intended activity state (kammerz-gsj6). `anchor` is the honest
+/// lower-bound date borrowed for milestones the note doesn't date (never
+/// fabricated); when `None`, completion/tail dates stay unset and the status
+/// degrades one step (documented per-status in `tests/import.rs`).
+///
+/// Terminal statuses (scanned/post-processed/archived) create NO dev record —
+/// lab vs self is unknowable from a terminal status, and development derives
+/// implicitly-done from any tail date (`activity.rs`). The tail three don't imply
+/// each other, so each must be set explicitly up to the status's rank.
+fn import_lifecycle(status: LegacyStatus, anchor: Option<&str>) -> ImportLifecycle {
+    let a = || anchor.map(str::to_string);
+    let mut out = ImportLifecycle {
+        dev: None,
+        date_scanned: None,
+        date_post_processed: None,
+        date_archived: None,
+    };
+    // Exhaustive over the typed vocabulary — adding a LegacyStatus variant is a
+    // compile error here until its lifecycle mapping is decided.
+    match status {
+        LegacyStatus::Loaded | LegacyStatus::Shooting | LegacyStatus::Shot => {}
+        LegacyStatus::AtLab => {
+            out.dev = Some(ImportDevRecord::Lab {
+                date_received: None,
+            })
+        }
+        LegacyStatus::LabDone => out.dev = Some(ImportDevRecord::Lab { date_received: a() }),
+        LegacyStatus::Developing => {
+            out.dev = Some(ImportDevRecord::SelfDev {
+                date_processed: None,
+            })
+        }
+        LegacyStatus::Developed => {
+            out.dev = Some(ImportDevRecord::SelfDev {
+                date_processed: a(),
+            })
+        }
+        LegacyStatus::Scanned => out.date_scanned = a(),
+        LegacyStatus::PostProcessed => {
+            out.date_scanned = a();
+            out.date_post_processed = a();
+        }
+        LegacyStatus::Archived => {
+            out.date_scanned = a();
+            out.date_post_processed = a();
+            out.date_archived = a();
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lifecycle_pre_dev_statuses_synthesize_nothing() {
+        for s in [
+            LegacyStatus::Loaded,
+            LegacyStatus::Shooting,
+            LegacyStatus::Shot,
+        ] {
+            let l = import_lifecycle(s, Some("2026-01-05"));
+            assert!(
+                l.dev.is_none()
+                    && l.date_scanned.is_none()
+                    && l.date_post_processed.is_none()
+                    && l.date_archived.is_none(),
+                "{s:?} should synthesize no dev record or tail dates"
+            );
+        }
+    }
+
+    #[test]
+    fn lifecycle_dev_stage_statuses_create_records() {
+        assert_eq!(
+            import_lifecycle(LegacyStatus::AtLab, Some("2026-01-05")).dev,
+            Some(ImportDevRecord::Lab {
+                date_received: None
+            }),
+            "at-lab: lab record in progress, no completion"
+        );
+        assert_eq!(
+            import_lifecycle(LegacyStatus::LabDone, Some("2026-01-05")).dev,
+            Some(ImportDevRecord::Lab {
+                date_received: Some("2026-01-05".into())
+            }),
+            "lab-done: lab record completed via anchor"
+        );
+        assert_eq!(
+            import_lifecycle(LegacyStatus::Developing, Some("2026-01-05")).dev,
+            Some(ImportDevRecord::SelfDev {
+                date_processed: None
+            }),
+            "developing: self record in progress, no completion"
+        );
+        assert_eq!(
+            import_lifecycle(LegacyStatus::Developed, Some("2026-01-05")).dev,
+            Some(ImportDevRecord::SelfDev {
+                date_processed: Some("2026-01-05".into())
+            }),
+            "developed: self record completed via anchor"
+        );
+    }
+
+    #[test]
+    fn lifecycle_terminal_statuses_fill_tail_chain_up_to_rank() {
+        let scanned = import_lifecycle(LegacyStatus::Scanned, Some("2026-01-05"));
+        assert_eq!(scanned.date_scanned.as_deref(), Some("2026-01-05"));
+        assert!(scanned.date_post_processed.is_none() && scanned.date_archived.is_none());
+        assert!(
+            scanned.dev.is_none(),
+            "terminal statuses create no dev record"
+        );
+
+        let pp = import_lifecycle(LegacyStatus::PostProcessed, Some("2026-01-05"));
+        assert_eq!(pp.date_scanned.as_deref(), Some("2026-01-05"));
+        assert_eq!(pp.date_post_processed.as_deref(), Some("2026-01-05"));
+        assert!(pp.date_archived.is_none());
+
+        let arch = import_lifecycle(LegacyStatus::Archived, Some("2026-01-05"));
+        assert_eq!(arch.date_scanned.as_deref(), Some("2026-01-05"));
+        assert_eq!(arch.date_post_processed.as_deref(), Some("2026-01-05"));
+        assert_eq!(arch.date_archived.as_deref(), Some("2026-01-05"));
+    }
+
+    #[test]
+    fn lifecycle_absent_anchor_degrades_completions() {
+        // Nothing recorded to borrow: completion/tail dates stay None. In-progress
+        // dev states still get their (dateless) record — the honest floor.
+        assert_eq!(
+            import_lifecycle(LegacyStatus::LabDone, None).dev,
+            Some(ImportDevRecord::Lab {
+                date_received: None
+            })
+        );
+        assert_eq!(
+            import_lifecycle(LegacyStatus::Developed, None).dev,
+            Some(ImportDevRecord::SelfDev {
+                date_processed: None
+            })
+        );
+        let arch = import_lifecycle(LegacyStatus::Archived, None);
+        assert!(
+            arch.date_scanned.is_none()
+                && arch.date_post_processed.is_none()
+                && arch.date_archived.is_none()
+        );
+    }
 }
