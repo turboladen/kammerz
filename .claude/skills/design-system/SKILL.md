@@ -24,8 +24,8 @@ All colors are CSS custom properties in `src/app.css` via `@theme`. Never use ra
 ### Mandatory Patterns
 1. **Section headers** — Always `text-xs font-semibold uppercase tracking-wider text-text-faint` with either a rule line or `justify-between` for action buttons. Never `text-sm font-semibold text-text-muted`.
 2. **Card hover** — Always `hover:border-accent/40 hover:-translate-y-px`. Never use other accent opacities.
-3. **Roll status** — Always use `<Badge status={...} />` component. Never inline status pills.
-4. **Status metadata** — Import from `src/lib/utils/status.ts`. Never define inline status maps. Use `getStatusColor()` for typed `RollStatus` values, `getStatusColorSafe()` for untyped strings.
+3. **Roll lifecycle** — Always use `<Badge badge={...} groupKey={...} />` for a roll's phase pill (server-derived `badge` + `group_key`, ADR-0013). Never inline status pills.
+4. **Phase metadata** — Import from `src/lib/utils/phase.ts` (`PHASE_META`, `phaseTheme(groupKey)`, `phaseLabel(groupKey)`). Never define inline phase maps; phase labels/colors live ONLY there (the backend emits `group_key` integers).
 5. **Page animations** — Wrap content sections in `<FadeIn>` with staggered `delay` props (50ms increments).
 6. **Error banners** — `rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400`
 7. **Empty states** — Use `<EmptyState>` component with Lucide icon snippet.
