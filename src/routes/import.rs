@@ -192,6 +192,11 @@ async fn import_parsed_roll(
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty());
+    // Only `.date_finished` is consumed from this call: its tail-date outputs
+    // need dev/scan/pp inputs that import never has (all None here), so the tail
+    // dates are synthesized by `import_lifecycle` below instead. The shared
+    // migration fn is kept for date_finished so the "borrow max shot date /
+    // loaded date" rule can't drift from the migration's.
     let filled = backfilled_dates(
         &data.status,
         date_loaded_in,

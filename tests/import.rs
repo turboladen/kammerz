@@ -588,3 +588,39 @@ async fn import_roll_with_unknown_status_is_422() {
         "message should name the bad status: {msg}"
     );
 }
+
+#[tokio::test]
+async fn import_archived_anchor_falls_back_to_max_shot_date() {
+    // Anchor precedence: with no date_finished or date_loaded, a completed-status
+    // import borrows the latest SHOT date as its lower-bound anchor — the tail
+    // milestones and the backfilled date_finished all land on it, and the roll
+    // still derives fully Done.
+    let app = open_app().await;
+    let payload = json!({
+        "roll_id": "IMPORT-ANCHOR-SHOT",
+        "status": "archived",
+        "shots": [
+            { "frame_number": "1", "date": "2026-03-01" },
+            { "frame_number": "2", "date": "2026-03-04" }
+        ]
+    });
+    let res = app
+        .clone()
+        .oneshot(post_json("/api/import/roll", &payload))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let roll_pk: i32 = json_body(res).await;
+
+    let res = app
+        .oneshot(get(&format!("/api/rolls/{roll_pk}/detail")))
+        .await
+        .unwrap();
+    let detail: Value = json_body(res).await;
+    assert_eq!(detail["roll"]["group_key"], 5);
+    assert_eq!(detail["roll"]["badge"], "Done");
+    assert_eq!(detail["roll"]["done"], true);
+    assert_eq!(detail["roll"]["date_archived"], "2026-03-04");
+    assert_eq!(detail["roll"]["date_scanned"], "2026-03-04");
+    assert_eq!(detail["roll"]["date_finished"], "2026-03-04");
+}
