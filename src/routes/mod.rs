@@ -142,8 +142,10 @@ pub enum Op {
 }
 
 /// Map a DB error to a user-friendly message. Recognizes common SQLite constraint
-/// errors and produces actionable text; falls back to the raw error otherwise.
-/// Accepts DbErr, TransactionError<DbErr>, or any Display type.
+/// errors and produces actionable text; for an unrecognized error it returns a
+/// generic message and logs the raw text server-side (never echoing it to the
+/// client — kammerz-vlyu.3). Accepts DbErr, TransactionError<DbErr>, or any
+/// Display type.
 ///
 /// This is the create/update/link helper — FK violations are worded as a missing
 /// reference. Delete handlers route through [`friendly_delete_err`] /
@@ -201,8 +203,12 @@ fn friendly_err_op(context: &str, op: Op, e: impl std::fmt::Display) -> String {
         return format!("The {col} field is required.");
     }
 
-    // Default: neutral verb so the message reads correctly with a noun context
-    format!("Could not save {context}: {raw}")
+    // Unrecognized DB error: don't echo the raw SQLite/SeaORM text (it leaks
+    // table and column names) to the client. Log it server-side for diagnosis
+    // and return a generic message, mirroring how `AppError::Internal` separates
+    // the client-facing message from the logged cause (kammerz-vlyu.3).
+    tracing::error!("unclassified DB error saving {context}: {raw}");
+    format!("Could not save {context}.")
 }
 
 /// Classify a transaction error into the right HTTP status. A not-found lookup
@@ -210,11 +216,12 @@ fn friendly_err_op(context: &str, op: Op, e: impl std::fmt::Display) -> String {
 /// [`crate::error::DbOptionExt::or_404_db`] — becomes a 404; a `DbErr::Custom`
 /// (an already-friendly business-rule rejection raised inside the closure, e.g.
 /// the lab/self dev mutual-exclusion guard) passes through verbatim as a 422;
-/// every other error stays a friendly 422. The transactional handlers — both
-/// creates (lab/self dev) and deletes (shots, lab/self dev) — use this; a
-/// double-delete of a stale id returns NOT_FOUND, matching the non-transactional
-/// handlers' `or_404`. `op` selects the FK wording (see [`Op`]): a transactional
-/// create passes [`Op::Write`], a delete passes [`Op::Delete`]. The inner
+/// every other error stays a friendly 422. The transactional handlers — creates
+/// (lab/self dev), updates (roll, lab/self dev), and deletes (shots, lab/self
+/// dev) — use this; a double-delete or a TOCTOU-deleted update target returns
+/// NOT_FOUND, matching the non-transactional handlers' `or_404`. `op` selects the
+/// FK wording (see [`Op`]): a transactional create/update passes [`Op::Write`], a
+/// delete passes [`Op::Delete`]. The inner
 /// messages are taken directly (not via `Display`) to avoid SeaORM's
 /// "RecordNotFound Error: " / "Custom Error: " prefixes.
 pub fn friendly_txn_err(context: &str, op: Op, e: TransactionError<DbErr>) -> AppError {
@@ -304,6 +311,41 @@ mod tests {
         assert_eq!(
             delete_msg,
             "Cannot delete this shot because it is still referenced by other records."
+        );
+    }
+
+    // Facet A (kammerz-vlyu.3): a transactional UPDATE whose target row was deleted
+    // between the pre-txn `or_404` fetch and the in-txn `.update()` surfaces as
+    // `DbErr::RecordNotFound` inside the closure. Routing it through
+    // `friendly_txn_err(_, Op::Write, _)` must classify that as a 404 — matching the
+    // non-transactional handlers' `or_404` — not a 422 with raw text. This is the
+    // only place the TOCTOU path can be exercised (an integration test can't win the
+    // delete race; the pre-txn fetch fires first).
+    #[test]
+    fn txn_write_record_not_found_maps_to_404() {
+        let err = friendly_txn_err(
+            "roll",
+            Op::Write,
+            TransactionError::Transaction(DbErr::RecordNotFound("roll 7 not found".to_string())),
+        );
+        let AppError::NotFound(msg) = err else {
+            panic!("RecordNotFound inside a txn update should be a 404, got: {err:?}");
+        };
+        assert_eq!(msg, "roll 7 not found");
+    }
+
+    // Facet B (kammerz-vlyu.3): an unclassified DB error (not UNIQUE/FK/NOT NULL)
+    // must NOT echo the raw SQLite/SeaORM text — which leaks table/column names — to
+    // the client. The fallback returns a generic message; the raw string is logged
+    // server-side instead.
+    #[test]
+    fn unclassified_error_does_not_leak_raw_text() {
+        let raw = "no such table: secret_tbl";
+        let msg = friendly_err("roll", DbErr::Exec(RuntimeErr::Internal(raw.to_string())));
+        assert_eq!(msg, "Could not save roll.");
+        assert!(
+            !msg.contains(raw) && !msg.contains("secret_tbl"),
+            "fallback must not leak raw DB text, got: {msg}"
         );
     }
 }
