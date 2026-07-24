@@ -338,6 +338,10 @@
 	}
 
 	async function handleImport() {
+		// In-flight guard, matching the other mutating handlers: a double-fire
+		// (Enter+click before the 'importing' view swaps in) would POST the roll
+		// twice, and the second hits the roll_id UNIQUE constraint (kammerz-vlyu.4).
+		if (step === 'importing') return;
 		// The Import button is disabled while importBlocker is set, but guard here
 		// too so the required-field invariant doesn't depend on the button's state.
 		if (importBlocker) {
