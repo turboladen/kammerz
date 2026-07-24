@@ -182,6 +182,12 @@ async fn main() {
     // layer here applies after `.fallback(...)`.
     let app = routes::create_router(state)
         .fallback(serve_spa)
+        // Innermost custom layer: catch a handler panic and return the standard
+        // 500 error envelope instead of dropping the connection (kammerz-vlyu.20).
+        // Placed inside session/trace/compression so the resulting 500 is logged
+        // by TraceLayer and compressed like any other response. Relies on
+        // panic=unwind (see `kammerz::panic`).
+        .layer(kammerz::panic::catch_panic_layer())
         .layer(session_layer)
         // Per-request access log at INFO. Both halves must be raised to INFO: the
         // span (carrying method + uri) and `on_response` (carrying status + latency)

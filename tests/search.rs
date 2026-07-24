@@ -95,3 +95,22 @@ async fn short_query_returns_empty_results() {
     let results: Value = json_body(res).await;
     assert_eq!(results["cameras"].as_array().unwrap().len(), 0);
 }
+
+// The min-length floor counts characters, not bytes (kammerz-vlyu.27): a single
+// multibyte glyph (here the 3-byte CJK char 日, percent-encoded) is one character,
+// so it must fall below the 2-char floor and short-circuit to empty results — a
+// byte-length check would have let its 3 bytes clear the floor and run the scan.
+#[tokio::test]
+async fn single_multibyte_char_returns_empty_results() {
+    let app = open_app().await;
+    let res = app.oneshot(get("/api/search?q=%E6%97%A5")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let results: Value = json_body(res).await;
+    for key in ["cameras", "lenses", "film_stocks", "rolls", "shots", "labs"] {
+        assert_eq!(
+            results[key].as_array().unwrap().len(),
+            0,
+            "a single-character multibyte query must return no {key}"
+        );
+    }
+}

@@ -38,11 +38,6 @@ impl ShotService {
         model.update(db).await
     }
 
-    pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
-        Shot::delete_by_id(id).exec(db).await?;
-        Ok(())
-    }
-
     // --- Shot-Lens junction ---
 
     pub async fn get_lenses_for_shot(

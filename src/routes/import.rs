@@ -11,7 +11,7 @@ use crate::config::AppConfig;
 use crate::error::{AppError, AppResult};
 use crate::extract::Json;
 use crate::patch::{now_string, trim, trim_opt};
-use crate::routes::friendly_err;
+use crate::routes::{Op, friendly_txn_err};
 use crate::services::import_service::{ImportService, ModelInfo, ParsedRoll};
 use crate::services::roll_service::{ImportDevRecord, ImportShotEntry, RollService};
 use crate::services::settings_service::SettingsService;
@@ -142,7 +142,7 @@ async fn import_parsed_roll(
     // the transaction would otherwise hit. The LLM prompt encourages "Same"-
     // propagation and range notation, so duplicates are plausible; surfacing them
     // here yields a targeted 422 naming the offending shot instead of the generic
-    // constraint error mapped through `friendly_err`. Compare trimmed values, the
+    // constraint error mapped through `friendly_txn_err`. Compare trimmed values, the
     // same form persisted below.
     let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
     for (i, s) in data.shots.iter().enumerate() {
@@ -272,7 +272,7 @@ async fn import_parsed_roll(
 
     let id = RollService::import_roll(&state.db, roll_model, shot_entries, life.dev)
         .await
-        .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
+        .map_err(|e| friendly_txn_err("roll", Op::Write, e))?;
     Ok((StatusCode::CREATED, Json(id)))
 }
 
