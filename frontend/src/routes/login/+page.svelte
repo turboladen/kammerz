@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { ApiRequestError } from '$lib/api/client';
+	import { safeNext } from '$lib/utils/redirect';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import { Aperture } from 'lucide-svelte';
@@ -11,31 +12,13 @@
 	let error = $state('');
 	let submitting = $state(false);
 
-	function safeNext(): string {
-		const raw = page.url.searchParams.get('next');
-		if (!raw) return '/';
-		// Resolve against the current origin and accept ONLY same-origin results.
-		// This rejects protocol-relative ('//host'), backslash ('/\\host'), and
-		// control-char ('/\t/host') forms that the URL parser would resolve
-		// cross-origin — a plain prefix check misses those.
-		try {
-			const url = new URL(raw, page.url.origin);
-			if (url.origin !== page.url.origin) return '/';
-			// Never bounce back to the login form (e.g. a stray ?next=/login).
-			if (url.pathname === '/login') return '/';
-			return url.pathname + url.search + url.hash;
-		} catch {
-			return '/';
-		}
-	}
-
 	async function submit() {
 		if (submitting) return;
 		error = '';
 		submitting = true;
 		try {
 			const ok = await auth.login(password);
-			if (ok) await goto(safeNext());
+			if (ok) await goto(safeNext(page.url.searchParams.get('next'), page.url.origin));
 			else error = 'Incorrect password';
 		} catch (e) {
 			error =

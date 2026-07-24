@@ -28,6 +28,11 @@
 	let deletingLens: Lens | null = $state(null);
 	let filterOwned = $state('all');
 	let error = $state('');
+	// In-flight guards: block a double-click from firing a mutation twice. `saving`
+	// covers the add/edit dialogs (temporally exclusive); `savingMount` covers the
+	// inline "+ New mount" create (a POST that would otherwise duplicate mount rows).
+	let saving = $state(false);
+	let savingMount = $state(false);
 
 	// Toolbar state (?q= pre-filters the list, e.g. from a search result link)
 	let searchQuery = $state(page.url.searchParams.get('q') ?? '');
@@ -149,12 +154,14 @@
 	const creatingMount = $derived(lensMountId === NEW_MOUNT_OPTION);
 
 	async function createMount() {
+		if (savingMount) return;
 		newMountError = '';
 		const name = newMountName.trim();
 		if (!name) {
 			newMountError = 'Mount name is required.';
 			return;
 		}
+		savingMount = true;
 		try {
 			const id = await createLensMount(name);
 			lensMounts = await listLensMounts();
@@ -162,6 +169,8 @@
 			newMountName = '';
 		} catch (err) {
 			newMountError = err instanceof Error ? err.message : String(err);
+		} finally {
+			savingMount = false;
 		}
 	}
 
@@ -231,6 +240,7 @@
 	}
 
 	async function handleAdd() {
+		if (saving) return;
 		error = '';
 		if (!brand.trim()) {
 			error = 'Brand is required.';
@@ -240,6 +250,7 @@
 			error = 'Lens mount is required.';
 			return;
 		}
+		saving = true;
 		try {
 			await createLens(buildInsert());
 			showAddDialog = false;
@@ -247,6 +258,8 @@
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			saving = false;
 		}
 	}
 
@@ -269,6 +282,7 @@
 	}
 
 	async function handleEdit() {
+		if (saving) return;
 		if (!editingLens) return;
 		error = '';
 		if (!brand.trim()) {
@@ -279,6 +293,7 @@
 			error = 'Lens mount is required.';
 			return;
 		}
+		saving = true;
 		try {
 			await updateLens(editingLens.id, buildInsert());
 			editingLens = null;
@@ -286,6 +301,8 @@
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			saving = false;
 		}
 	}
 
@@ -431,7 +448,7 @@
 					<div class="flex-1">
 						<Input label="New Mount Name" bind:value={newMountName} placeholder="Nikon F" spellcheck="false" />
 					</div>
-					<Button variant="primary" onclick={createMount}>Create</Button>
+					<Button variant="primary" disabled={savingMount} onclick={createMount}>Create</Button>
 					<Button
 						variant="ghost"
 						onclick={() => {
@@ -482,7 +499,7 @@
 					resetForm();
 				}}>Cancel</Button
 			>
-			<Button variant="primary" disabled={!!dateError || creatingMount} onclick={handleAdd}>Add Lens</Button>
+			<Button variant="primary" disabled={saving || !!dateError || creatingMount} onclick={handleAdd}>Add Lens</Button>
 		</div>
 	</div>
 </Dialog>
@@ -514,7 +531,7 @@
 						<div class="flex-1">
 							<Input label="New Mount Name" bind:value={newMountName} placeholder="Nikon F" spellcheck="false" />
 						</div>
-						<Button variant="primary" onclick={createMount}>Create</Button>
+						<Button variant="primary" disabled={savingMount} onclick={createMount}>Create</Button>
 						<Button
 							variant="ghost"
 							onclick={() => {
@@ -565,7 +582,7 @@
 						resetForm();
 					}}>Cancel</Button
 				>
-				<Button variant="primary" disabled={!!dateError || creatingMount} onclick={handleEdit}>Save</Button>
+				<Button variant="primary" disabled={saving || !!dateError || creatingMount} onclick={handleEdit}>Save</Button>
 			</div>
 		</div>
 	</Dialog>
