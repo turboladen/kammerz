@@ -16,6 +16,9 @@
 	let editingLab: Lab | null = $state(null);
 	let deletingLab: Lab | null = $state(null);
 	let error = $state('');
+	// In-flight guard: blocks a double-click/double-tap from firing a create/update
+	// twice (add + edit dialogs are temporally exclusive, so one flag covers both).
+	let saving = $state(false);
 
 	let name = $state('');
 	let location = $state('');
@@ -54,11 +57,13 @@
 	}
 
 	async function handleAdd() {
+		if (saving) return;
 		error = '';
 		if (!name.trim()) {
 			error = 'Lab name is required.';
 			return;
 		}
+		saving = true;
 		try {
 			const lab: LabInsert = {
 				name: name.trim(),
@@ -73,6 +78,8 @@
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			saving = false;
 		}
 	}
 
@@ -87,12 +94,14 @@
 	}
 
 	async function handleEdit() {
+		if (saving) return;
 		if (!editingLab) return;
 		error = '';
 		if (!name.trim()) {
 			error = 'Lab name is required.';
 			return;
 		}
+		saving = true;
 		try {
 			await updateLab(editingLab.id, {
 				name: name.trim(),
@@ -106,6 +115,8 @@
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			saving = false;
 		}
 	}
 
@@ -206,7 +217,7 @@
 					resetForm();
 				}}>Cancel</Button
 			>
-			<Button variant="primary" onclick={handleAdd}>Add Lab</Button>
+			<Button variant="primary" disabled={saving} onclick={handleAdd}>Add Lab</Button>
 		</div>
 	</div>
 </Dialog>
@@ -244,7 +255,7 @@
 						resetForm();
 					}}>Cancel</Button
 				>
-				<Button variant="primary" onclick={handleEdit}>Save</Button>
+				<Button variant="primary" disabled={saving} onclick={handleEdit}>Save</Button>
 			</div>
 		</div>
 	</Dialog>

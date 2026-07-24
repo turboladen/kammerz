@@ -95,12 +95,14 @@
 	const creatingMount = $derived(editLensMountId === NEW_MOUNT_OPTION);
 
 	async function createMount() {
+		if (savingMount) return;
 		newMountError = '';
 		const name = newMountName.trim();
 		if (!name) {
 			newMountError = 'Mount name is required.';
 			return;
 		}
+		savingMount = true;
 		try {
 			const newId = await createLensMount(name);
 			lensMounts = await listLensMounts();
@@ -108,6 +110,8 @@
 			newMountName = '';
 		} catch (err) {
 			newMountError = err instanceof Error ? err.message : String(err);
+		} finally {
+			savingMount = false;
 		}
 	}
 
@@ -119,6 +123,13 @@
 	let maintNotes = $state('');
 	const maintDateError = $derived(dateFieldError(maintDateDone));
 	let error = $state('');
+	// In-flight guards: block a double-click from firing a mutation twice. One flag
+	// per independent write surface on this page (inline edit, inline "+ New mount",
+	// the maintenance dialog, and the link-lens dialog).
+	let savingEdit = $state(false);
+	let savingMount = $state(false);
+	let savingMaint = $state(false);
+	let savingLink = $state(false);
 
 	function resetMaint() {
 		maintType = 'CLA';
@@ -250,6 +261,7 @@
 	}
 
 	async function saveEdit() {
+		if (savingEdit) return;
 		error = '';
 		if (!editBrand.trim()) {
 			error = 'Brand is required.';
@@ -259,6 +271,15 @@
 			error = 'Model is required.';
 			return;
 		}
+		// Mirror the Add path's guard: the mount Select has a selectable empty option,
+		// so blanking it in edit mode would send lens_mount_id 0 (invalid FK). For a
+		// fixed-lens camera the field is locked to view text and editLensMountId stays
+		// populated, so this never trips there (kammerz-vlyu.5).
+		if (!editLensMountId) {
+			error = 'Lens mount is required.';
+			return;
+		}
+		savingEdit = true;
 		try {
 			await updateCamera(id, {
 				brand: editBrand.trim(),
@@ -277,6 +298,8 @@
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			savingEdit = false;
 		}
 	}
 
@@ -298,7 +321,9 @@
 	}
 
 	async function addMaintenance() {
+		if (savingMaint) return;
 		error = '';
+		savingMaint = true;
 		try {
 			const record: CameraMaintenanceInsert = {
 				camera_id: id,
@@ -314,6 +339,8 @@
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			savingMaint = false;
 		}
 	}
 
@@ -337,8 +364,10 @@
 	}
 
 	async function handleLinkLens() {
+		if (savingLink) return;
 		if (!linkLensId) return;
 		error = '';
+		savingLink = true;
 		try {
 			const lensIdToLink = Number(linkLensId);
 			await linkLensToCamera(id, lensIdToLink);
@@ -355,6 +384,8 @@
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			savingLink = false;
 		}
 	}
 
@@ -401,7 +432,7 @@
 {:else if editing}
 	<PageHeader title="Edit {camera.brand} {camera.model}" backHref={cameraBackNav.href} backLabel={cameraBackNav.label}>
 		<Button variant="ghost" onclick={() => (editing = false)}>Cancel</Button>
-		<Button variant="primary" disabled={!!editDateError || creatingMount} onclick={saveEdit}>Save</Button>
+		<Button variant="primary" disabled={savingEdit || !!editDateError || creatingMount} onclick={saveEdit}>Save</Button>
 	</PageHeader>
 	<div class="max-w-2xl p-6">
 		<div class="space-y-4">
@@ -427,7 +458,7 @@
 						<div class="flex-1">
 							<Input label="New Mount Name" bind:value={newMountName} placeholder="Nikon F" spellcheck="false" />
 						</div>
-						<Button variant="primary" onclick={createMount}>Create</Button>
+						<Button variant="primary" disabled={savingMount} onclick={createMount}>Create</Button>
 						<Button
 							variant="ghost"
 							onclick={() => {
@@ -704,7 +735,7 @@
 					resetMaint();
 				}}>Cancel</Button
 			>
-			<Button variant="primary" disabled={!!maintDateError} onclick={addMaintenance}>Add Record</Button>
+			<Button variant="primary" disabled={savingMaint || !!maintDateError} onclick={addMaintenance}>Add Record</Button>
 		</div>
 	</div>
 </Dialog>
@@ -738,7 +769,7 @@
 				}}>Cancel</Button
 			>
 			{#if unlinkedLenses.length > 0}
-				<Button variant="primary" onclick={handleLinkLens} disabled={!linkLensId}>Link Lens</Button>
+				<Button variant="primary" onclick={handleLinkLens} disabled={savingLink || !linkLensId}>Link Lens</Button>
 			{/if}
 		</div>
 	</div>

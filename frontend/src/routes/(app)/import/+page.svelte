@@ -13,6 +13,7 @@
 	import { lensDisplayName } from '$lib/utils/lens';
 	import { buildCameraLabels } from '$lib/utils/disambiguate';
 	import { appendNote, coerceApproxDate, dateFieldError } from '$lib/utils/date';
+	import { normalizeAperture, normalizeShutter } from '$lib/utils/exposure';
 	import type { ParsedRoll, Camera, FilmStock, Lens, ImportRollDto, ModelInfo } from '$lib/types';
 	import { ChevronDown, ChevronUp, Eye, EyeOff, RefreshCw, Trash2 } from 'lucide-svelte';
 
@@ -313,8 +314,11 @@
 				const { date, note } = coerceApproxDate(s.date);
 				return {
 					frame_number: s.frame_number,
-					aperture: s.aperture ?? '',
-					shutter_speed: s.shutter_speed ?? '',
+					// Seed the editable preview with the bare stored form (strip the model's
+					// f/ prefix / trailing s) so the preview matches what gets saved and never
+					// round-trips to a doubled f/f/5.6 (kammerz-vlyu.1, kammerz-jd1).
+					aperture: normalizeAperture(s.aperture ?? ''),
+					shutter_speed: normalizeShutter(s.shutter_speed ?? ''),
 					date,
 					location: s.location ?? '',
 					notes: appendNote(s.notes ?? '', note)
@@ -334,6 +338,10 @@
 	}
 
 	async function handleImport() {
+		// In-flight guard, matching the other mutating handlers: a double-fire
+		// (Enter+click before the 'importing' view swaps in) would POST the roll
+		// twice, and the second hits the roll_id UNIQUE constraint (kammerz-vlyu.4).
+		if (step === 'importing') return;
 		// The Import button is disabled while importBlocker is set, but guard here
 		// too so the required-field invariant doesn't depend on the button's state.
 		if (importBlocker) {
@@ -357,8 +365,10 @@
 				notes: rollNotes || null,
 				shots: shots.map((s) => ({
 					frame_number: s.frame_number.trim(),
-					aperture: s.aperture || null,
-					shutter_speed: s.shutter_speed || null,
+					// Re-normalize on submit too — the user may have re-typed an f/-prefixed
+					// value into the editable preview input (kammerz-vlyu.1).
+					aperture: normalizeAperture(s.aperture ?? '') || null,
+					shutter_speed: normalizeShutter(s.shutter_speed ?? '') || null,
 					date: s.date || null,
 					time: null,
 					location: s.location || null,

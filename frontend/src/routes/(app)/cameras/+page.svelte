@@ -31,6 +31,11 @@
 	let showAddDialog = $state(false);
 	let filterOwned = $state('all');
 	let error: string = $state('');
+	// In-flight guards: block a double-click from firing a mutation twice. `saving`
+	// covers the add dialog; `savingMount` covers the inline "+ New mount" create
+	// (a POST that would otherwise duplicate mount rows).
+	let saving = $state(false);
+	let savingMount = $state(false);
 
 	// Toolbar state
 	let searchQuery = $state('');
@@ -199,12 +204,14 @@
 	}
 
 	async function createMount() {
+		if (savingMount) return;
 		newMountError = '';
 		const name = newMountName.trim();
 		if (!name) {
 			newMountError = 'Mount name is required.';
 			return;
 		}
+		savingMount = true;
 		try {
 			const id = await createLensMount(name);
 			lensMounts = await listLensMounts();
@@ -212,10 +219,13 @@
 			newMountName = '';
 		} catch (err) {
 			newMountError = err instanceof Error ? err.message : String(err);
+		} finally {
+			savingMount = false;
 		}
 	}
 
 	async function handleAdd() {
+		if (saving) return;
 		error = '';
 		if (!brand.trim()) {
 			error = 'Brand is required.';
@@ -233,6 +243,7 @@
 			error = 'Focal length is required for fixed-lens cameras.';
 			return;
 		}
+		saving = true;
 		try {
 			const camera: CameraInsert = {
 				brand,
@@ -265,6 +276,8 @@
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			saving = false;
 		}
 	}
 
@@ -380,7 +393,7 @@
 					<div class="flex-1">
 						<Input label="New Mount Name" bind:value={newMountName} placeholder="Nikon F" spellcheck="false" />
 					</div>
-					<Button variant="primary" onclick={createMount}>Create</Button>
+					<Button variant="primary" disabled={savingMount} onclick={createMount}>Create</Button>
 					<Button
 						variant="ghost"
 						onclick={() => {
@@ -447,7 +460,9 @@
 					resetForm();
 				}}>Cancel</Button
 			>
-			<Button variant="primary" disabled={!!addDateError || creatingMount} onclick={handleAdd}>Add Camera</Button>
+			<Button variant="primary" disabled={saving || !!addDateError || creatingMount} onclick={handleAdd}
+				>Add Camera</Button
+			>
 		</div>
 	</div>
 </Dialog>

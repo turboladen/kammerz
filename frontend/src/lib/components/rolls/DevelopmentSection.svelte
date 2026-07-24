@@ -126,6 +126,9 @@
 	let devSelfNotes = $state('');
 	let devFormStages: { stage_name: string; duration: string; notes: string }[] = $state([]);
 	let devSelfError = $state('');
+	// In-flight guard: blocks a double-click from saving a dev record twice (the lab
+	// and self dialogs are mutually exclusive, so one flag covers both).
+	let devSaving = $state(false);
 	const selfDateError = $derived(dateFieldError(devDateProcessed));
 
 	// Canonical chemistry reference for the self-dev autocomplete (kammerz-9fx).
@@ -285,7 +288,9 @@
 	}
 
 	async function handleSaveLabDev() {
+		if (devSaving) return;
 		devLabError = '';
+		devSaving = true;
 		try {
 			const payload = {
 				roll_id: rollId,
@@ -307,10 +312,13 @@
 			await onchange();
 		} catch (err) {
 			devLabError = err instanceof Error ? err.message : String(err);
+		} finally {
+			devSaving = false;
 		}
 	}
 
 	async function handleSaveSelfDev() {
+		if (devSaving) return;
 		devSelfError = '';
 		// stage_name is TEXT NOT NULL. Drop rows the user added but left entirely
 		// blank (a stray trailing "+ Add"), but reject a row that has timing/notes
@@ -320,6 +328,7 @@
 			devSelfError = 'Stage name is required.';
 			return;
 		}
+		devSaving = true;
 		try {
 			const stages = keptStages.map((s, i) => ({
 				stage_name: s.stage_name.trim(),
@@ -356,6 +365,8 @@
 			await onchange();
 		} catch (err) {
 			devSelfError = err instanceof Error ? err.message : String(err);
+		} finally {
+			devSaving = false;
 		}
 	}
 
@@ -553,7 +564,7 @@
 			{/if}
 			<div class="flex justify-end gap-2 pt-2">
 				<Button variant="ghost" onclick={cancelLabDevDialog}>Cancel</Button>
-				<Button variant="primary" disabled={!!labDateError} onclick={handleSaveLabDev}>Save</Button>
+				<Button variant="primary" disabled={devSaving || !!labDateError} onclick={handleSaveLabDev}>Save</Button>
 			</div>
 		</div>
 	</Dialog>
@@ -675,7 +686,7 @@
 			{/if}
 			<div class="flex justify-end gap-2 pt-2">
 				<Button variant="ghost" onclick={cancelSelfDevDialog}>Cancel</Button>
-				<Button variant="primary" disabled={!!selfDateError} onclick={handleSaveSelfDev}>Save</Button>
+				<Button variant="primary" disabled={devSaving || !!selfDateError} onclick={handleSaveSelfDev}>Save</Button>
 			</div>
 		</div>
 	</Dialog>

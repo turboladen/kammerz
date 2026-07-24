@@ -32,6 +32,9 @@
 	let filterFormat = $state('all');
 	let deletingStock: FilmStock | null = $state(null);
 	let error = $state('');
+	// In-flight guard: blocks a double-click/double-tap from firing a create/update
+	// twice (add + edit dialogs are temporally exclusive, so one flag covers both).
+	let saving = $state(false);
 
 	// Toolbar state (?q= pre-filters the list, e.g. from a search result link)
 	let searchQuery = $state(page.url.searchParams.get('q') ?? '');
@@ -174,6 +177,7 @@
 	}
 
 	async function handleAdd() {
+		if (saving) return;
 		error = '';
 		if (!brand.trim()) {
 			error = 'Brand is required.';
@@ -183,6 +187,7 @@
 			error = 'Name is required.';
 			return;
 		}
+		saving = true;
 		try {
 			await createFilmStock(buildInsert());
 			showAddDialog = false;
@@ -190,6 +195,8 @@
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			saving = false;
 		}
 	}
 
@@ -206,6 +213,7 @@
 	}
 
 	async function handleEdit() {
+		if (saving) return;
 		if (!editingStock) return;
 		error = '';
 		if (!brand.trim()) {
@@ -216,6 +224,7 @@
 			error = 'Name is required.';
 			return;
 		}
+		saving = true;
 		try {
 			await updateFilmStock(editingStock.id, buildInsert());
 			editingStock = null;
@@ -223,6 +232,8 @@
 			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			saving = false;
 		}
 	}
 
@@ -395,7 +406,7 @@
 					resetForm();
 				}}>Cancel</Button
 			>
-			<Button variant="primary" onclick={handleAdd}>Add Film Stock</Button>
+			<Button variant="primary" disabled={saving} onclick={handleAdd}>Add Film Stock</Button>
 		</div>
 	</div>
 </Dialog>
@@ -440,7 +451,7 @@
 						resetForm();
 					}}>Cancel</Button
 				>
-				<Button variant="primary" onclick={handleEdit}>Save</Button>
+				<Button variant="primary" disabled={saving} onclick={handleEdit}>Save</Button>
 			</div>
 		</div>
 	</Dialog>

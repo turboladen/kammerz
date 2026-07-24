@@ -33,6 +33,8 @@
 	let pushPull = $state('');
 	let notes = $state('');
 	let error = $state('');
+	// In-flight guard: blocks a double-click from creating the roll twice.
+	let saving = $state(false);
 
 	// Map camera format → matching film stock format
 	const cameraFormatToStockFormat: Record<string, string> = {
@@ -149,11 +151,13 @@
 	}
 
 	async function handleSubmit() {
+		if (saving) return;
 		error = '';
 		if (!rollId.trim()) {
 			error = 'Roll ID is required.';
 			return;
 		}
+		saving = true;
 		try {
 			const roll: RollInsert = {
 				roll_id: rollId.trim(),
@@ -173,6 +177,8 @@
 			goto(`/rolls/${id}`);
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			saving = false;
 		}
 	}
 
@@ -260,7 +266,7 @@
 
 				<div class="flex justify-end gap-2 pt-4">
 					<Button variant="ghost" href="/rolls">Cancel</Button>
-					<Button variant="primary" disabled={!!dateLoadedError} onclick={handleSubmit}>Create Roll</Button>
+					<Button variant="primary" disabled={saving || !!dateLoadedError} onclick={handleSubmit}>Create Roll</Button>
 				</div>
 			</div>
 		</FadeIn>

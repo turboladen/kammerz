@@ -134,6 +134,11 @@
 	let shotOpenSnapshot: ShotFormFields | null = $state(null);
 	// Guards double-fired navigation while a nav-triggered save is in flight.
 	let shotNavSaving = $state(false);
+	// In-flight guards: block a double-click from firing a mutation twice. `shotSaving`
+	// covers the shot dialog's Save / Save & Next; `savingRoll` covers the inline
+	// roll-edit Save. (`shotNavSaving` above already guards the prev/next arrows.)
+	let shotSaving = $state(false);
+	let savingRoll = $state(false);
 
 	function currentShotFormFields(): ShotFormFields {
 		return {
@@ -608,12 +613,14 @@
 	}
 
 	async function handleSaveShot() {
+		if (shotSaving) return;
 		shotError = '';
 		if (!shotFrameNumber.trim()) {
 			shotError = 'Frame number is required.';
 			return;
 		}
 		const lensIds = shotLensId ? [Number(shotLensId)] : [];
+		shotSaving = true;
 		try {
 			if (editingShotId) {
 				await updateShot(editingShotId, buildShotUpdatePayload(currentShotFormFields()));
@@ -636,10 +643,13 @@
 			await loadRollData();
 		} catch (err) {
 			shotError = err instanceof Error ? err.message : String(err);
+		} finally {
+			shotSaving = false;
 		}
 	}
 
 	async function handleSaveShotAndNext() {
+		if (shotSaving) return;
 		shotError = '';
 		if (!shotFrameNumber.trim()) {
 			shotError = 'Frame number is required.';
@@ -647,6 +657,7 @@
 		}
 		const lensIds = shotLensId ? [Number(shotLensId)] : [];
 		const savedLensId = shotLensId;
+		shotSaving = true;
 		try {
 			await createShot({
 				roll_id: id,
@@ -675,6 +686,8 @@
 			shotError = '';
 		} catch (err) {
 			shotError = err instanceof Error ? err.message : String(err);
+		} finally {
+			shotSaving = false;
 		}
 	}
 
@@ -832,11 +845,13 @@
 	}
 
 	async function saveEditRoll() {
+		if (savingRoll) return;
 		error = '';
 		if (!editRollId.trim()) {
 			error = 'Roll ID is required.';
 			return;
 		}
+		savingRoll = true;
 		try {
 			// For fixed-lens cameras the lens Select is hidden and replaced by a
 			// read-only display of the built-in lens — persist that lens, never a
@@ -855,6 +870,8 @@
 			await loadRollData();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
+		} finally {
+			savingRoll = false;
 		}
 	}
 
@@ -1015,7 +1032,7 @@
 									editingRoll = false;
 								}}>Cancel</Button
 							>
-							<Button variant="primary" onclick={saveEditRoll}>Save</Button>
+							<Button variant="primary" disabled={savingRoll} onclick={saveEditRoll}>Save</Button>
 						</div>
 					</div>
 				{:else}
@@ -1426,9 +1443,11 @@
 							}}>Cancel</Button
 						>
 						{#if !editingShotId}
-							<Button variant="ghost" disabled={!!shotDateError} onclick={handleSaveShotAndNext}>Save & Next</Button>
+							<Button variant="ghost" disabled={shotSaving || !!shotDateError} onclick={handleSaveShotAndNext}
+								>Save & Next</Button
+							>
 						{/if}
-						<Button variant="primary" disabled={!!shotDateError} onclick={handleSaveShot}>
+						<Button variant="primary" disabled={shotSaving || !!shotDateError} onclick={handleSaveShot}>
 							{editingShotId ? 'Save' : 'Add Shot'}
 						</Button>
 					</div>
