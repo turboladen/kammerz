@@ -30,7 +30,13 @@ pub async fn open_app_with_url(db_url: &str) -> axum::Router {
         password_hash: None,
         ..AppConfig::default()
     };
-    kammerz::routes::create_router(AppState { db, config })
+    kammerz::routes::create_router(AppState {
+        db,
+        config,
+        // The backup endpoint opens a separate snapshot connection to this URL
+        // (kammerz-vlyu.16), so file-backed tests must carry the real path.
+        db_url: db_url.to_string(),
+    })
 }
 
 /// Like [`open_app`] but also returns the DB connection, for tests that must
@@ -45,6 +51,11 @@ pub async fn open_app_with_db() -> (axum::Router, sea_orm::DatabaseConnection) {
     let app = kammerz::routes::create_router(AppState {
         db: db.clone(),
         config,
+        // NOTE: the backup endpoint opens a SEPARATE connection to this URL
+        // (kammerz-vlyu.16), and `sqlite::memory:` resolves to a fresh EMPTY DB —
+        // not the served one. A `/api/backup` test must use `open_app_with_url`
+        // with a file path (see tests/backup.rs), never this helper.
+        db_url: "sqlite::memory:".to_string(),
     });
     (app, db)
 }
@@ -67,7 +78,14 @@ pub async fn app_with_password(pw: &str) -> axum::Router {
     let store = tower_sessions_sqlx_store::SqliteStore::new(pool);
     store.migrate().await.unwrap();
     let layer = tower_sessions::SessionManagerLayer::new(store);
-    kammerz::routes::create_router(AppState { db, config }).layer(layer)
+    kammerz::routes::create_router(AppState {
+        db,
+        config,
+        // In-memory URL — not usable for a `/api/backup` test (see the note in
+        // `open_app_with_db`).
+        db_url: "sqlite::memory:".to_string(),
+    })
+    .layer(layer)
 }
 
 /// Build a GET request with an empty body.
