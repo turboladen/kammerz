@@ -13,6 +13,7 @@
 		normalizeAperture,
 		normalizeShutter
 	} from '$lib/utils/exposure';
+	import { timeFieldError } from '$lib/utils/time';
 	import { ChevronDown, ChevronUp } from 'lucide-svelte';
 
 	interface SaveEntry {
@@ -57,6 +58,10 @@
 	let notes = $state('');
 	let showMore = $state(false);
 
+	// Gate an invalid time pre-submit, mirroring the shot dialog (kammerz-vlyu.21). The date
+	// field is the native `<input type="date">` (can't be invalid), so only time needs gating.
+	const timeError = $derived(timeFieldError(time));
+
 	// Local lens: seeded from prop and stays in sync when the prop changes (e.g. roll change).
 	// Initialise to '' — the $effect runs immediately on mount and sets the real value.
 	let localLensId = $state('');
@@ -88,7 +93,7 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && frameNumber.trim() && !saving) {
+		if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && frameNumber.trim() && !saving && !timeError) {
 			e.preventDefault();
 			handleSave();
 		}
@@ -156,7 +161,7 @@
 		<Button
 			variant="primary"
 			onclick={handleSave}
-			disabled={saving || !frameNumber.trim()}
+			disabled={saving || !frameNumber.trim() || !!timeError}
 			title="Save frame and advance to next (⌘/Ctrl+Enter)"
 		>
 			{saving ? 'Saving…' : 'Save & Next'}

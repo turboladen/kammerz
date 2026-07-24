@@ -556,7 +556,7 @@
 				<Input type="date" label="Date Submitted" class="h-[38px]" bind:value={devDateDroppedOff} />
 				<Input type="date" label="Date Received" class="h-[38px]" bind:value={devDateReceived} />
 			</div>
-			<Input label="Cost" bind:value={devCost} placeholder="15.00" />
+			<Input label="Cost" bind:value={devCost} type="number" step="0.01" placeholder="15.00" />
 			<Textarea label="Notes" bind:value={devLabNotes} placeholder="Processing notes..." />
 
 			{#if devLabError}
