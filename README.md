@@ -72,23 +72,37 @@ Other recognized variables (all optional, with sensible defaults): `KAMMERZ_TRUS
 
 ## Deployment (systemd)
 
-Releases are deployed straight from this repo with `just deploy` — there are no GitHub release artifacts. One-time toolchain setup on the Mac (cross-compiler for the aarch64 DietPi server; the linker is wired up in `.cargo/config.toml`):
+Releases are deployed straight from this repo with `just deploy` — there are no GitHub release artifacts. One-time toolchain setup on the Mac (cross-compiler for the aarch64 DietPi server; the linker is set in the `build-linux` recipe's environment via `CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER`, not `.cargo/config.toml` — a committed `[target.*]` linker section would break a native aarch64 build):
 
 ```bash
 rustup target add aarch64-unknown-linux-gnu
 brew install messense/macos-cross-toolchains/aarch64-unknown-linux-gnu
 ```
 
-First-time setup — create the service user and directories on the server, then push your filled-in `.env` from the Mac (the systemd unit hard-requires `/opt/kammerz/.env`, so this **must happen before the first deploy**; a premature start crash-loops the unit until `sudo systemctl reset-failed kammerz`):
+First-time setup — provision the service user, data directory, `.env`, and systemd unit on the server with `just bootstrap`. This **must run before the first deploy**: the systemd unit hard-requires `/opt/kammerz/.env`, and a premature start crash-loops the unit until `sudo systemctl reset-failed kammerz`. Prereq: copy `deploy/.env.example` → `deploy/.env` and fill in `KAMMERZ_PASSWORD_HASH` (it's gitignored).
+
+```bash
+just bootstrap <user>@<server>
+```
+
+`bootstrap` is idempotent: it creates the `kammerz` system user (`useradd --system`, no home directory, no login shell), creates `/opt/kammerz/data`, installs your filled-in `deploy/.env` as `/opt/kammerz/.env` (mode 600, owner `kammerz`, never clobbering an existing one), and installs + enables the systemd unit so a reboot brings the service back.
+
+<details>
+<summary>Manual equivalent (fallback, if you can't run <code>just bootstrap</code>)</summary>
 
 ```bash
 # on the server
-sudo useradd --system --home-dir /opt/kammerz --no-create-home --shell /usr/sbin/nologin kammerz
-sudo install -d -o kammerz -g kammerz /opt/kammerz /opt/kammerz/data
+sudo useradd --system --shell /usr/sbin/nologin kammerz
+sudo mkdir -p /opt/kammerz/data && sudo chown -R kammerz:kammerz /opt/kammerz
 
-# from the Mac (filled-in .env in the repo root)
-ssh <user>@<server> "sudo tee /opt/kammerz/.env > /dev/null && sudo chown kammerz:kammerz /opt/kammerz/.env && sudo chmod 600 /opt/kammerz/.env" < .env
+# from the Mac (filled-in deploy/.env)
+ssh <user>@<server> "sudo tee /opt/kammerz/.env > /dev/null && sudo chmod 600 /opt/kammerz/.env && sudo chown kammerz:kammerz /opt/kammerz/.env" < deploy/.env
+
+# install + enable the systemd unit (bootstrap does this; enabling it survives a reboot)
+ssh <user>@<server> "sudo tee /etc/systemd/system/kammerz.service > /dev/null && sudo systemctl daemon-reload && sudo systemctl enable kammerz" < deploy/kammerz.service
 ```
+
+</details>
 
 Then every release is one command from the Mac:
 
@@ -96,7 +110,7 @@ Then every release is one command from the Mac:
 just deploy <user>@<server>          # add a port arg if your .env overrides PORT, e.g. just deploy box 8080
 ```
 
-The deploy user needs **passwordless sudo** on the server (the recipe runs `sudo -n` over non-interactive ssh). The recipe runs the backend test suite, cross-compiles the binary (fresh SPA embedded via rust-embed), uploads it alongside the live one and swaps it in atomically, installs `deploy/kammerz.service` into `/etc/systemd/system/` (so unit-file edits always propagate), restarts the service, and then polls `GET /api/health` until it reports the **build SHA that was just compiled** — a green deploy means the new binary is the one serving, not merely that something answered. After the first deploy, enable boot startup once: `ssh <user>@<server> 'sudo systemctl enable kammerz'`.
+The deploy user needs **passwordless sudo** on the server (the recipe runs `sudo -n` over non-interactive ssh). The recipe runs the backend test suite, cross-compiles the binary (fresh SPA embedded via rust-embed), uploads it alongside the live one and swaps it in atomically, installs `deploy/kammerz.service` into `/etc/systemd/system/` (so unit-file edits always propagate), restarts the service, and then polls `GET /api/health` until it reports the **build SHA that was just compiled** — a green deploy means the new binary is the one serving, not merely that something answered.
 
 The provided `deploy/kammerz.service` is hardened (`ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `NoNewPrivileges`) and only grants write access to `/opt/kammerz/data`, where the SQLite catalog lives.
 
