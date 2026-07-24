@@ -1337,6 +1337,7 @@ version = "0.1.0"
 dependencies = [
  "sea-orm-migration",
  "strum",
+ "tokio",
 ]
 
 [[package]]
