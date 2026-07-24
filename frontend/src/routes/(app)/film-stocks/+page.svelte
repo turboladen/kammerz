@@ -159,6 +159,7 @@
 	}
 
 	function openAddDialog() {
+		editingStock = null; // defensively enforce add/edit mutual exclusion (kammerz-f9pr)
 		resetForm();
 		error = '';
 		showAddDialog = true;
@@ -201,6 +202,7 @@
 	}
 
 	function startEdit(stock: FilmStock) {
+		showAddDialog = false; // defensively enforce add/edit mutual exclusion (kammerz-f9pr)
 		error = '';
 		editingStock = stock;
 		brand = stock.brand;
