@@ -83,6 +83,37 @@ pub async fn vacuum_into(db: &DatabaseConnection, dest: &str) -> Result<(), DbEr
         .map(|_| ())
 }
 
+/// Take a `VACUUM INTO` snapshot of the DB at `db_url` on a fresh, short-lived
+/// connection, then close it. Used by `/api/backup` so the snapshot doesn't hold
+/// the single (max=min=1) data-pool connection for its whole duration — which
+/// would block every other request, including the `/api/health` probe a
+/// systemd/uptime watchdog keys on (kammerz-vlyu.16). WAL mode (set on the data
+/// pool in [`init`]) permits this concurrent reader alongside the single writer,
+/// and the DB header persists WAL across connections so no journal pragma is
+/// needed here. Mirrors the separate session-store pool `main.rs` already opens
+/// against the same file.
+///
+/// The pool is NOT `create_if_missing`: a backup of a database that doesn't exist
+/// is an error, and a read-only snapshot connection must never leave a stray
+/// empty file behind. `busy_timeout` matches [`init`]/the session pool so a
+/// momentary collision with the writer waits instead of failing `SQLITE_BUSY`.
+pub async fn vacuum_into_standalone(db_url: &str, dest: &str) -> Result<(), DbErr> {
+    let base = sqlite_path(db_url);
+    let opts = SqliteConnectOptions::from_str(base)
+        .map_err(|e| DbErr::Custom(format!("bad sqlite url: {e}")))?
+        .busy_timeout(busy_timeout());
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(opts)
+        .await
+        .map_err(|e| DbErr::Custom(format!("backup snapshot pool: {e}")))?;
+    let conn = sea_orm::SqlxSqliteConnector::from_sqlx_sqlite_pool(pool.clone());
+    let result = vacuum_into(&conn, dest).await;
+    // Release the short-lived connection whether or not the snapshot succeeded.
+    pool.close().await;
+    result
+}
+
 /// Whether pre-migration snapshots are taken at startup.
 ///
 /// Snapshots protect a deployed catalog across binary upgrades, so they

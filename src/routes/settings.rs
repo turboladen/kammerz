@@ -22,6 +22,12 @@ pub struct SetSettingDto {
 /// server-side (see `resolve_key` in `routes/import.rs`). `PUT` works normally.
 const SECRET_KEYS: &[&str] = &["claude_api_key"];
 
+/// Every setting key the app recognizes. `PUT` rejects anything else so the
+/// table can't be used as an arbitrary unauthenticated key/value store
+/// (kammerz-vlyu.17). Keep in sync with the keys read in `routes/import.rs`
+/// (`claude_api_key`, `claude_model`) and the frontend `import` page.
+const KNOWN_KEYS: &[&str] = &["claude_api_key", "claude_model"];
+
 /// Sentinel returned by `GET` for a secret key that has a saved value. The
 /// frontend treats any non-null response as "a key is saved" and never echoes
 /// this value back.
@@ -53,7 +59,18 @@ async fn set_setting(
     Path(key): Path<String>,
     Json(data): Json<SetSettingDto>,
 ) -> AppResult<StatusCode> {
-    SettingsService::set_setting(&db, key, data.value)
+    // Only known keys are writable — reject anything else rather than store it
+    // verbatim (kammerz-vlyu.17).
+    if !KNOWN_KEYS.contains(&key.as_str()) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Unknown setting key '{key}'."
+        )));
+    }
+    // Trim per the trim-everywhere convention: a whitespace-only value is stored
+    // as empty (which reads back as "not configured" for a secret key, and is
+    // treated as unset by `resolve_key`).
+    let value = data.value.trim().to_string();
+    SettingsService::set_setting(&db, key, value)
         .await
         .map_err(|e| AppError::UnprocessableEntity(friendly_err("setting", e)))?;
     Ok(StatusCode::NO_CONTENT)

@@ -1,17 +1,56 @@
-use axum::http::StatusCode;
+use std::net::SocketAddr;
+
+use axum::body::Body;
+use axum::extract::ConnectInfo;
+use axum::http::{Request, StatusCode};
+use kammerz::auth::rate_limit::IMPORT_BURST_SIZE;
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
 mod common;
 use common::{get, json_body, open_app, post_json};
 
+/// GET `path` carrying a `ConnectInfo<SocketAddr>` for `ip`. The billable import
+/// endpoints (`/models`, `/parse`) are rate-limited with `PeerIpKeyExtractor`,
+/// which reads this extension; `oneshot` bypasses the connect-info make-service
+/// (same as the login tests), so it must be inserted manually. Distinct `ip`s are
+/// throttled independently.
+fn get_from_ip(path: &str, ip: &str) -> Request<Body> {
+    let mut req = Request::builder()
+        .method("GET")
+        .uri(path)
+        .body(Body::empty())
+        .unwrap();
+    let addr: SocketAddr = format!("{ip}:9999").parse().unwrap();
+    req.extensions_mut().insert(ConnectInfo(addr));
+    req
+}
+
+/// Like [`get_from_ip`] but a POST with a JSON body — used to prove `/models` and
+/// `/parse` share one per-IP bucket.
+fn post_from_ip(path: &str, ip: &str, body: &Value) -> Request<Body> {
+    let mut req = Request::builder()
+        .method("POST")
+        .uri(path)
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(body).unwrap()))
+        .unwrap();
+    let addr: SocketAddr = format!("{ip}:9999").parse().unwrap();
+    req.extensions_mut().insert(ConnectInfo(addr));
+    req
+}
+
 #[tokio::test]
 async fn list_models_without_key_is_422() {
     // open_app() configures no password and no anthropic_api_key, and the fresh
     // in-memory DB has no `claude_api_key` settings row — so key resolution fails
-    // before any network call to Anthropic.
+    // before any network call to Anthropic. ConnectInfo is required now that the
+    // route is rate-limited (the limiter's key extractor reads it).
     let app = open_app().await;
-    let res = app.oneshot(get("/api/import/models")).await.unwrap();
+    let res = app
+        .oneshot(get_from_ip("/api/import/models", "10.20.0.1"))
+        .await
+        .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let v: serde_json::Value = json_body(res).await;
     let msg = v["error"]["message"].as_str().unwrap_or_default();
@@ -19,6 +58,72 @@ async fn list_models_without_key_is_422() {
         msg.contains("No Anthropic API key"),
         "expected the no-API-key message, got: {msg}"
     );
+}
+
+#[tokio::test]
+async fn import_billable_endpoints_are_rate_limited_per_ip() {
+    let app = open_app().await;
+
+    // The burst quota all reach the handler → 422 (no API key configured). The
+    // limiter runs as a layer BEFORE the handler, so it throttles regardless of
+    // whether an upstream Anthropic call would have happened.
+    for _ in 0..IMPORT_BURST_SIZE {
+        let res = app
+            .clone()
+            .oneshot(get_from_ip("/api/import/models", "10.20.0.2"))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    // The next call on the same IP (within the replenish window) is throttled →
+    // 429 through the standard error envelope with a Retry-After header.
+    let res = app
+        .clone()
+        .oneshot(get_from_ip("/api/import/models", "10.20.0.2"))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert!(
+        res.headers().contains_key("retry-after"),
+        "429 should carry a Retry-After header"
+    );
+    let v: Value = json_body(res).await;
+    assert_eq!(v["error"]["code"], "TOO_MANY_REQUESTS");
+
+    // A different IP has its own bucket and is not throttled (still 422).
+    let res = app
+        .oneshot(get_from_ip("/api/import/models", "10.20.0.3"))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn import_models_and_parse_share_one_bucket() {
+    let app = open_app().await;
+
+    // Spend the whole burst on /models…
+    for _ in 0..IMPORT_BURST_SIZE {
+        let res = app
+            .clone()
+            .oneshot(get_from_ip("/api/import/models", "10.20.0.4"))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    // …then /parse on the same IP is already throttled: the two billable routes
+    // draw from one shared per-IP bucket (kammerz-vlyu.14).
+    let res = app
+        .oneshot(post_from_ip(
+            "/api/import/parse",
+            "10.20.0.4",
+            &json!({ "note_text": "anything" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
 }
 
 // --- POST /api/import/roll (transactional roll + shots + lens links, kammerz-6l5) ---

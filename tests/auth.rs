@@ -61,7 +61,12 @@ async fn test_app_cfg(password_hash: Option<String>, trust_proxy: bool) -> axum:
     let store = tower_sessions_sqlx_store::SqliteStore::new(pool);
     store.migrate().await.unwrap();
     let layer = tower_sessions::SessionManagerLayer::new(store);
-    kammerz::routes::create_router(kammerz::AppState { db, config }).layer(layer)
+    kammerz::routes::create_router(kammerz::AppState {
+        db,
+        config,
+        db_url: "sqlite::memory:".to_string(),
+    })
+    .layer(layer)
 }
 
 #[tokio::test]
