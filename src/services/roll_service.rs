@@ -9,14 +9,6 @@ use ::entity::roll::{self, Entity as Roll, PushPull};
 use ::entity::roll_event::RollEventType;
 use ::entity::{development_lab, development_self, shot};
 
-/// Convert `TransactionError<DbErr>` to `DbErr`.
-fn transaction_err(e: TransactionError<DbErr>) -> DbErr {
-    match e {
-        TransactionError::Connection(db_err) => db_err,
-        TransactionError::Transaction(db_err) => db_err,
-    }
-}
-
 /// Flat struct for rolls joined with camera and film stock data.
 /// Mirrors the frontend's `RollWithDetails` TypeScript interface.
 ///
@@ -238,88 +230,83 @@ impl RollService {
         roll_model: roll::ActiveModel,
         shot_entries: Vec<ImportShotEntry>,
         dev: Option<ImportDevRecord>,
-    ) -> Result<i32, DbErr> {
-        let roll_id = db
-            .transaction::<_, i32, DbErr>(|txn| {
-                Box::pin(async move {
-                    let roll_result = roll_model.insert(txn).await?;
-                    let new_roll_id = roll_result.id;
+    ) -> Result<i32, TransactionError<DbErr>> {
+        db.transaction::<_, i32, DbErr>(|txn| {
+            Box::pin(async move {
+                let roll_result = roll_model.insert(txn).await?;
+                let new_roll_id = roll_result.id;
 
-                    // Bulk import emits only the founding roll_loaded event — per-shot
-                    // events are intentionally NOT logged, so an imported timeline has a
-                    // sensible start without dozens of shot entries.
-                    RollEventService::record(
-                        txn,
-                        new_roll_id,
-                        RollEventType::RollLoaded,
-                        None,
-                        None,
-                        "Roll loaded".to_string(),
-                    )
-                    .await?;
+                // Bulk import emits only the founding roll_loaded event — per-shot
+                // events are intentionally NOT logged, so an imported timeline has a
+                // sensible start without dozens of shot entries.
+                RollEventService::record(
+                    txn,
+                    new_roll_id,
+                    RollEventType::RollLoaded,
+                    None,
+                    None,
+                    "Roll loaded".to_string(),
+                )
+                .await?;
 
-                    let now = now_string();
+                let now = now_string();
 
-                    // Synthesize the dev record for a dev-stage import inside the same
-                    // transaction (rest defaulted, mirroring routes/development.rs — the
-                    // DB default handles negatives_not_collecting).
-                    match dev {
-                        Some(ImportDevRecord::Lab { date_received }) => {
-                            development_lab::ActiveModel {
-                                roll_id: Set(new_roll_id),
-                                date_received: Set(date_received),
-                                created_at: Set(now.clone()),
-                                updated_at: Set(now.clone()),
-                                ..Default::default()
-                            }
-                            .insert(txn)
-                            .await?;
-                        }
-                        Some(ImportDevRecord::SelfDev { date_processed }) => {
-                            development_self::ActiveModel {
-                                roll_id: Set(new_roll_id),
-                                date_processed: Set(date_processed),
-                                created_at: Set(now.clone()),
-                                updated_at: Set(now.clone()),
-                                ..Default::default()
-                            }
-                            .insert(txn)
-                            .await?;
-                        }
-                        None => {}
-                    }
-
-                    for entry in shot_entries {
-                        let shot_model = shot::ActiveModel {
+                // Synthesize the dev record for a dev-stage import inside the same
+                // transaction (rest defaulted, mirroring routes/development.rs — the
+                // DB default handles negatives_not_collecting).
+                match dev {
+                    Some(ImportDevRecord::Lab { date_received }) => {
+                        development_lab::ActiveModel {
                             roll_id: Set(new_roll_id),
-                            frame_number: Set(entry.frame_number),
-                            aperture: Set(entry.aperture),
-                            shutter_speed: Set(entry.shutter_speed),
-                            date: Set(entry.date),
-                            time: Set(entry.time),
-                            location: Set(entry.location),
-                            notes: Set(entry.notes),
+                            date_received: Set(date_received),
                             created_at: Set(now.clone()),
                             updated_at: Set(now.clone()),
                             ..Default::default()
-                        };
-                        let shot_result = shot_model.insert(txn).await?;
+                        }
+                        .insert(txn)
+                        .await?;
+                    }
+                    Some(ImportDevRecord::SelfDev { date_processed }) => {
+                        development_self::ActiveModel {
+                            roll_id: Set(new_roll_id),
+                            date_processed: Set(date_processed),
+                            created_at: Set(now.clone()),
+                            updated_at: Set(now.clone()),
+                            ..Default::default()
+                        }
+                        .insert(txn)
+                        .await?;
+                    }
+                    None => {}
+                }
 
-                        if let Some(lens_ids) = entry.lens_ids {
-                            if !lens_ids.is_empty() {
-                                ShotService::set_lenses_for_shot(txn, shot_result.id, lens_ids)
-                                    .await?;
-                            }
+                for entry in shot_entries {
+                    let shot_model = shot::ActiveModel {
+                        roll_id: Set(new_roll_id),
+                        frame_number: Set(entry.frame_number),
+                        aperture: Set(entry.aperture),
+                        shutter_speed: Set(entry.shutter_speed),
+                        date: Set(entry.date),
+                        time: Set(entry.time),
+                        location: Set(entry.location),
+                        notes: Set(entry.notes),
+                        created_at: Set(now.clone()),
+                        updated_at: Set(now.clone()),
+                        ..Default::default()
+                    };
+                    let shot_result = shot_model.insert(txn).await?;
+
+                    if let Some(lens_ids) = entry.lens_ids {
+                        if !lens_ids.is_empty() {
+                            ShotService::set_lenses_for_shot(txn, shot_result.id, lens_ids).await?;
                         }
                     }
+                }
 
-                    Ok(new_roll_id)
-                })
+                Ok(new_roll_id)
             })
-            .await
-            .map_err(transaction_err)?;
-
-        Ok(roll_id)
+        })
+        .await
     }
 
     /// Suggest a roll ID in YYMMDD-N format.
