@@ -10,7 +10,7 @@ use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, OptionExt};
 use crate::extract::{Json, Path};
 use crate::patch::{double_option, now_string, trim_opt};
-use crate::routes::{friendly_delete_err, friendly_err};
+use crate::routes::{Op, friendly_delete_err, friendly_err, friendly_txn_err};
 use crate::services::camera_service::CameraService;
 use crate::services::lens_service::LensService;
 use crate::validate::{require_nonempty, validate_date_opt, validate_non_negative_f64};
@@ -321,7 +321,7 @@ async fn create_with_lens(
             })
         })
         .await
-        .map_err(|e| AppError::UnprocessableEntity(friendly_err("camera", e)))?;
+        .map_err(|e| friendly_txn_err("camera", Op::Write, e))?;
 
     Ok((StatusCode::CREATED, Json(camera_id)))
 }

@@ -25,7 +25,9 @@ async fn search(
 ) -> AppResult<Json<SearchResults>> {
     let query = params.q.trim();
     // Return empty results for very short queries (parity with the old command).
-    if query.len() < 2 {
+    // Count characters, not bytes — a single multibyte glyph must not clear the
+    // 2-char floor (kammerz-vlyu.27).
+    if query.chars().count() < 2 {
         return Ok(Json(SearchResults {
             cameras: vec![],
             lenses: vec![],

@@ -7,10 +7,10 @@ use serde::Deserialize;
 
 use crate::AppState;
 use crate::auth::middleware::RequireAuth;
-use crate::error::{AppError, AppResult, DbOptionExt, OptionExt};
+use crate::error::{AppResult, DbOptionExt, OptionExt};
 use crate::extract::{Json, Path};
 use crate::patch::{double_option, now_string, trim, trim_opt};
-use crate::routes::{Op, friendly_err, friendly_txn_err};
+use crate::routes::{Op, friendly_txn_err};
 use crate::services::roll_event_service::RollEventService;
 use crate::services::shot_service::ShotService;
 use crate::validate::{
@@ -146,7 +146,7 @@ async fn create(
             })
         })
         .await
-        .map_err(|e| AppError::UnprocessableEntity(friendly_err("shot", e)))?;
+        .map_err(|e| friendly_txn_err("shot", Op::Write, e))?;
 
     Ok((StatusCode::CREATED, Json(result_id)))
 }
@@ -233,7 +233,7 @@ async fn update(
         })
     })
     .await
-    .map_err(|e| AppError::UnprocessableEntity(friendly_err("shot", e)))?;
+    .map_err(|e| friendly_txn_err("shot", Op::Write, e))?;
 
     Ok(StatusCode::NO_CONTENT)
 }
