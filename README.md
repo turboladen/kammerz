@@ -180,7 +180,7 @@ Snapshots from `/api/backup` or `VACUUM INTO` have no sidecar files of their own
 
 ## Field access over VPN
 
-The app stays **LAN-bound** — it binds `0.0.0.0:$PORT` and is not exposed to the public internet. To reach it away from home, connect your phone/laptop to your home network's VPN at the gateway, then browse to the server's LAN address.
+The app stays **LAN-bound** and is not exposed to the public internet — it binds all interfaces (`0.0.0.0:$PORT`) when a password hash is set, and only the loopback interface in open (no-password) mode. To reach it away from home, connect your phone/laptop to your home network's VPN at the gateway, then browse to the server's LAN address.
 
 This is configured **on the UniFi gateway**, not in Kammerz (see the `../unifi-management` MCP for managing the gateway/VPN). No application code or config is involved in VPN access.
 
