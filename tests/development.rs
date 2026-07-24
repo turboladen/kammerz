@@ -659,6 +659,52 @@ async fn delete_missing_self_dev_returns_404() {
     );
 }
 
+// kammerz-vlyu.3: updating a lab dev that doesn't exist returns 404 NOT_FOUND,
+// not 422. The pre-txn `or_404` fetch classifies the ordinary missing-id case;
+// the in-txn TOCTOU path (target deleted mid-update) is now routed through
+// friendly_txn_err(Op::Write, _) too — that RecordNotFound→404 mapping is
+// unit-tested in routes::mod (txn_write_record_not_found_maps_to_404), since a
+// race can't be won from an integration test. This guards the update/delete 404
+// symmetry against regression.
+#[tokio::test]
+async fn update_missing_lab_dev_returns_404() {
+    let app = open_app().await;
+
+    let res = app
+        .oneshot(put_json(
+            "/api/development/lab/999999",
+            &json!({ "cost": 12.0 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "NOT_FOUND");
+    assert_eq!(body["error"]["message"], "Lab development 999999 not found");
+}
+
+// kammerz-vlyu.3 (batches kammerz-o0vj): symmetric self-dev case — update of a
+// missing self dev is 404.
+#[tokio::test]
+async fn update_missing_self_dev_returns_404() {
+    let app = open_app().await;
+
+    let res = app
+        .oneshot(put_json(
+            "/api/development/self/999999",
+            &json!({ "developer": "ghost" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    let body: Value = json_body(res).await;
+    assert_eq!(body["error"]["code"], "NOT_FOUND");
+    assert_eq!(
+        body["error"]["message"],
+        "Self development 999999 not found"
+    );
+}
+
 // --- kammerz-8rh: delete-side status reverts + sibling/no-regression branches ---
 
 /// POST a lab dev for `roll_id` and return its id. `body` lets callers add

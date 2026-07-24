@@ -12,10 +12,10 @@ use serde::Deserialize;
 
 use crate::AppState;
 use crate::auth::middleware::RequireAuth;
-use crate::error::{AppError, AppResult, DbOptionExt, OptionExt};
+use crate::error::{AppResult, DbOptionExt, OptionExt};
 use crate::extract::{Json, Path};
 use crate::patch::{double_option, now_string, trim_opt};
-use crate::routes::{Op, friendly_err, friendly_txn_err};
+use crate::routes::{Op, friendly_txn_err};
 use crate::services::chemical_service::{ChemicalService, GroupedChemicals};
 use crate::services::development_service::{
     DevelopmentService, LabDevListItem, SelfDevWithStages, StageInput,
@@ -348,7 +348,7 @@ async fn update_lab_dev(
         })
     })
     .await
-    .map_err(|e| AppError::UnprocessableEntity(friendly_err("lab development", e)))?;
+    .map_err(|e| friendly_txn_err("lab development", Op::Write, e))?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -565,7 +565,7 @@ async fn update_self_dev(
         })
     })
     .await
-    .map_err(|e| AppError::UnprocessableEntity(friendly_err("self development", e)))?;
+    .map_err(|e| friendly_txn_err("self development", Op::Write, e))?;
 
     Ok(StatusCode::NO_CONTENT)
 }

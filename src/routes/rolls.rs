@@ -11,7 +11,7 @@ use crate::auth::middleware::RequireAuth;
 use crate::error::{AppError, AppResult, OptionExt};
 use crate::extract::{Json, Path};
 use crate::patch::{double_option, now_string, trim_opt};
-use crate::routes::{friendly_delete_err, friendly_err};
+use crate::routes::{Op, friendly_delete_err, friendly_err, friendly_txn_err};
 use crate::services::development_service::DevelopmentService;
 use crate::services::roll_event_service::RollEventService;
 use crate::services::roll_service::{RollService, RollWithDetails};
@@ -319,7 +319,7 @@ async fn update(
         })
     })
     .await
-    .map_err(|e| AppError::UnprocessableEntity(friendly_err("roll", e)))?;
+    .map_err(|e| friendly_txn_err("roll", Op::Write, e))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
