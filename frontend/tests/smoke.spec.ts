@@ -224,6 +224,107 @@ test('activity board sets a lifecycle date and it persists (kammerz-64ga)', asyn
 });
 
 /**
+ * kammerz-vlyu.10: the core daily loop had ZERO end-to-end coverage — every shot
+ * in this suite is seeded via raw page.request.post, and the QuickAddBar was only
+ * asserted VISIBLE (never submitted). This drives the REAL QuickAddBar: fill the
+ * aperture/shutter comboboxes, click Save & Next, and assert (a) the shot persists
+ * and (b) the next-frame auto-suggest advanced. A broken submit handler or a
+ * regressed shot-entry wire-up would now fail the gate instead of sailing through.
+ */
+test('QuickAddBar submits a real shot and advances the next frame (kammerz-vlyu.10)', async ({ page }) => {
+	const created = await page.request.post(`${BASE}/api/rolls`, {
+		data: { roll_id: `E2E-QAB-${Date.now()}`, frame_count: 36 }
+	});
+	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
+	const id: number = await created.json();
+	try {
+		await page.goto(`${BASE}/rolls/${id}`);
+		await page.waitForLoadState('networkidle');
+
+		// The QuickAddBar frame chip is a read-only mono cell showing the parent's
+		// nextFrameNumber. Scope the lookup to the QuickAddBar container — the
+		// innermost div holding BOTH the "Save & Next" button and the "Frame" label —
+		// so a future "Frame" text elsewhere on the page can't make it ambiguous.
+		// Inside that container, anchor on the "Frame" label span and read its sibling
+		// chip. A fresh 36-frame roll with no shots suggests frame 1.
+		const quickAdd = page
+			.locator('div')
+			.filter({ has: page.getByRole('button', { name: /Save & Next/i }) })
+			.filter({ has: page.getByText('Frame', { exact: true }) })
+			.last();
+		const frameChip = quickAdd.getByText('Frame', { exact: true }).locator('xpath=following-sibling::div[1]');
+		await expect(frameChip).toHaveText('1');
+
+		// Fill the REAL exposure inputs — each ComboInput is an <input role="combobox">
+		// named by its label ("f/", "Shutter"). Focusing opens a suggestion dropdown
+		// (an absolutely-positioned listbox that can overlay Save & Next); press Escape
+		// to collapse it before clicking so the click can't be intercepted.
+		await page.getByRole('combobox', { name: 'f/', exact: true }).fill('5.6');
+		await page.getByRole('combobox', { name: 'Shutter', exact: true }).fill('1/250');
+		await page.keyboard.press('Escape');
+
+		await page.getByRole('button', { name: /Save & Next/i }).click();
+
+		// The next-frame auto-suggest advances to 2 once the save round-trips and the
+		// page reloads — this web-first assertion is also the sync barrier before the
+		// API read below (no fixed sleep, no async-save race).
+		await expect(frameChip).toHaveText('2');
+
+		// The shot persisted with the values entered (aperture/shutter stored BARE).
+		const shots = await (await page.request.get(`${BASE}/api/shots/for-roll/${id}`)).json();
+		expect(shots.length, 'exactly one shot should persist').toBe(1);
+		expect(shots[0].frame_number).toBe('1');
+		expect(shots[0].aperture).toBe('5.6');
+		expect(shots[0].shutter_speed).toBe('1/250');
+	} finally {
+		await page.request.delete(`${BASE}/api/rolls/${id}`);
+	}
+});
+
+/**
+ * kammerz-vlyu.10: no e2e created a development record through the UI dialog at all
+ * (the autoPrompt lab/self bridge). This opens the Start-development Lab dialog from
+ * the activity board, saves it, and asserts the roll's derived lifecycle moved to
+ * Developing (ADR-0013: recording a dev record IS the state change). Lab is chosen
+ * over self for the simplest valid form — no fields are required to create the
+ * record, and lab/self collapse to the identical derived view (src/activity.rs).
+ */
+test('Start-development dialog records a lab dev and moves the roll to Developing (kammerz-vlyu.10)', async ({
+	page
+}) => {
+	const created = await page.request.post(`${BASE}/api/rolls`, {
+		data: { roll_id: `E2E-DEV-${Date.now()}`, frame_count: 36 }
+	});
+	expect(created.ok(), `create roll failed: ${created.status()}`).toBeTruthy();
+	const id: number = await created.json();
+	try {
+		await page.goto(`${BASE}/rolls/${id}`);
+		await page.waitForLoadState('networkidle');
+
+		// The board collapses in the shooting phase — expand it to reveal the
+		// Development row's Start Lab/Self buttons (shown while no dev record exists).
+		await page.getByRole('button', { name: /Show details/ }).click();
+		await page.getByRole('button', { name: 'Lab', exact: true }).click();
+
+		// The autoPrompt bridge opens the Lab Development dialog. No field is required
+		// to record the dev — save immediately.
+		const dialog = page.getByRole('dialog');
+		await expect(dialog.getByRole('heading', { name: 'Lab Development' })).toBeVisible();
+		await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+		await expect(dialog).toBeHidden();
+		await page.waitForLoadState('networkidle');
+
+		// The dev record with no completion date moves the roll to group_key 1 /
+		// badge "Developing" (a lab dev with no Date Received is still in progress).
+		const roll = await (await page.request.get(`${BASE}/api/rolls/${id}`)).json();
+		expect(roll.badge, 'recording a dev record must move the roll to Developing').toBe('Developing');
+		expect(roll.group_key).toBe(1);
+	} finally {
+		await page.request.delete(`${BASE}/api/rolls/${id}`);
+	}
+});
+
+/**
  * Regression guard for kammerz-11o3: edits made in the Edit Shot dialog must
  * survive < > navigation to an adjacent shot (auto-save-on-navigate). The old
  * behavior re-seeded the shared form fields from the target shot, silently

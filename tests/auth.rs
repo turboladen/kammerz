@@ -2,7 +2,8 @@ use std::net::SocketAddr;
 
 use axum::body::Body;
 use axum::extract::ConnectInfo;
-use axum::http::{Request, StatusCode};
+use axum::http::header::{COOKIE, SET_COOKIE};
+use axum::http::{Request, Response, StatusCode};
 use http_body_util::BodyExt;
 use kammerz::auth::rate_limit::LOGIN_BURST_SIZE;
 use tower::ServiceExt;
@@ -140,6 +141,86 @@ async fn login_with_correct_password_succeeds_within_burst() {
     let body = res.into_body().collect().await.unwrap().to_bytes();
     let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(v["authenticated"], true);
+}
+
+/// Extract the session cookie the `SessionManagerLayer` sets on a response and
+/// return it as a `name=value` pair suitable for a `Cookie` request header. We
+/// forward only the first `;`-delimited segment (dropping `HttpOnly`/`Path`/…),
+/// and don't hardcode the cookie name — so the thread survives a tower-sessions
+/// default-name change.
+fn session_cookie(res: &Response<Body>) -> String {
+    res.headers()
+        .get(SET_COOKIE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(';').next())
+        .expect("login response should set a session cookie")
+        .to_string()
+}
+
+/// A plain GET/POST carrying a `Cookie` header (no `ConnectInfo` — only `login`
+/// needs the peer IP for rate limiting; `/me` and `/logout` don't).
+fn req_with_cookie(method: &str, uri: &str, cookie: &str) -> Request<Body> {
+    Request::builder()
+        .method(method)
+        .uri(uri)
+        .header(COOKIE, cookie)
+        .body(Body::empty())
+        .unwrap()
+}
+
+async fn json_body(res: Response<Body>) -> serde_json::Value {
+    let body = res.into_body().collect().await.unwrap().to_bytes();
+    serde_json::from_slice(&body).unwrap()
+}
+
+#[tokio::test]
+async fn session_cookie_threads_login_me_logout_me() {
+    // The whole point: thread the real session cookie through the lifecycle the
+    // response-body-only login test never exercised — login mints an authed
+    // session, /me carrying its cookie reports authed, and /logout flushes it so
+    // the same cookie then reports unauthed. Guards a regression where logout
+    // silently fails to clear the session.
+    let app = test_app(Some(kammerz::auth::password::hash_password("pw").unwrap())).await;
+
+    // Log in and capture the session cookie the layer sets.
+    let login = app
+        .clone()
+        .oneshot(login_req("127.0.0.1", "pw"))
+        .await
+        .unwrap();
+    assert_eq!(login.status(), StatusCode::OK);
+    let cookie = session_cookie(&login);
+
+    // /me carrying the cookie sees the authed session.
+    let me1 = app
+        .clone()
+        .oneshot(req_with_cookie("GET", "/api/auth/me", &cookie))
+        .await
+        .unwrap();
+    assert_eq!(me1.status(), StatusCode::OK);
+    let v = json_body(me1).await;
+    assert_eq!(v["authenticated"], true);
+    assert_eq!(v["auth_required"], true);
+
+    // Logout flushes the session server-side.
+    let logout = app
+        .clone()
+        .oneshot(req_with_cookie("POST", "/api/auth/logout", &cookie))
+        .await
+        .unwrap();
+    assert_eq!(logout.status(), StatusCode::OK);
+    let v = json_body(logout).await;
+    assert_eq!(v["authenticated"], false);
+
+    // The SAME cookie now resolves to no session → unauthed. (flush() removed the
+    // record from the store, so reusing the login cookie is a valid check.)
+    let me2 = app
+        .oneshot(req_with_cookie("GET", "/api/auth/me", &cookie))
+        .await
+        .unwrap();
+    assert_eq!(me2.status(), StatusCode::OK);
+    let v = json_body(me2).await;
+    assert_eq!(v["authenticated"], false);
 }
 
 #[tokio::test]
