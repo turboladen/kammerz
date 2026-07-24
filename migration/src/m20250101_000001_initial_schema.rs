@@ -33,13 +33,13 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(Cameras::CreatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .col(
                         ColumnDef::new(Cameras::UpdatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .to_owned(),
             )
@@ -76,13 +76,13 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(CameraMaintenance::CreatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .col(
                         ColumnDef::new(CameraMaintenance::UpdatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .foreign_key(
                         ForeignKey::create()
@@ -134,13 +134,13 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(Lenses::CreatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .col(
                         ColumnDef::new(Lenses::UpdatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .to_owned(),
             )
@@ -199,13 +199,13 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(FilmStocks::CreatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .col(
                         ColumnDef::new(FilmStocks::UpdatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .to_owned(),
             )
@@ -246,13 +246,13 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(Labs::CreatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .col(
                         ColumnDef::new(Labs::UpdatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .to_owned(),
             )
@@ -290,13 +290,13 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(Rolls::CreatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .col(
                         ColumnDef::new(Rolls::UpdatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .foreign_key(
                         ForeignKey::create()
@@ -369,13 +369,13 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(Shots::CreatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .col(
                         ColumnDef::new(Shots::UpdatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .foreign_key(
                         ForeignKey::create()
@@ -462,13 +462,13 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(DevelopmentLab::CreatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .col(
                         ColumnDef::new(DevelopmentLab::UpdatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .foreign_key(
                         ForeignKey::create()
@@ -529,13 +529,13 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(DevelopmentSelf_::CreatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .col(
                         ColumnDef::new(DevelopmentSelf_::UpdatedAt)
                             .text()
                             .not_null()
-                            .default("datetime('now')"),
+                            .default(Expr::cust("(datetime('now'))")),
                     )
                     .foreign_key(
                         ForeignKey::create()
@@ -824,4 +824,106 @@ enum DevStages {
     DurationSeconds,
     Notes,
     SortOrder,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Migrator;
+    use sea_orm_migration::prelude::*;
+    use sea_orm_migration::sea_orm::{
+        ConnectOptions, ConnectionTrait, Database, DatabaseConnection, Statement,
+    };
+
+    async fn fresh_db() -> DatabaseConnection {
+        let mut opt = ConnectOptions::new("sqlite::memory:");
+        opt.max_connections(1).min_connections(1);
+        let db = Database::connect(opt).await.unwrap();
+        db.execute_unprepared("PRAGMA foreign_keys=OFF")
+            .await
+            .unwrap();
+        db
+    }
+
+    async fn table_sql(db: &DatabaseConnection, name: &str) -> String {
+        db.query_one(Statement::from_string(
+            db.get_database_backend(),
+            format!("SELECT sql AS v FROM sqlite_master WHERE type = 'table' AND name = '{name}'"),
+        ))
+        .await
+        .unwrap()
+        .unwrap()
+        .try_get::<String>("", "v")
+        .unwrap()
+    }
+
+    /// kammerz-2v2h: a `&str` passed to `.default()` is emitted by sea-query as a
+    /// QUOTED STRING LITERAL, so `datetime('now')` would be stored as literal text.
+    /// The fix uses `Expr::cust`, which emits a real SQL expression default. The
+    /// tables m019 never rebuilds (only renames) are where the bug would persist —
+    /// assert their created m001 DDL carries the expression form, not the literal.
+    /// At Some(1) the dev/maintenance tables still have their pre-m019 singular names.
+    #[tokio::test]
+    async fn initial_schema_timestamp_defaults_are_expressions() {
+        let db = fresh_db().await;
+        Migrator::up(&db, Some(1)).await.unwrap();
+
+        for t in [
+            "camera_maintenance",
+            "film_stocks",
+            "labs",
+            "shots",
+            "development_lab",
+            "development_self",
+        ] {
+            let sql = table_sql(&db, t).await;
+            assert!(
+                sql.contains("(datetime('now'))"),
+                "{t}: timestamp default must be the datetime() expression, got: {sql}"
+            );
+            assert!(
+                !sql.contains("'datetime(''now'')'"),
+                "{t}: timestamp default must NOT be a quoted string literal, got: {sql}"
+            );
+        }
+    }
+
+    /// End-to-end proof of the fix: on the full schema, inserting into a non-rebuilt
+    /// table WITHOUT the timestamps must evaluate `datetime('now')` to a real
+    /// timestamp — not store the literal text (which is what the bug did).
+    #[tokio::test]
+    async fn omitted_timestamp_defaults_to_real_datetime() {
+        let db = fresh_db().await;
+        Migrator::up(&db, None).await.unwrap();
+
+        db.execute_unprepared("INSERT INTO labs (name) VALUES ('default-probe')")
+            .await
+            .unwrap();
+        let created = db
+            .query_one(Statement::from_string(
+                db.get_database_backend(),
+                "SELECT created_at AS v FROM labs WHERE name = 'default-probe'".to_owned(),
+            ))
+            .await
+            .unwrap()
+            .unwrap()
+            .try_get::<String>("", "v")
+            .unwrap();
+
+        assert_ne!(
+            created, "datetime('now')",
+            "default stored the literal text instead of a timestamp"
+        );
+        // datetime('now') renders as 'YYYY-MM-DD HH:MM:SS'.
+        assert_eq!(
+            created.len(),
+            19,
+            "expected a datetime string, got: {created}"
+        );
+        assert!(
+            created.as_bytes()[0].is_ascii_digit()
+                && created.contains('-')
+                && created.contains(':'),
+            "expected a datetime string, got: {created}"
+        );
+    }
 }
