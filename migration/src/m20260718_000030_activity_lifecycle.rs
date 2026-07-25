@@ -305,6 +305,8 @@ impl MigrationTrait for Migration {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Migrator;
+    use sea_orm_migration::sea_orm::{ConnectOptions, Database, DatabaseConnection};
 
     #[test]
     fn loaded_and_shooting_get_no_dates() {
@@ -522,6 +524,320 @@ mod tests {
         );
         for s in BACKFILL_ORDER {
             assert!(s.parse::<LegacyStatus>().is_ok(), "{s} must round-trip");
+        }
+    }
+
+    // ── DB-level test of up()'s backfill against a legacy `status` schema ──
+    //
+    // The pure `backfilled_dates` mapping is unit-tested above, but up()'s actual
+    // SQL (status-column detection, the dev-completion COALESCE subqueries,
+    // MAX(shots.date), the guarded per-row UPDATEs) never runs in the normal
+    // suite: every fresh test DB runs ALL migrations, and this one drops `status`.
+    // Here we stop at m029 — the REAL pre-m030 schema, `status` still present —
+    // seed legacy rows, run up(), and assert the resulting dates equal what
+    // `backfilled_dates` computes for the same inputs, cross-checking the SQL path
+    // against the pure mapping. (Migrator::up(Some(29)) rather than a hand-built
+    // schema slice keeps the rolls/shots/dev tables exactly production's.)
+
+    /// A fresh in-memory DB migrated through m029 only (this migration not yet
+    /// applied), FK enforcement OFF exactly as `db.rs` sets it before migrating
+    /// (so seeded child rows needn't reference real cameras/labs). A single
+    /// connection keeps the in-memory DB alive across statements.
+    async fn migrated_through_029() -> DatabaseConnection {
+        let mut opt = ConnectOptions::new("sqlite::memory:");
+        opt.max_connections(1).min_connections(1);
+        let db = Database::connect(opt).await.unwrap();
+        db.execute_unprepared("PRAGMA foreign_keys=OFF")
+            .await
+            .unwrap();
+        // Some(29): apply the first 29 migrations (through m029), none after — so
+        // `rolls.status` still exists (this migration, #30, drops it).
+        Migrator::up(&db, Some(29)).await.unwrap();
+        db
+    }
+
+    /// A test-controlled date literal or NULL for a raw INSERT.
+    fn sql_opt(v: Option<&str>) -> String {
+        v.map_or_else(|| "NULL".to_string(), |s| format!("'{s}'"))
+    }
+
+    /// The three backfill-target columns for one roll after the migration ran.
+    async fn roll_target_dates(
+        db: &DatabaseConnection,
+        id: i32,
+    ) -> (Option<String>, Option<String>, Option<String>) {
+        let row = db
+            .query_one(Statement::from_string(
+                db.get_database_backend(),
+                format!(
+                    "SELECT date_finished, date_scanned, date_archived FROM rolls WHERE id = {id}"
+                ),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        (
+            row.try_get("", "date_finished").unwrap(),
+            row.try_get("", "date_scanned").unwrap(),
+            row.try_get("", "date_archived").unwrap(),
+        )
+    }
+
+    /// One seeded legacy roll and the child rows that drive its backfill.
+    struct Scenario {
+        id: i32,
+        roll_id: &'static str,
+        status: &'static str,
+        legacy: LegacyStatus,
+        date_loaded: Option<&'static str>,
+        date_finished: Option<&'static str>,
+        date_scanned: Option<&'static str>,
+        date_post_processed: Option<&'static str>,
+        date_archived: Option<&'static str>,
+        shot_dates: &'static [&'static str],
+        lab_received: Option<&'static str>,
+        self_processed: Option<&'static str>,
+    }
+
+    impl Scenario {
+        /// `MAX(shots.date)` — ISO dates sort lexically, matching the SQL's MAX.
+        fn max_shot_date(&self) -> Option<&'static str> {
+            self.shot_dates.iter().max().copied()
+        }
+
+        /// The dev completion the SQL's COALESCE picks: lab `date_received` first,
+        /// then self `date_processed`.
+        fn dev_completion(&self) -> Option<&'static str> {
+            self.lab_received.or(self.self_processed)
+        }
+
+        /// The pure mapping's verdict for this roll's seeded inputs — the oracle
+        /// the SQL path must reproduce.
+        fn expected(&self) -> BackfilledDates {
+            backfilled_dates(
+                self.legacy,
+                self.date_loaded,
+                self.date_finished,
+                self.max_shot_date(),
+                self.dev_completion(),
+                self.date_scanned,
+                self.date_post_processed,
+                self.date_archived,
+            )
+        }
+
+        async fn seed(&self, db: &DatabaseConnection) {
+            db.execute_unprepared(&format!(
+                "INSERT INTO rolls (id, roll_id, status, date_loaded, date_finished, \
+                 date_scanned, date_post_processed, date_archived) \
+                 VALUES ({}, '{}', '{}', {}, {}, {}, {}, {})",
+                self.id,
+                self.roll_id,
+                self.status,
+                sql_opt(self.date_loaded),
+                sql_opt(self.date_finished),
+                sql_opt(self.date_scanned),
+                sql_opt(self.date_post_processed),
+                sql_opt(self.date_archived),
+            ))
+            .await
+            .unwrap();
+
+            // Distinct frame_number per shot (UNIQUE(roll_id, frame_number)).
+            for (i, date) in self.shot_dates.iter().enumerate() {
+                db.execute_unprepared(&format!(
+                    "INSERT INTO shots (roll_id, frame_number, date) VALUES ({}, '{}', '{date}')",
+                    self.id, i,
+                ))
+                .await
+                .unwrap();
+            }
+            if let Some(d) = self.lab_received {
+                db.execute_unprepared(&format!(
+                    "INSERT INTO development_labs (roll_id, date_received) VALUES ({}, '{d}')",
+                    self.id,
+                ))
+                .await
+                .unwrap();
+            }
+            if let Some(d) = self.self_processed {
+                db.execute_unprepared(&format!(
+                    "INSERT INTO development_selves (roll_id, date_processed) VALUES ({}, '{d}')",
+                    self.id,
+                ))
+                .await
+                .unwrap();
+            }
+        }
+
+        /// The DB's post-migration dates must equal the pre-existing seeded value
+        /// (the `WHERE ... IS NULL` guard leaves it) or, when that was NULL, the
+        /// value `backfilled_dates` derived — i.e. `expected.or(seeded)`.
+        async fn assert_backfilled(&self, db: &DatabaseConnection) {
+            let expected = self.expected();
+            let (df, ds, da) = roll_target_dates(db, self.id).await;
+            assert_eq!(
+                df.as_deref(),
+                expected.date_finished.as_deref().or(self.date_finished),
+                "date_finished for {}",
+                self.roll_id
+            );
+            assert_eq!(
+                ds.as_deref(),
+                expected.date_scanned.as_deref().or(self.date_scanned),
+                "date_scanned for {}",
+                self.roll_id
+            );
+            assert_eq!(
+                da.as_deref(),
+                expected.date_archived.as_deref().or(self.date_archived),
+                "date_archived for {}",
+                self.roll_id
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn up_backfills_dates_from_legacy_status() {
+        let scenarios = [
+            // 1. `shot` with shots → date_finished := MAX(shot dates).
+            Scenario {
+                id: 1,
+                roll_id: "R-shot-shots",
+                status: "shot",
+                legacy: LegacyStatus::Shot,
+                date_loaded: Some("2026-01-01"),
+                date_finished: None,
+                date_scanned: None,
+                date_post_processed: None,
+                date_archived: None,
+                shot_dates: &["2026-01-03", "2026-01-05"],
+                lab_received: None,
+                self_processed: None,
+            },
+            // 2. `shot` with no shots → date_finished falls back to date_loaded.
+            Scenario {
+                id: 2,
+                roll_id: "R-shot-noshots",
+                status: "shot",
+                legacy: LegacyStatus::Shot,
+                date_loaded: Some("2026-02-01"),
+                date_finished: None,
+                date_scanned: None,
+                date_post_processed: None,
+                date_archived: None,
+                shot_dates: &[],
+                lab_received: None,
+                self_processed: None,
+            },
+            // 3. `scanned` + a LAB dev → dev_completion (COALESCE lab branch)
+            //    flows into date_scanned; date_finished from date_loaded.
+            Scenario {
+                id: 3,
+                roll_id: "R-scanned-lab",
+                status: "scanned",
+                legacy: LegacyStatus::Scanned,
+                date_loaded: Some("2026-03-01"),
+                date_finished: None,
+                date_scanned: None,
+                date_post_processed: None,
+                date_archived: None,
+                shot_dates: &[],
+                lab_received: Some("2026-03-10"),
+                self_processed: None,
+            },
+            // 4. `scanned` + a SELF dev (no lab) → COALESCE self branch supplies
+            //    dev_completion → date_scanned.
+            Scenario {
+                id: 4,
+                roll_id: "R-scanned-self",
+                status: "scanned",
+                legacy: LegacyStatus::Scanned,
+                date_loaded: Some("2026-04-01"),
+                date_finished: None,
+                date_scanned: None,
+                date_post_processed: None,
+                date_archived: None,
+                shot_dates: &[],
+                lab_received: None,
+                self_processed: Some("2026-04-10"),
+            },
+            // 5. `archived`, no scanned/pp → date_archived chains off the
+            //    date_scanned this same run derives from dev completion.
+            Scenario {
+                id: 5,
+                roll_id: "R-archived-chain",
+                status: "archived",
+                legacy: LegacyStatus::Archived,
+                date_loaded: Some("2026-05-01"),
+                date_finished: None,
+                date_scanned: None,
+                date_post_processed: None,
+                date_archived: None,
+                shot_dates: &[],
+                lab_received: None,
+                self_processed: Some("2026-05-10"),
+            },
+            // 6. `loaded` → nothing backfilled.
+            Scenario {
+                id: 6,
+                roll_id: "R-loaded",
+                status: "loaded",
+                legacy: LegacyStatus::Loaded,
+                date_loaded: Some("2026-06-01"),
+                date_finished: None,
+                date_scanned: None,
+                date_post_processed: None,
+                date_archived: None,
+                shot_dates: &[],
+                lab_received: None,
+                self_processed: None,
+            },
+            // 7. `archived` with every target already populated → the
+            //    `WHERE ... IS NULL` guard leaves all three untouched.
+            Scenario {
+                id: 7,
+                roll_id: "R-already-full",
+                status: "archived",
+                legacy: LegacyStatus::Archived,
+                date_loaded: Some("2026-07-01"),
+                date_finished: Some("2026-07-05"),
+                date_scanned: Some("2026-07-06"),
+                date_post_processed: None,
+                date_archived: Some("2026-07-07"),
+                shot_dates: &[],
+                lab_received: None,
+                self_processed: None,
+            },
+        ];
+
+        let db = migrated_through_029().await;
+        for s in &scenarios {
+            s.seed(&db).await;
+        }
+
+        // Run THIS migration's up() against the seeded legacy rows.
+        Migration.up(&SchemaManager::new(&db)).await.unwrap();
+
+        for s in &scenarios {
+            s.assert_backfilled(&db).await;
+        }
+
+        // up() must have dropped the legacy column.
+        let cols = roll_columns(&db).await.unwrap();
+        assert!(
+            !cols.iter().any(|c| c == "status"),
+            "up() must drop the legacy status column"
+        );
+
+        // Re-running up() now hits the `status`-column-gone branch: the backfill
+        // block is skipped entirely, so it is a clean no-op and the dates persist.
+        Migration
+            .up(&SchemaManager::new(&db))
+            .await
+            .expect("m030 up() must be idempotent on re-run");
+        for s in &scenarios {
+            s.assert_backfilled(&db).await;
         }
     }
 }

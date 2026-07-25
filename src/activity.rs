@@ -370,6 +370,28 @@ mod tests {
     }
 
     #[test]
+    fn with_dev_prefers_lab_when_both_present() {
+        // The documented lab-precedence invariant (relied on by roll/stats/search
+        // services): a legacy both-dev roll derives from the LAB record — is_lab_dev
+        // true, dev_completion == the lab date (NOT the self date) — and the derived
+        // view reflects the lab completion (development done → group_key 2, "To scan").
+        let sig = ActivitySignals::default().with_dev(
+            Some(1),
+            Some("2026-01-10".into()), // lab completion
+            Some(2),
+            Some("2026-02-20".into()), // self completion (must be ignored)
+        );
+        assert!(sig.has_dev);
+        assert!(sig.is_lab_dev);
+        assert_eq!(sig.dev_completion.as_deref(), Some("2026-01-10"));
+
+        let ra = derive(&sig);
+        assert_eq!(state(&ra, "development"), "done");
+        assert_eq!(ra.group_key, 2);
+        assert_eq!(ra.badge, "To scan");
+    }
+
+    #[test]
     fn scanned_marks_scanning_done() {
         let ra = derive(&ActivitySignals {
             has_dev: true,
