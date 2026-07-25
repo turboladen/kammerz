@@ -9,10 +9,12 @@ use tower::ServiceExt;
 async fn set_then_get_setting_roundtrips() {
     let app = open_app().await;
 
-    // Unknown key initially returns null.
+    // Use a known, non-secret key (`claude_model`): the allowlist rejects unknown
+    // keys (kammerz-vlyu.17), and a secret key would mask its value on GET.
+    // A not-yet-set known key returns null.
     let res = app
         .clone()
-        .oneshot(get("/api/settings/test_key"))
+        .oneshot(get("/api/settings/claude_model"))
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::OK);
@@ -23,18 +25,89 @@ async fn set_then_get_setting_roundtrips() {
     let res = app
         .clone()
         .oneshot(put_json(
-            "/api/settings/test_key",
-            &serde_json::json!({ "value": "hello" }),
+            "/api/settings/claude_model",
+            &serde_json::json!({ "value": "claude-sonnet-4-5" }),
         ))
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::NO_CONTENT);
 
     // GET returns the value.
-    let res = app.oneshot(get("/api/settings/test_key")).await.unwrap();
+    let res = app
+        .oneshot(get("/api/settings/claude_model"))
+        .await
+        .unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let val: Value = json_body(res).await;
-    assert_eq!(val, "hello");
+    assert_eq!(val, "claude-sonnet-4-5");
+}
+
+#[tokio::test]
+async fn unknown_setting_key_is_rejected() {
+    let app = open_app().await;
+
+    // Writing an unrecognized key must not silently store it (kammerz-vlyu.17).
+    let res = app
+        .oneshot(put_json(
+            "/api/settings/bogus_key",
+            &serde_json::json!({ "value": "whatever" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let val: Value = json_body(res).await;
+    assert_eq!(val["error"]["code"], "VALIDATION_ERROR");
+}
+
+#[tokio::test]
+async fn setting_value_is_trimmed_on_write() {
+    let app = open_app().await;
+
+    // Surrounding whitespace is stripped before storage.
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            "/api/settings/claude_model",
+            &serde_json::json!({ "value": "  claude-opus-4  " }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    let res = app
+        .oneshot(get("/api/settings/claude_model"))
+        .await
+        .unwrap();
+    let val: Value = json_body(res).await;
+    assert_eq!(val, "claude-opus-4");
+}
+
+#[tokio::test]
+async fn whitespace_only_api_key_reads_as_unset() {
+    let app = open_app().await;
+
+    // A whitespace-only secret trims to empty → stored empty → reads back as
+    // "not configured" (null, not the mask), matching an unset key (kammerz-vlyu.17).
+    let res = app
+        .clone()
+        .oneshot(put_json(
+            "/api/settings/claude_api_key",
+            &serde_json::json!({ "value": "   " }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    let res = app
+        .oneshot(get("/api/settings/claude_api_key"))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let val: Value = json_body(res).await;
+    assert!(
+        val.is_null(),
+        "whitespace-only API key should read as unset"
+    );
 }
 
 #[tokio::test]

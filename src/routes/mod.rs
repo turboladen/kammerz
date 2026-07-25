@@ -36,6 +36,15 @@ pub fn create_router(state: AppState) -> Router {
         login_route(PeerIpKeyExtractor)
     };
 
+    // The billable Anthropic import endpoints are rate-limited with the same
+    // per-IP scheme as login (kammerz-vlyu.14); the extractor choice tracks
+    // trust-proxy mode identically. Both branches erase to `Router<AppState>`.
+    let import_routes = if state.config.trust_proxy {
+        import::router(SmartIpKeyExtractor)
+    } else {
+        import::router(PeerIpKeyExtractor)
+    };
+
     Router::<AppState>::new()
         .route("/api/health", get(health))
         .route("/api/auth/login", login_route)
@@ -53,7 +62,7 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/api/search", search::router())
         .nest("/api/stats", stats::router())
         .nest("/api/settings", settings::router())
-        .nest("/api/import", import::router())
+        .nest("/api/import", import_routes)
         .nest("/api/backup", backup::router())
         .with_state(state)
 }
@@ -122,6 +131,13 @@ async fn health(State(db): State<DatabaseConnection>) -> AppResult<Json<Value>> 
     // installed on a remote NAS, so the log line alone isn't always reachable);
     // `build` is the SHA `just deploy` greps for to confirm the new binary is
     // the one answering — keep both fields and their names stable.
+    //
+    // Exposing build/version on the UNAUTHENTICATED health endpoint is a
+    // deliberate, reviewed decision (kammerz-vlyu.24): `just deploy` polls this
+    // to verify the deployed SHA, and this is a single-user LAN/VPN app where the
+    // precise-fingerprint / targeted-CVE risk is low and accepted. Do NOT drop or
+    // auth-gate these fields to "harden" the endpoint — that silently breaks
+    // deploy verification.
     Ok(Json(json!({
         "ok": true,
         "version": env!("CARGO_PKG_VERSION"),

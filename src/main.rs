@@ -86,10 +86,26 @@ async fn main() {
         std::process::exit(1);
     });
     match &config.password_hash {
-        None => {
+        None if config.bind_addr.is_loopback() => {
+            // Open mode, but the kammerz-vlyu.13 default (or an explicit loopback
+            // BIND_ADDR) keeps us off-host — the safe open-mode posture.
             tracing::warn!(
-                "KAMMERZ_PASSWORD_HASH is not set — running in OPEN (no-auth) mode. \
-                 Set it for any network-reachable deployment."
+                "KAMMERZ_PASSWORD_HASH is not set — running in OPEN (no-auth) mode, bound to \
+                 loopback ({}) only. Set KAMMERZ_PASSWORD_HASH before exposing this instance \
+                 off-host via BIND_ADDR.",
+                config.bind_addr
+            );
+        }
+        None => {
+            // Open mode AND reachable off-host: name the concrete exposure so an
+            // operator who set a non-loopback BIND_ADDR without a hash sees exactly
+            // what they've opened up (kammerz-vlyu.13).
+            tracing::warn!(
+                "KAMMERZ_PASSWORD_HASH is not set AND BIND_ADDR={} is non-loopback — the entire \
+                 catalog, the DB backup download, and settings writes (including a billable \
+                 claude_api_key) are reachable UNAUTHENTICATED by every host on the LAN/VPN. \
+                 Set KAMMERZ_PASSWORD_HASH for any network-reachable deployment.",
+                config.bind_addr
             );
         }
         Some(hash) if !kammerz::auth::password::is_valid_hash(hash) => {
@@ -160,7 +176,10 @@ async fn main() {
         .with_secure(config.secure_cookies)
         .with_same_site(SameSite::Lax)
         .with_http_only(true)
-        .with_expiry(Expiry::OnInactivity(TimeDuration::days(30)));
+        // 14-day inactivity window (kammerz-vlyu.25): a shared-password cookie
+        // shouldn't stay valid for a full month if stolen/persisted, but this is
+        // still comfortable for field use where days pass between sessions.
+        .with_expiry(Expiry::OnInactivity(TimeDuration::days(14)));
 
     // Capture the bind address before `config` moves into AppState below.
     let bind_addr = config.bind_addr;
@@ -168,6 +187,7 @@ async fn main() {
     let state = AppState {
         db: db.clone(),
         config,
+        db_url: db_url.clone(),
     };
 
     // gzip/brotli negotiation on the way out (the primary remote path is a phone

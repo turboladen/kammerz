@@ -4,9 +4,13 @@ use axum::http::StatusCode;
 use axum::routing::{get, post};
 use sea_orm::{DatabaseConnection, Set};
 use serde::Deserialize;
+use tower_governor::GovernorLayer;
+use tower_governor::governor::GovernorConfigBuilder;
+use tower_governor::key_extractor::KeyExtractor;
 
 use crate::AppState;
 use crate::auth::middleware::RequireAuth;
+use crate::auth::rate_limit;
 use crate::config::AppConfig;
 use crate::error::{AppError, AppResult};
 use crate::extract::Json;
@@ -64,10 +68,33 @@ pub struct ParseNoteDto {
 
 // --- Router ---
 
-pub fn router() -> Router<AppState> {
+/// Build the import router. The two billable Anthropic endpoints (`/models`,
+/// `/parse`) share a per-IP rate limiter to bound how fast a caller can trigger
+/// billed calls (kammerz-vlyu.14); `/roll` (a local DB write) is unlimited.
+///
+/// Generic over the key extractor, mirroring `login_route`, so `create_router`
+/// can pick `PeerIpKeyExtractor` (default) or `SmartIpKeyExtractor` (trust-proxy
+/// mode) — both erase to the same `Router<AppState>`. The single `GovernorLayer`
+/// is cloned onto both routes, so they draw from ONE shared per-IP bucket (its
+/// inner `Arc<RateLimiter>` is what clones); see `auth::rate_limit`.
+pub fn router<K>(extractor: K) -> Router<AppState>
+where
+    K: KeyExtractor + Send + Sync + 'static,
+    K::Key: Send + Sync,
+{
+    let limiter = GovernorLayer::new(
+        GovernorConfigBuilder::default()
+            .burst_size(rate_limit::IMPORT_BURST_SIZE)
+            .per_second(rate_limit::IMPORT_REPLENISH_SECONDS)
+            .key_extractor(extractor)
+            .finish()
+            .expect("import rate-limit config is valid"),
+    )
+    .error_handler(rate_limit::on_governor_error);
+
     Router::new()
-        .route("/models", get(list_models))
-        .route("/parse", post(parse_note))
+        .route("/models", get(list_models).layer(limiter.clone()))
+        .route("/parse", post(parse_note).layer(limiter))
         .route("/roll", post(import_parsed_roll))
 }
 
@@ -81,6 +108,9 @@ async fn resolve_key(db: &DatabaseConnection, config: &AppConfig) -> AppResult<S
     }
     SettingsService::get_setting(db, "claude_api_key")
         .await?
+        // Trim (handles legacy pre-trim rows) and treat a whitespace-only stored
+        // key as unset rather than sending spaces upstream (kammerz-vlyu.17).
+        .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .ok_or_else(|| {
             AppError::UnprocessableEntity(

@@ -50,9 +50,24 @@ pub const LOGIN_BURST_SIZE: u32 = 5;
 /// burst size), so it stays off the public API surface.
 pub(crate) const LOGIN_REPLENISH_SECONDS: u64 = 10;
 
+/// Immediate burst allowed on the billable Anthropic import endpoints
+/// (`/api/import/models`, `/api/import/parse`) before throttling. A human fetches
+/// the model list once per visit and parses one note at a time, so a small burst
+/// covers legitimate use comfortably; the limiter's real job is to bound how fast
+/// an unauthenticated caller (possible in open mode) can rack up billed calls
+/// (kammerz-vlyu.14). Both endpoints share ONE per-IP bucket, so this is a
+/// combined budget. `/api/import/roll` (a local DB write, not billed) is exempt.
+pub const IMPORT_BURST_SIZE: u32 = 8;
+
+/// Seconds to replenish one import slot once the burst is spent (GCRA period).
+/// ~1 billed call per 6s sustained. Crate-internal: only `import::router`
+/// consumes it (tests need only the burst size).
+pub(crate) const IMPORT_REPLENISH_SECONDS: u64 = 6;
+
 /// Map a `GovernorError` onto the project's standard `{error:{code,message}}`
-/// envelope so a throttled login is byte-identical to every other API error (the
-/// frontend `request()` helper parses this shape).
+/// envelope so a throttled request is byte-identical to every other API error
+/// (the frontend `request()` helper parses this shape). Shared by the login
+/// limiter and the billable-import limiter (kammerz-vlyu.14).
 pub fn on_governor_error(err: GovernorError) -> Response {
     match err {
         GovernorError::TooManyRequests { headers, .. } => {
@@ -68,7 +83,7 @@ pub fn on_governor_error(err: GovernorError) -> Response {
         // message server-side and returns an opaque body, so fold in the governor
         // variant to keep the unexpected case diagnosable without leaking detail.
         other @ (GovernorError::UnableToExtractKey | GovernorError::Other { .. }) => {
-            AppError::Internal(format!("login rate limiter: {other}")).into_response()
+            AppError::Internal(format!("rate limiter: {other}")).into_response()
         }
     }
 }

@@ -14,7 +14,6 @@ use axum::extract::State;
 use axum::http::header;
 use axum::response::IntoResponse;
 use axum::routing::get;
-use sea_orm::DatabaseConnection;
 
 use crate::AppState;
 use crate::auth::middleware::RequireAuth;
@@ -41,14 +40,17 @@ fn temp_snapshot_path() -> std::path::PathBuf {
 
 async fn download_backup(
     _: RequireAuth,
-    State(db): State<DatabaseConnection>,
+    State(state): State<AppState>,
 ) -> AppResult<impl IntoResponse> {
     let path = temp_snapshot_path();
     let path_str = path
         .to_str()
         .ok_or_else(|| AppError::Internal("temp dir path is not valid UTF-8".to_string()))?;
 
-    let snapshot = match crate::db::vacuum_into(&db, path_str).await {
+    // Snapshot on a short-lived SEPARATE connection so the single data-pool
+    // connection stays free for concurrent /api/health probes and API calls
+    // during the backup (kammerz-vlyu.16).
+    let snapshot = match crate::db::vacuum_into_standalone(&state.db_url, path_str).await {
         Ok(()) => tokio::fs::read(&path)
             .await
             .map_err(|e| AppError::Internal(format!("read backup snapshot: {e}"))),
