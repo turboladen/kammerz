@@ -241,11 +241,6 @@ impl DevelopmentService {
         model.update(db).await
     }
 
-    pub async fn delete_lab_dev(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
-        DevelopmentLab::delete_by_id(id).exec(db).await?;
-        Ok(())
-    }
-
     /// List every lab-development with its joined roll, film stock, camera, and
     /// lab context. Lab devs have no stages, so this returns the flat rows
     /// directly (no batch-merge step like the self-dev list).
@@ -305,12 +300,6 @@ impl DevelopmentService {
         model: development_self::ActiveModel,
     ) -> Result<development_self::Model, DbErr> {
         model.update(db).await
-    }
-
-    pub async fn delete_self_dev(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
-        // Dev stages are cascade-deleted by FK constraint
-        DevelopmentSelf::delete_by_id(id).exec(db).await?;
-        Ok(())
     }
 
     // --- Dev Stages ---
