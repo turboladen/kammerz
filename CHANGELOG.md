@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - TBD
+## [0.1.0] - 2026-07-25
 
 First release of Kammerz — a self-hosted film photography catalog. A single Rust
 (axum) binary serves a SvelteKit single-page app and a JSON API over SQLite,
