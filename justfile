@@ -73,6 +73,13 @@ build-linux: ci-frontend
 deploy host port='3002': ci-backend build-linux
     #!/usr/bin/env bash
     set -euo pipefail
+    # Refuse to deploy a dirty tree: build.rs would embed a `<sha>-dirty` build,
+    # serving un-pushed code that STILL passes the health-SHA prefix check below —
+    # silently defeating deploy provenance. Commit or stash first (kammerz-vlyu.19).
+    if [ -n "$(git status --porcelain)" ]; then
+        echo "❌ working tree is dirty — commit or stash before deploying (kammerz-vlyu.19)." >&2
+        exit 1
+    fi
     host="{{host}}"
     sha="$(git rev-parse --short=8 HEAD)"
     ssh "$host" "sudo -n tee /opt/kammerz/kammerz.new > /dev/null && sudo -n chmod +x /opt/kammerz/kammerz.new && sudo -n chown kammerz:kammerz /opt/kammerz/kammerz.new" < target/{{linux_target}}/release/kammerz

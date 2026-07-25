@@ -38,6 +38,23 @@ fn temp_snapshot_path() -> std::path::PathBuf {
     ))
 }
 
+/// Read the snapshot, tightening it to owner-only (0600) first — it holds the
+/// full catalog and briefly lives in a shared temp dir, so don't rely solely on
+/// the deployment's `PrivateTmp`. Fails closed if perms can't be set
+/// (kammerz-vlyu.15).
+async fn read_secured_snapshot(path: &std::path::Path) -> AppResult<Vec<u8>> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        tokio::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+            .await
+            .map_err(|e| AppError::Internal(format!("secure snapshot perms: {e}")))?;
+    }
+    tokio::fs::read(path)
+        .await
+        .map_err(|e| AppError::Internal(format!("read backup snapshot: {e}")))
+}
+
 async fn download_backup(
     _: RequireAuth,
     State(state): State<AppState>,
@@ -51,9 +68,7 @@ async fn download_backup(
     // connection stays free for concurrent /api/health probes and API calls
     // during the backup (kammerz-vlyu.16).
     let snapshot = match crate::db::vacuum_into_standalone(&state.db_url, path_str).await {
-        Ok(()) => tokio::fs::read(&path)
-            .await
-            .map_err(|e| AppError::Internal(format!("read backup snapshot: {e}"))),
+        Ok(()) => read_secured_snapshot(&path).await,
         Err(e) => Err(AppError::Internal(format!("VACUUM INTO failed: {e}"))),
     };
     // Best-effort cleanup of the temp file on both success and failure.
