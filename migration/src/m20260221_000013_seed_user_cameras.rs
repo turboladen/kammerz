@@ -1,3 +1,4 @@
+use crate::seed_guard::{insert_camera, insert_lens, insert_lens_ordinal};
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -7,6 +8,16 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let db = manager.get_connection();
+
+        // Re-run safety (kammerz-vlyu.8): `execute_unprepared` auto-commits per
+        // statement and this migration is only recorded after `up()` returns, so a
+        // mid-migration crash re-runs from statement 1 — duplicating already-
+        // committed cameras/lenses (neither table has a unique key). Every insert is
+        // guarded on its pre-m017 natural key via `crate::seed_guard`, and junction
+        // inserts are `INSERT OR IGNORE` (composite PK). On a clean first run every
+        // guard is true so all inserts fire in original order with the same
+        // AUTOINCREMENT ids (byte-identical). See the module docs for the Zeiss
+        // Tessar special case.
 
         // ── Phase 1: New lens mounts ──────────────────────────────
         db.execute_unprepared(
@@ -20,112 +31,99 @@ impl MigrationTrait for Migration {
 
         // ── Phase 2: Interchangeable-lens cameras ─────────────────
         // Nikon F mount (7 cameras)
-        db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Nikon', 'FE', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Nikon F'), 'SLR', datetime('now'), datetime('now')),
-                ('Nikon', 'F2SB Photomic', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Nikon F'), 'SLR', datetime('now'), datetime('now')),
-                ('Nikon', 'N80', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Nikon F'), 'SLR', datetime('now'), datetime('now')),
-                ('Nikon', 'N75', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Nikon F'), 'SLR', datetime('now'), datetime('now')),
-                ('Nikon', 'N90', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Nikon F'), 'SLR', datetime('now'), datetime('now')),
-                ('Nikon', 'EM', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Nikon F'), 'SLR', datetime('now'), datetime('now')),
-                ('Nikon', 'Nikkormat FT', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Nikon F'), 'SLR', datetime('now'), datetime('now'))",
-        )
-        .await?;
+        insert_camera(db, "Nikon", "FE", "35mm", "Nikon F", "SLR").await?;
+        insert_camera(db, "Nikon", "F2SB Photomic", "35mm", "Nikon F", "SLR").await?;
+        insert_camera(db, "Nikon", "N80", "35mm", "Nikon F", "SLR").await?;
+        insert_camera(db, "Nikon", "N75", "35mm", "Nikon F", "SLR").await?;
+        insert_camera(db, "Nikon", "N90", "35mm", "Nikon F", "SLR").await?;
+        insert_camera(db, "Nikon", "EM", "35mm", "Nikon F", "SLR").await?;
+        insert_camera(db, "Nikon", "Nikkormat FT", "35mm", "Nikon F", "SLR").await?;
 
         // Minolta MD/MC mount (5 cameras)
-        db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Minolta', 'SR-T 101', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Minolta MD/MC'), 'SLR', datetime('now'), datetime('now')),
-                ('Minolta', 'XD-11', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Minolta MD/MC'), 'SLR', datetime('now'), datetime('now')),
-                ('Minolta', 'XD-7', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Minolta MD/MC'), 'SLR', datetime('now'), datetime('now')),
-                ('Minolta', 'XE-1', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Minolta MD/MC'), 'SLR', datetime('now'), datetime('now')),
-                ('Minolta', 'XG-M', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Minolta MD/MC'), 'SLR', datetime('now'), datetime('now'))",
-        )
-        .await?;
+        insert_camera(db, "Minolta", "SR-T 101", "35mm", "Minolta MD/MC", "SLR").await?;
+        insert_camera(db, "Minolta", "XD-11", "35mm", "Minolta MD/MC", "SLR").await?;
+        insert_camera(db, "Minolta", "XD-7", "35mm", "Minolta MD/MC", "SLR").await?;
+        insert_camera(db, "Minolta", "XE-1", "35mm", "Minolta MD/MC", "SLR").await?;
+        insert_camera(db, "Minolta", "XG-M", "35mm", "Minolta MD/MC", "SLR").await?;
 
         // Olympus OM mount (1 camera)
-        db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Olympus', 'OM-1n', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Olympus OM'), 'SLR', datetime('now'), datetime('now'))",
-        )
-        .await?;
+        insert_camera(db, "Olympus", "OM-1n", "35mm", "Olympus OM", "SLR").await?;
 
         // Pentax K mount (1 camera)
-        db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Pentax', 'K1000', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Pentax K'), 'SLR', datetime('now'), datetime('now'))",
-        )
-        .await?;
+        insert_camera(db, "Pentax", "K1000", "35mm", "Pentax K", "SLR").await?;
 
         // M42 (Universal) mount (5 cameras)
-        db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Asahi Pentax', 'SV', '35mm', (SELECT id FROM lens_mounts WHERE name = 'M42 (Universal)'), 'SLR', datetime('now'), datetime('now')),
-                ('Pentax', 'Spotmatic SP', '35mm', (SELECT id FROM lens_mounts WHERE name = 'M42 (Universal)'), 'SLR', datetime('now'), datetime('now')),
-                ('Fujica', 'ST705', '35mm', (SELECT id FROM lens_mounts WHERE name = 'M42 (Universal)'), 'SLR', datetime('now'), datetime('now')),
-                ('Fujica', 'ST901', '35mm', (SELECT id FROM lens_mounts WHERE name = 'M42 (Universal)'), 'SLR', datetime('now'), datetime('now')),
-                ('Voigtländer', 'VSL 1 (TM)', '35mm', (SELECT id FROM lens_mounts WHERE name = 'M42 (Universal)'), 'SLR', datetime('now'), datetime('now'))",
+        insert_camera(db, "Asahi Pentax", "SV", "35mm", "M42 (Universal)", "SLR").await?;
+        insert_camera(
+            db,
+            "Pentax",
+            "Spotmatic SP",
+            "35mm",
+            "M42 (Universal)",
+            "SLR",
+        )
+        .await?;
+        insert_camera(db, "Fujica", "ST705", "35mm", "M42 (Universal)", "SLR").await?;
+        insert_camera(db, "Fujica", "ST901", "35mm", "M42 (Universal)", "SLR").await?;
+        insert_camera(
+            db,
+            "Voigtländer",
+            "VSL 1 (TM)",
+            "35mm",
+            "M42 (Universal)",
+            "SLR",
         )
         .await?;
 
         // Contax/Yashica mount (4 cameras)
-        db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Contax', 'AX', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Contax/Yashica'), 'SLR', datetime('now'), datetime('now')),
-                ('Contax', 'RTSIII', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Contax/Yashica'), 'SLR', datetime('now'), datetime('now')),
-                ('Contax', '139 Quartz', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Contax/Yashica'), 'SLR', datetime('now'), datetime('now')),
-                ('Contax', 'S2', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Contax/Yashica'), 'SLR', datetime('now'), datetime('now'))",
-        )
-        .await?;
+        insert_camera(db, "Contax", "AX", "35mm", "Contax/Yashica", "SLR").await?;
+        insert_camera(db, "Contax", "RTSIII", "35mm", "Contax/Yashica", "SLR").await?;
+        insert_camera(db, "Contax", "139 Quartz", "35mm", "Contax/Yashica", "SLR").await?;
+        insert_camera(db, "Contax", "S2", "35mm", "Contax/Yashica", "SLR").await?;
 
         // Leica R mount (2 cameras)
-        db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Leica', 'R6', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Leica R'), 'SLR', datetime('now'), datetime('now')),
-                ('Leica', 'Leicaflex SL', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Leica R'), 'SLR', datetime('now'), datetime('now'))",
-        )
-        .await?;
+        insert_camera(db, "Leica", "R6", "35mm", "Leica R", "SLR").await?;
+        insert_camera(db, "Leica", "Leicaflex SL", "35mm", "Leica R", "SLR").await?;
 
         // Mamiya Z mount (2 cameras) — NEW mount
-        db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Mamiya', 'ZM', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Mamiya Z'), 'SLR', datetime('now'), datetime('now')),
-                ('Mamiya', 'ZE', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Mamiya Z'), 'SLR', datetime('now'), datetime('now'))",
-        )
-        .await?;
+        insert_camera(db, "Mamiya", "ZM", "35mm", "Mamiya Z", "SLR").await?;
+        insert_camera(db, "Mamiya", "ZE", "35mm", "Mamiya Z", "SLR").await?;
 
         // Rangefinders with new mounts
-        db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Zorki', 'C', '35mm', (SELECT id FROM lens_mounts WHERE name = 'M39 (LTM)'), 'rangefinder', datetime('now'), datetime('now')),
-                ('Contax', 'IIa', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Contax RF'), 'rangefinder', datetime('now'), datetime('now')),
-                ('Contax', 'G1', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Contax G'), 'rangefinder', datetime('now'), datetime('now'))",
-        )
-        .await?;
+        insert_camera(db, "Zorki", "C", "35mm", "M39 (LTM)", "rangefinder").await?;
+        insert_camera(db, "Contax", "IIa", "35mm", "Contax RF", "rangefinder").await?;
+        insert_camera(db, "Contax", "G1", "35mm", "Contax G", "rangefinder").await?;
 
         // Medium and large format
-        db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Mamiya', 'RB67 Pro SD', '6x7', (SELECT id FROM lens_mounts WHERE name = 'Mamiya RB/RZ67'), 'SLR', datetime('now'), datetime('now')),
-                ('Intrepid', '4x5 Black Edition', '4x5', (SELECT id FROM lens_mounts WHERE name = 'Copal #0'), 'view', datetime('now'), datetime('now'))",
+        insert_camera(db, "Mamiya", "RB67 Pro SD", "6x7", "Mamiya RB/RZ67", "SLR").await?;
+        insert_camera(
+            db,
+            "Intrepid",
+            "4x5 Black Edition",
+            "4x5",
+            "Copal #0",
+            "view",
         )
         .await?;
 
         // ── Phase 3: Fixed-lens cameras ───────────────────────────
-        // Each fixed-lens camera needs: camera INSERT, lens INSERT,
-        // junction INSERT, and default_lens_id UPDATE.
+        // Each fixed-lens camera needs: camera INSERT, lens INSERT, junction
+        // INSERT OR IGNORE, and default_lens_id UPDATE. Lens natural key is the
+        // pre-m017 `name_on_lens` column.
 
         // 33. Meopta Flexaret III (6x6 TLR)
+        insert_camera(db, "Meopta", "Flexaret III", "6x6", "Fixed Lens", "TLR").await?;
+        insert_lens(
+            db,
+            "Meopta",
+            "Belar 80mm f/3.5",
+            "Fixed Lens",
+            Some("80"),
+            Some("3.5"),
+        )
+        .await?;
         db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Meopta', 'Flexaret III', '6x6', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'TLR', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                ('Meopta', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'Belar 80mm f/3.5', '80', '3.5', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
+            "INSERT OR IGNORE INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Meopta' AND model = 'Flexaret III'),
                  (SELECT id FROM lenses WHERE brand = 'Meopta' AND name_on_lens = 'Belar 80mm f/3.5'))",
         ).await?;
@@ -135,16 +133,18 @@ impl MigrationTrait for Migration {
         ).await?;
 
         // 34. Voigtländer Brilliant (6x6 TLR)
+        insert_camera(db, "Voigtländer", "Brilliant", "6x6", "Fixed Lens", "TLR").await?;
+        insert_lens(
+            db,
+            "Voigtländer",
+            "Voigtar 75mm f/7.7",
+            "Fixed Lens",
+            Some("75"),
+            Some("7.7"),
+        )
+        .await?;
         db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Voigtländer', 'Brilliant', '6x6', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'TLR', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                ('Voigtländer', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'Voigtar 75mm f/7.7', '75', '7.7', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
+            "INSERT OR IGNORE INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Voigtländer' AND model = 'Brilliant'),
                  (SELECT id FROM lenses WHERE brand = 'Voigtländer' AND name_on_lens = 'Voigtar 75mm f/7.7'))",
         ).await?;
@@ -154,16 +154,26 @@ impl MigrationTrait for Migration {
         ).await?;
 
         // 35. Yashica Electro 35 GSN (35mm rangefinder)
+        insert_camera(
+            db,
+            "Yashica",
+            "Electro 35 GSN",
+            "35mm",
+            "Fixed Lens",
+            "rangefinder",
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Yashica",
+            "Yashinon-DX 45mm f/1.7",
+            "Fixed Lens",
+            Some("45"),
+            Some("1.7"),
+        )
+        .await?;
         db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Yashica', 'Electro 35 GSN', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'rangefinder', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                ('Yashica', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'Yashinon-DX 45mm f/1.7', '45', '1.7', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
+            "INSERT OR IGNORE INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Yashica' AND model = 'Electro 35 GSN'),
                  (SELECT id FROM lenses WHERE brand = 'Yashica' AND name_on_lens = 'Yashinon-DX 45mm f/1.7'))",
         ).await?;
@@ -173,16 +183,18 @@ impl MigrationTrait for Migration {
         ).await?;
 
         // 36. Kodak Chevron (6x6 rangefinder)
+        insert_camera(db, "Kodak", "Chevron", "6x6", "Fixed Lens", "rangefinder").await?;
+        insert_lens(
+            db,
+            "Kodak",
+            "Ektar 78mm f/3.5",
+            "Fixed Lens",
+            Some("78"),
+            Some("3.5"),
+        )
+        .await?;
         db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Kodak', 'Chevron', '6x6', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'rangefinder', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                ('Kodak', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'Ektar 78mm f/3.5', '78', '3.5', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
+            "INSERT OR IGNORE INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Kodak' AND model = 'Chevron'),
                  (SELECT id FROM lenses WHERE brand = 'Kodak' AND name_on_lens = 'Ektar 78mm f/3.5'))",
         ).await?;
@@ -192,16 +204,18 @@ impl MigrationTrait for Migration {
         ).await?;
 
         // 37. Kodak No. 2 Brownie, Model D (6x9 box — simple meniscus lens)
+        insert_camera(
+            db,
+            "Kodak",
+            "No. 2 Brownie, Model D",
+            "6x9",
+            "Fixed Lens",
+            "box",
+        )
+        .await?;
+        insert_lens(db, "Kodak", "Meniscus", "Fixed Lens", None, None).await?;
         db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Kodak', 'No. 2 Brownie, Model D', '6x9', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'box', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, created_at, updated_at) VALUES
-                ('Kodak', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'Meniscus', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
+            "INSERT OR IGNORE INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Kodak' AND model = 'No. 2 Brownie, Model D'),
                  (SELECT id FROM lenses WHERE brand = 'Kodak' AND name_on_lens = 'Meniscus'))",
         ).await?;
@@ -211,16 +225,18 @@ impl MigrationTrait for Migration {
         ).await?;
 
         // 38. Rollei XF 35 (35mm rangefinder)
+        insert_camera(db, "Rollei", "XF 35", "35mm", "Fixed Lens", "rangefinder").await?;
+        insert_lens(
+            db,
+            "Rollei",
+            "Sonnar 40mm f/2.3",
+            "Fixed Lens",
+            Some("40"),
+            Some("2.3"),
+        )
+        .await?;
         db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Rollei', 'XF 35', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'rangefinder', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                ('Rollei', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'Sonnar 40mm f/2.3', '40', '2.3', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
+            "INSERT OR IGNORE INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Rollei' AND model = 'XF 35'),
                  (SELECT id FROM lenses WHERE brand = 'Rollei' AND name_on_lens = 'Sonnar 40mm f/2.3'))",
         ).await?;
@@ -230,16 +246,18 @@ impl MigrationTrait for Migration {
         ).await?;
 
         // 39. Nikon 35Ti (35mm point-and-shoot)
+        insert_camera(db, "Nikon", "35Ti", "35mm", "Fixed Lens", "point-and-shoot").await?;
+        insert_lens(
+            db,
+            "Nikon",
+            "Nikkor 35mm f/2.8",
+            "Fixed Lens",
+            Some("35"),
+            Some("2.8"),
+        )
+        .await?;
         db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Nikon', '35Ti', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'point-and-shoot', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                ('Nikon', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'Nikkor 35mm f/2.8', '35', '2.8', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
+            "INSERT OR IGNORE INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Nikon' AND model = '35Ti'),
                  (SELECT id FROM lenses WHERE brand = 'Nikon' AND name_on_lens = 'Nikkor 35mm f/2.8'))",
         ).await?;
@@ -249,16 +267,26 @@ impl MigrationTrait for Migration {
         ).await?;
 
         // 40. Olympus Stylus Epic Zoom 80 (35mm point-and-shoot)
+        insert_camera(
+            db,
+            "Olympus",
+            "Stylus Epic Zoom 80",
+            "35mm",
+            "Fixed Lens",
+            "point-and-shoot",
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Olympus",
+            "38-80mm f/4.5",
+            "Fixed Lens",
+            Some("38-80"),
+            Some("4.5"),
+        )
+        .await?;
         db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Olympus', 'Stylus Epic Zoom 80', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'point-and-shoot', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                ('Olympus', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), '38-80mm f/4.5', '38-80', '4.5', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
+            "INSERT OR IGNORE INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Olympus' AND model = 'Stylus Epic Zoom 80'),
                  (SELECT id FROM lenses WHERE brand = 'Olympus' AND name_on_lens = '38-80mm f/4.5'))",
         ).await?;
@@ -268,16 +296,18 @@ impl MigrationTrait for Migration {
         ).await?;
 
         // 41. Olympus 35RD (35mm rangefinder)
+        insert_camera(db, "Olympus", "35RD", "35mm", "Fixed Lens", "rangefinder").await?;
+        insert_lens(
+            db,
+            "Olympus",
+            "F.Zuiko 40mm f/1.7",
+            "Fixed Lens",
+            Some("40"),
+            Some("1.7"),
+        )
+        .await?;
         db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Olympus', '35RD', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'rangefinder', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                ('Olympus', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'F.Zuiko 40mm f/1.7', '40', '1.7', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
+            "INSERT OR IGNORE INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Olympus' AND model = '35RD'),
                  (SELECT id FROM lenses WHERE brand = 'Olympus' AND name_on_lens = 'F.Zuiko 40mm f/1.7'))",
         ).await?;
@@ -287,16 +317,26 @@ impl MigrationTrait for Migration {
         ).await?;
 
         // 42. Minolta Hi-Matic F (35mm rangefinder)
+        insert_camera(
+            db,
+            "Minolta",
+            "Hi-Matic F",
+            "35mm",
+            "Fixed Lens",
+            "rangefinder",
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Minolta",
+            "Rokkor 38mm f/2.7",
+            "Fixed Lens",
+            Some("38"),
+            Some("2.7"),
+        )
+        .await?;
         db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Minolta', 'Hi-Matic F', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'rangefinder', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                ('Minolta', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'Rokkor 38mm f/2.7', '38', '2.7', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
+            "INSERT OR IGNORE INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Minolta' AND model = 'Hi-Matic F'),
                  (SELECT id FROM lenses WHERE brand = 'Minolta' AND name_on_lens = 'Rokkor 38mm f/2.7'))",
         ).await?;
@@ -306,16 +346,26 @@ impl MigrationTrait for Migration {
         ).await?;
 
         // 43. Canon Canonet G-III QL (35mm rangefinder, QL17 version)
+        insert_camera(
+            db,
+            "Canon",
+            "Canonet G-III QL",
+            "35mm",
+            "Fixed Lens",
+            "rangefinder",
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Canon",
+            "Canon Lens 40mm f/1.7",
+            "Fixed Lens",
+            Some("40"),
+            Some("1.7"),
+        )
+        .await?;
         db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Canon', 'Canonet G-III QL', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'rangefinder', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                ('Canon', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'Canon Lens 40mm f/1.7', '40', '1.7', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
+            "INSERT OR IGNORE INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Canon' AND model = 'Canonet G-III QL'),
                  (SELECT id FROM lenses WHERE brand = 'Canon' AND name_on_lens = 'Canon Lens 40mm f/1.7'))",
         ).await?;
@@ -325,35 +375,74 @@ impl MigrationTrait for Migration {
         ).await?;
 
         // 44. Zeiss Ikon S310 (35mm point-and-shoot)
+        // SPECIAL CASE: this and the Contessamat below share the lens natural key
+        // ('Zeiss Ikon','Tessar 50mm f/2.8','Fixed Lens') — two intentional rows.
+        // The ordinal guard keeps exactly two (S310 = the first / lower id).
+        //
+        // DO NOT change these two SELECTs back to MAX(id). S310's junction + default
+        // resolve to MIN(id) — the lower/first Tessar, which is S310's own lens. On a
+        // clean first run only one Tessar exists at this point, so MIN == MAX (byte-
+        // identical to the original). But on a crash RE-RUN both Tessars already
+        // exist, and MAX(id) would then resolve S310 to the Contessamat's higher-id
+        // lens: a spurious second S310 junction row (INSERT OR IGNORE won't dedup a
+        // different (camera_id, lens_id) pair) plus a wrong non-null default that
+        // NEITHER m019 (FK-off, so its rebuild doesn't cascade-wipe) NOR m020 (heals
+        // only NULL defaults) repairs. MIN(id) is re-run-safe and matches m020's own
+        // split (S310 -> MIN, Contessamat -> MAX). See seed_migrations_idempotent.
+        insert_camera(
+            db,
+            "Zeiss Ikon",
+            "S310",
+            "35mm",
+            "Fixed Lens",
+            "point-and-shoot",
+        )
+        .await?;
+        insert_lens_ordinal(
+            db,
+            "Zeiss Ikon",
+            "Tessar 50mm f/2.8",
+            "Fixed Lens",
+            Some("50"),
+            Some("2.8"),
+            1,
+        )
+        .await?;
         db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Zeiss Ikon', 'S310', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'point-and-shoot', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                ('Zeiss Ikon', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'Tessar 50mm f/2.8', '50', '2.8', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
+            "INSERT OR IGNORE INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Zeiss Ikon' AND model = 'S310'),
-                 (SELECT MAX(id) FROM lenses WHERE brand = 'Zeiss Ikon' AND name_on_lens = 'Tessar 50mm f/2.8'))",
+                 (SELECT MIN(id) FROM lenses WHERE brand = 'Zeiss Ikon' AND name_on_lens = 'Tessar 50mm f/2.8'))",
         ).await?;
         db.execute_unprepared(
-            "UPDATE cameras SET default_lens_id = (SELECT MAX(id) FROM lenses WHERE brand = 'Zeiss Ikon' AND name_on_lens = 'Tessar 50mm f/2.8')
+            "UPDATE cameras SET default_lens_id = (SELECT MIN(id) FROM lenses WHERE brand = 'Zeiss Ikon' AND name_on_lens = 'Tessar 50mm f/2.8')
              WHERE brand = 'Zeiss Ikon' AND model = 'S310'",
         ).await?;
 
         // 45. Zeiss Ikon Contessamat SBE (35mm point-and-shoot)
+        // Second row of the intentional Tessar pair (ordinal guard keeps <2). The
+        // junction + default resolve to MAX(id) — always the Contessamat's own
+        // (higher id) lens, re-run-safe as-is.
+        insert_camera(
+            db,
+            "Zeiss Ikon",
+            "Contessamat SBE",
+            "35mm",
+            "Fixed Lens",
+            "point-and-shoot",
+        )
+        .await?;
+        insert_lens_ordinal(
+            db,
+            "Zeiss Ikon",
+            "Tessar 50mm f/2.8",
+            "Fixed Lens",
+            Some("50"),
+            Some("2.8"),
+            2,
+        )
+        .await?;
         db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Zeiss Ikon', 'Contessamat SBE', '35mm', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'point-and-shoot', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                ('Zeiss Ikon', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'Tessar 50mm f/2.8', '50', '2.8', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
+            "INSERT OR IGNORE INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Zeiss Ikon' AND model = 'Contessamat SBE'),
                  (SELECT MAX(id) FROM lenses WHERE brand = 'Zeiss Ikon' AND name_on_lens = 'Tessar 50mm f/2.8'))",
         ).await?;
@@ -363,16 +452,18 @@ impl MigrationTrait for Migration {
         ).await?;
 
         // 46. Diana F (medium format box)
+        insert_camera(db, "Diana", "F", "medium format", "Fixed Lens", "box").await?;
+        insert_lens(
+            db,
+            "Diana",
+            "75mm f/11",
+            "Fixed Lens",
+            Some("75"),
+            Some("11"),
+        )
+        .await?;
         db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Diana', 'F', 'medium format', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), 'box', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                ('Diana', (SELECT id FROM lens_mounts WHERE name = 'Fixed Lens'), '75mm f/11', '75', '11', datetime('now'), datetime('now'))",
-        ).await?;
-        db.execute_unprepared(
-            "INSERT INTO camera_lenses (camera_id, lens_id) VALUES
+            "INSERT OR IGNORE INTO camera_lenses (camera_id, lens_id) VALUES
                 ((SELECT id FROM cameras WHERE brand = 'Diana' AND model = 'F'),
                  (SELECT id FROM lenses WHERE brand = 'Diana' AND name_on_lens = '75mm f/11'))",
         )

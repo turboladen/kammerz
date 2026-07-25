@@ -1,5 +1,7 @@
 pub use sea_orm_migration::prelude::*;
 
+mod seed_guard;
+
 mod m20250101_000001_initial_schema;
 mod m20250101_000002_seed_film_stocks;
 mod m20250201_000003_settings_table;

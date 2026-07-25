@@ -1,3 +1,4 @@
+use crate::seed_guard::{insert_camera, insert_lens};
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -16,17 +17,28 @@ impl MigrationTrait for Migration {
         .await?;
 
         // ── Camera: Voigtländer VSL 1 (QBM version) ────────────────
-        db.execute_unprepared(
-            "INSERT INTO cameras (brand, model, format, lens_mount_id, camera_type, created_at, updated_at) VALUES
-                ('Voigtländer', 'VSL 1', '35mm', (SELECT id FROM lens_mounts WHERE name = 'QBM'), 'SLR', datetime('now'), datetime('now'))",
-        )
-        .await?;
+        // Guarded on (brand, model); distinct from m013's 'VSL 1 (TM)' (kammerz-vlyu.8).
+        insert_camera(db, "Voigtländer", "VSL 1", "35mm", "QBM", "SLR").await?;
 
         // ── Lenses: Nikkor 200mm f/4 AI + Color-Ultron 50mm f/1.8 ──
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                ('Nikon', (SELECT id FROM lens_mounts WHERE name = 'Nikon F'), 'Nikkor 200mm f/4 AI', '200', '4', datetime('now'), datetime('now')),
-                ('Voigtländer', (SELECT id FROM lens_mounts WHERE name = 'QBM'), 'Color-Ultron 50mm f/1.8', '50', '1.8', datetime('now'), datetime('now'))",
+        // The Color-Ultron here is on QBM; m016 seeds a same-named lens on M42 —
+        // different natural key (mount differs), so both survive the guard.
+        insert_lens(
+            db,
+            "Nikon",
+            "Nikkor 200mm f/4 AI",
+            "Nikon F",
+            Some("200"),
+            Some("4"),
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Voigtländer",
+            "Color-Ultron 50mm f/1.8",
+            "QBM",
+            Some("50"),
+            Some("1.8"),
         )
         .await?;
 

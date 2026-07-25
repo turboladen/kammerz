@@ -1,3 +1,4 @@
+use crate::seed_guard::insert_lens;
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -9,37 +10,203 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
 
         // ── Seed 20 interchangeable lenses ──────────────────────────
-        // Grouped by mount system for readability.
-        db.execute_unprepared(
-            "INSERT INTO lenses (brand, lens_mount_id, name_on_lens, focal_length, max_aperture, created_at, updated_at) VALUES
-                -- Pentax K (1)
-                ('Asahi', (SELECT id FROM lens_mounts WHERE name = 'Pentax K'), 'SMC Pentax 55mm f/2', '55', '2', datetime('now'), datetime('now')),
-                -- M42 Universal (4)
-                ('Asahi', (SELECT id FROM lens_mounts WHERE name = 'M42 (Universal)'), 'SMC Super Takumar 50mm f/1.4', '50', '1.4', datetime('now'), datetime('now')),
-                ('Asahi', (SELECT id FROM lens_mounts WHERE name = 'M42 (Universal)'), 'Super-Multi-Coated TAKUMAR 35mm f/3.5', '35', '3.5', datetime('now'), datetime('now')),
-                ('Asahi', (SELECT id FROM lens_mounts WHERE name = 'M42 (Universal)'), 'Super-Multi-Coated TAKUMAR 105mm f/2.8', '105', '2.8', datetime('now'), datetime('now')),
-                ('Helios', (SELECT id FROM lens_mounts WHERE name = 'M42 (Universal)'), '44-2 58mm f/2', '58', '2', datetime('now'), datetime('now')),
-                -- M39 / LTM (1)
-                ('Industar', (SELECT id FROM lens_mounts WHERE name = 'M39 (LTM)'), 'N-61 L/D 55mm f/2.8', '55', '2.8', datetime('now'), datetime('now')),
-                -- Mamiya 645 (1)
-                ('Mamiya', (SELECT id FROM lens_mounts WHERE name = 'Mamiya 645'), 'Sekor C 80mm f/2.8 N', '80', '2.8', datetime('now'), datetime('now')),
-                -- Mamiya Z (1)
-                ('Mamiya', (SELECT id FROM lens_mounts WHERE name = 'Mamiya Z'), 'Sekor EF 35mm f/2.8', '35', '2.8', datetime('now'), datetime('now')),
-                -- Minolta MD/MC (7)
-                ('Minolta', (SELECT id FROM lens_mounts WHERE name = 'Minolta MD/MC'), 'MC Macro Rokkor QF 50mm f/3.5', '50', '3.5', datetime('now'), datetime('now')),
-                ('Minolta', (SELECT id FROM lens_mounts WHERE name = 'Minolta MD/MC'), 'MC Rokkor-PF 55mm f/1.7', '55', '1.7', datetime('now'), datetime('now')),
-                ('Minolta', (SELECT id FROM lens_mounts WHERE name = 'Minolta MD/MC'), 'MC Tele Rokkor-HF 30cm f/4.5', '300', '4.5', datetime('now'), datetime('now')),
-                ('Minolta', (SELECT id FROM lens_mounts WHERE name = 'Minolta MD/MC'), 'MD Rokkor 50mm f/1.4', '50', '1.4', datetime('now'), datetime('now')),
-                ('Minolta', (SELECT id FROM lens_mounts WHERE name = 'Minolta MD/MC'), 'MD Rokkor 50mm f/1.7', '50', '1.7', datetime('now'), datetime('now')),
-                ('Minolta', (SELECT id FROM lens_mounts WHERE name = 'Minolta MD/MC'), 'MD Tele Rokkor-X 135mm f/2.8', '135', '2.8', datetime('now'), datetime('now')),
-                ('Minolta', (SELECT id FROM lens_mounts WHERE name = 'Minolta MD/MC'), 'MD W.Rokkor 28mm f/2.8', '28', '2.8', datetime('now'), datetime('now')),
-                -- Nikon F (4)
-                ('Nikon', (SELECT id FROM lens_mounts WHERE name = 'Nikon F'), '50mm f/1.8 Series E', '50', '1.8', datetime('now'), datetime('now')),
-                ('Nikon', (SELECT id FROM lens_mounts WHERE name = 'Nikon F'), 'Nikkor 50mm f/1.4 AF-D', '50', '1.4', datetime('now'), datetime('now')),
-                ('Nikon', (SELECT id FROM lens_mounts WHERE name = 'Nikon F'), 'Nikkor 55mm f/1.2', '55', '1.2', datetime('now'), datetime('now')),
-                ('Nikon', (SELECT id FROM lens_mounts WHERE name = 'Nikon F'), 'Nikkor 70-210mm f/4.0 AF-D', '70-210', '4', datetime('now'), datetime('now')),
-                -- Olympus OM (1)
-                ('Olympus', (SELECT id FROM lens_mounts WHERE name = 'Olympus OM'), 'F. Zuiko Auto-S 50mm f/1.8', '50', '1.8', datetime('now'), datetime('now'))",
+        // Guarded on the pre-m017 natural key (brand, name_on_lens, lens_mount_id)
+        // so a mid-migration crash re-run doesn't duplicate them (kammerz-vlyu.8).
+        // Grouped by mount system for readability; order preserves ids on a clean run.
+
+        // Pentax K (1)
+        insert_lens(
+            db,
+            "Asahi",
+            "SMC Pentax 55mm f/2",
+            "Pentax K",
+            Some("55"),
+            Some("2"),
+        )
+        .await?;
+
+        // M42 Universal (4)
+        insert_lens(
+            db,
+            "Asahi",
+            "SMC Super Takumar 50mm f/1.4",
+            "M42 (Universal)",
+            Some("50"),
+            Some("1.4"),
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Asahi",
+            "Super-Multi-Coated TAKUMAR 35mm f/3.5",
+            "M42 (Universal)",
+            Some("35"),
+            Some("3.5"),
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Asahi",
+            "Super-Multi-Coated TAKUMAR 105mm f/2.8",
+            "M42 (Universal)",
+            Some("105"),
+            Some("2.8"),
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Helios",
+            "44-2 58mm f/2",
+            "M42 (Universal)",
+            Some("58"),
+            Some("2"),
+        )
+        .await?;
+
+        // M39 / LTM (1)
+        insert_lens(
+            db,
+            "Industar",
+            "N-61 L/D 55mm f/2.8",
+            "M39 (LTM)",
+            Some("55"),
+            Some("2.8"),
+        )
+        .await?;
+
+        // Mamiya 645 (1)
+        insert_lens(
+            db,
+            "Mamiya",
+            "Sekor C 80mm f/2.8 N",
+            "Mamiya 645",
+            Some("80"),
+            Some("2.8"),
+        )
+        .await?;
+
+        // Mamiya Z (1)
+        insert_lens(
+            db,
+            "Mamiya",
+            "Sekor EF 35mm f/2.8",
+            "Mamiya Z",
+            Some("35"),
+            Some("2.8"),
+        )
+        .await?;
+
+        // Minolta MD/MC (7)
+        insert_lens(
+            db,
+            "Minolta",
+            "MC Macro Rokkor QF 50mm f/3.5",
+            "Minolta MD/MC",
+            Some("50"),
+            Some("3.5"),
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Minolta",
+            "MC Rokkor-PF 55mm f/1.7",
+            "Minolta MD/MC",
+            Some("55"),
+            Some("1.7"),
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Minolta",
+            "MC Tele Rokkor-HF 30cm f/4.5",
+            "Minolta MD/MC",
+            Some("300"),
+            Some("4.5"),
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Minolta",
+            "MD Rokkor 50mm f/1.4",
+            "Minolta MD/MC",
+            Some("50"),
+            Some("1.4"),
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Minolta",
+            "MD Rokkor 50mm f/1.7",
+            "Minolta MD/MC",
+            Some("50"),
+            Some("1.7"),
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Minolta",
+            "MD Tele Rokkor-X 135mm f/2.8",
+            "Minolta MD/MC",
+            Some("135"),
+            Some("2.8"),
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Minolta",
+            "MD W.Rokkor 28mm f/2.8",
+            "Minolta MD/MC",
+            Some("28"),
+            Some("2.8"),
+        )
+        .await?;
+
+        // Nikon F (4)
+        insert_lens(
+            db,
+            "Nikon",
+            "50mm f/1.8 Series E",
+            "Nikon F",
+            Some("50"),
+            Some("1.8"),
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Nikon",
+            "Nikkor 50mm f/1.4 AF-D",
+            "Nikon F",
+            Some("50"),
+            Some("1.4"),
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Nikon",
+            "Nikkor 55mm f/1.2",
+            "Nikon F",
+            Some("55"),
+            Some("1.2"),
+        )
+        .await?;
+        insert_lens(
+            db,
+            "Nikon",
+            "Nikkor 70-210mm f/4.0 AF-D",
+            "Nikon F",
+            Some("70-210"),
+            Some("4"),
+        )
+        .await?;
+
+        // Olympus OM (1)
+        insert_lens(
+            db,
+            "Olympus",
+            "F. Zuiko Auto-S 50mm f/1.8",
+            "Olympus OM",
+            Some("50"),
+            Some("1.8"),
         )
         .await?;
 
