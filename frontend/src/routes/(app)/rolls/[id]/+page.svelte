@@ -58,7 +58,7 @@
 		type DevAutoPrompt
 	} from '$lib/utils/activity-board';
 	import { todayLocal, dateFieldError } from '$lib/utils/date';
-	import { parseTime } from '$lib/utils/time';
+	import { parseTime, timeFieldError } from '$lib/utils/time';
 	import type {
 		RollWithDetails,
 		RollInsert,
@@ -153,6 +153,10 @@
 		};
 	}
 	const shotDateError = $derived(dateFieldError(shotDate));
+	// Gate an invalid time pre-submit, mirroring shotDateError — a bad value (e.g. "99:99")
+	// would otherwise round-trip to the backend as a 422. Uses timeFieldError so the gate
+	// matches the inline message TimeInput already shows (kammerz-vlyu.21).
+	const shotTimeError = $derived(timeFieldError(shotTime));
 	// Time to send: canonical 24h `HH:MM` when valid (e.g. "1430" → "14:30"), null when
 	// blank/whitespace, else the trimmed raw so the backend 422 surfaces a mistyped time
 	// instead of it being silently dropped. Trims so whitespace-only collapses to null.
@@ -557,7 +561,7 @@
 				shotError = 'Frame number is required.';
 				return;
 			}
-			if (shotDateError) return; // arrows are disabled too — belt and suspenders
+			if (shotDateError || shotTimeError) return; // arrows are disabled too — belt and suspenders
 			shotNavSaving = true;
 			try {
 				await updateShot(editingShotId, buildShotUpdatePayload(fields));
@@ -1321,7 +1325,7 @@
 				<div class="flex items-center justify-between">
 					<button
 						class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:bg-surface-overlay hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
-						disabled={!hasPrevShot || (!isShotView && (shotNavSaving || !!shotDateError))}
+						disabled={!hasPrevShot || (!isShotView && (shotNavSaving || !!shotDateError || !!shotTimeError))}
 						onclick={goPrevShot}
 						aria-label="Previous shot"
 						title="Previous shot"
@@ -1333,7 +1337,7 @@
 					{/if}
 					<button
 						class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:bg-surface-overlay hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
-						disabled={!hasNextShot || (!isShotView && (shotNavSaving || !!shotDateError))}
+						disabled={!hasNextShot || (!isShotView && (shotNavSaving || !!shotDateError || !!shotTimeError))}
 						onclick={goNextShot}
 						aria-label="Next shot"
 						title="Next shot"
@@ -1443,11 +1447,17 @@
 							}}>Cancel</Button
 						>
 						{#if !editingShotId}
-							<Button variant="ghost" disabled={shotSaving || !!shotDateError} onclick={handleSaveShotAndNext}
-								>Save & Next</Button
+							<Button
+								variant="ghost"
+								disabled={shotSaving || !!shotDateError || !!shotTimeError}
+								onclick={handleSaveShotAndNext}>Save & Next</Button
 							>
 						{/if}
-						<Button variant="primary" disabled={shotSaving || !!shotDateError} onclick={handleSaveShot}>
+						<Button
+							variant="primary"
+							disabled={shotSaving || !!shotDateError || !!shotTimeError}
+							onclick={handleSaveShot}
+						>
 							{editingShotId ? 'Save' : 'Add Shot'}
 						</Button>
 					</div>

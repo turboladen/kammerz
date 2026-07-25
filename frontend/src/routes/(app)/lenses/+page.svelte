@@ -215,6 +215,7 @@
 	}
 
 	function openAddDialog() {
+		editingLens = null; // defensively enforce add/edit mutual exclusion (kammerz-f9pr)
 		resetForm();
 		error = '';
 		showAddDialog = true;
@@ -250,6 +251,15 @@
 			error = 'Lens mount is required.';
 			return;
 		}
+		// NaN defense-in-depth (kammerz-8cm8): the "+ New mount…" sentinel would serialize to
+		// NaN as lens_mount_id (buildInsert does Number(lensMountId)). The Add button is already
+		// disabled while `creatingMount`, so this guard is UI-unreachable today — the visible
+		// hint under the mount Select is what tells the user to finish the sub-form. Kept as
+		// belt-and-suspenders.
+		if (creatingMount) {
+			error = 'Finish creating the new mount, or pick an existing one.';
+			return;
+		}
 		saving = true;
 		try {
 			await createLens(buildInsert());
@@ -264,6 +274,7 @@
 	}
 
 	function startEdit(lens: Lens) {
+		showAddDialog = false; // defensively enforce add/edit mutual exclusion (kammerz-f9pr)
 		error = '';
 		editingLens = lens;
 		brand = lens.brand;
@@ -291,6 +302,13 @@
 		}
 		if (!lensMountId) {
 			error = 'Lens mount is required.';
+			return;
+		}
+		// NaN defense-in-depth (kammerz-8cm8): see handleAdd — the "+ New mount…" sentinel would
+		// serialize to NaN. Button already disabled while `creatingMount`; visible hint is the
+		// user-facing message. Belt-and-suspenders.
+		if (creatingMount) {
+			error = 'Finish creating the new mount, or pick an existing one.';
 			return;
 		}
 		saving = true;
@@ -491,6 +509,11 @@
 		{#if error}
 			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
 		{/if}
+		{#if creatingMount}
+			<p class="text-right text-xs text-text-faint">
+				Create the new mount above (or pick an existing one) to continue.
+			</p>
+		{/if}
 		<div class="flex justify-end gap-2 pt-2">
 			<Button
 				variant="ghost"
@@ -573,6 +596,11 @@
 			<Textarea label="Notes" bind:value={notes} />
 			{#if error}
 				<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+			{/if}
+			{#if creatingMount}
+				<p class="text-right text-xs text-text-faint">
+					Create the new mount above (or pick an existing one) to continue.
+				</p>
 			{/if}
 			<div class="flex justify-end gap-2 pt-2">
 				<Button

@@ -200,7 +200,15 @@
 		lensMaxAperture = '';
 		newMountName = '';
 		newMountError = '';
+		// Deliberately does NOT clear the page-level `error` — closing the Add dialog must
+		// not wipe a still-relevant delete-failure banner (kammerz-4zp). Error is cleared on
+		// dialog open (openAddDialog) and on submit (handleAdd) instead.
+	}
+
+	function openAddDialog() {
+		resetForm();
 		error = '';
+		showAddDialog = true;
 	}
 
 	async function createMount() {
@@ -237,6 +245,15 @@
 		}
 		if (!lensMountId) {
 			error = 'Lens mount is required.';
+			return;
+		}
+		// NaN defense-in-depth (kammerz-8cm8): the "+ New mount…" sentinel is a non-numeric
+		// value that would serialize to NaN as lens_mount_id. The Save button is already
+		// disabled while `creatingMount`, so this guard is UI-unreachable today — the visible
+		// hint under the mount Select is what tells the user to finish the sub-form. Kept as
+		// belt-and-suspenders in case the disabled binding ever regresses.
+		if (creatingMount) {
+			error = 'Finish creating the new mount, or pick an existing one.';
 			return;
 		}
 		if (isFixedLens && !lensFocalLength.trim()) {
@@ -287,7 +304,7 @@
 </script>
 
 <PageHeader title="Cameras" description="Your camera collection">
-	<Button variant="primary" onclick={() => (showAddDialog = true)}>+ Add Camera</Button>
+	<Button variant="primary" onclick={openAddDialog}>+ Add Camera</Button>
 </PageHeader>
 
 <div class="p-6">
@@ -324,7 +341,7 @@
 	{:else if resultCount === 0 && cameras.length === 0}
 		<EmptyState title="No Cameras" message="Add your first camera to get started.">
 			{#snippet icon()}<CameraIcon size={24} strokeWidth={1.5} />{/snippet}
-			<Button variant="primary" onclick={() => (showAddDialog = true)}>+ Add Camera</Button>
+			<Button variant="primary" onclick={openAddDialog}>+ Add Camera</Button>
 		</EmptyState>
 	{:else if resultCount === 0}
 		<p class="mt-6 text-center text-sm text-text-muted">
@@ -451,6 +468,11 @@
 		<Textarea label="Notes" bind:value={notes} placeholder="Any notes about this camera..." />
 		{#if error}
 			<div class="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-400">{error}</div>
+		{/if}
+		{#if creatingMount}
+			<p class="text-right text-xs text-text-faint">
+				Create the new mount above (or pick an existing one) to continue.
+			</p>
 		{/if}
 		<div class="flex justify-end gap-2 pt-2">
 			<Button

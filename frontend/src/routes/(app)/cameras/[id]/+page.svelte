@@ -279,6 +279,14 @@
 			error = 'Lens mount is required.';
 			return;
 		}
+		// NaN defense-in-depth (kammerz-8cm8): the "+ New mount…" sentinel would serialize to
+		// NaN as lens_mount_id. The Save button is already disabled while `creatingMount`, so
+		// this guard is UI-unreachable today — the visible hint under the mount Select is what
+		// tells the user to finish the sub-form. Kept as belt-and-suspenders.
+		if (creatingMount) {
+			error = 'Finish creating the new mount, or pick an existing one.';
+			return;
+		}
 		savingEdit = true;
 		try {
 			await updateCamera(id, {
@@ -471,6 +479,9 @@
 					{#if newMountError}
 						<div class="mt-2 text-sm text-red-400">{newMountError}</div>
 					{/if}
+					<p class="mt-2 text-xs text-text-faint">
+						Save is disabled until you create this mount (or pick an existing one).
+					</p>
 				</div>
 			{/if}
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">

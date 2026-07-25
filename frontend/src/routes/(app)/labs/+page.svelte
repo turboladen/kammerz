@@ -51,6 +51,7 @@
 	}
 
 	function openAddDialog() {
+		editingLab = null; // defensively enforce add/edit mutual exclusion (kammerz-f9pr)
 		resetForm();
 		error = '';
 		showAddDialog = true;
@@ -84,6 +85,7 @@
 	}
 
 	function startEdit(lab: Lab) {
+		showAddDialog = false; // defensively enforce add/edit mutual exclusion (kammerz-f9pr)
 		error = '';
 		editingLab = lab;
 		name = lab.name;
